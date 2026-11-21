@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(x50-patch-switcher VERSION 0.1.0 LANGUAGES CXX)
+project(x50-patch-switcher VERSION 0.9.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -46,6 +46,8 @@ add_library(x50core STATIC src/core/Version.cpp src/core/Version.h
 set_target_properties(x50core PROPERTIES AUTORCC ON)
 target_include_directories(x50core PUBLIC src)
 target_link_libraries(x50core PUBLIC Qt6::Core)
+# The project VERSION is the single source of truth for the app version.
+target_compile_definitions(x50core PUBLIC X50_VERSION="${PROJECT_VERSION}")
 x50_target_options(x50core)
 
 add_library(x50midi STATIC src/midi/MidiBackend.h src/midi/RtMidiBackend.cpp src/midi/RtMidiBackend.h

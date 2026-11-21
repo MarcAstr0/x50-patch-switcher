@@ -203,8 +203,10 @@ jobs:
         shell: pwsh
         run: |
           $sha = $env:GITHUB_SHA.Substring(0, 7)
-          Compress-Archive -Path X50-Patch-Switcher -DestinationPath "X50-Patch-Switcher-windows-$sha.zip"
-          "ZIP_NAME=X50-Patch-Switcher-windows-$sha.zip" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $ver = [regex]::Match((Get-Content CMakeLists.txt -Raw), 'project\(x50-patch-switcher VERSION ([0-9.]+)').Groups[1].Value
+          if (-not $ver) { Write-Host "version not found in CMakeLists.txt"; exit 1 }
+          Compress-Archive -Path X50-Patch-Switcher -DestinationPath "X50-Patch-Switcher-windows-$ver-$sha.zip"
+          "ZIP_NAME=X50-Patch-Switcher-windows-$ver-$sha.zip" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Extract the zip into a fresh folder
         if: runner.os == 'Windows'
