@@ -694,6 +694,10 @@ void BrowseView::onContextMenu(const QPoint &pos)
 
 bool BrowseView::handleKey(QObject *source, QKeyEvent *ev)
 {
+    // Keys typed in the set editor (the label field, a focused cell) are never browse shortcuts:
+    // PgUp/PgDn and Ctrl+Left/Right would send MIDI, Ctrl+1..8 would overwrite a slot.
+    if (const auto *w = qobject_cast<const QWidget *>(source); w && m_editor && (w == m_editor || m_editor->isAncestorOf(w)))
+        return false;
     const Qt::KeyboardModifiers mods = ev->modifiers() & ~Qt::KeypadModifier;
     const int key = ev->key();
     const bool repeat = ev->isAutoRepeat();  // a held key never repeats a send

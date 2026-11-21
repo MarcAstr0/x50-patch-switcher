@@ -13,6 +13,7 @@
 #include <QFocusEvent>
 #include <QFontMetrics>
 #include <QKeyEvent>
+#include <QKeySequence>
 #include <QLineEdit>
 #include <QMimeData>
 #include <QMouseEvent>
@@ -81,8 +82,9 @@ void SlotCell::setDropTarget(bool on)
 
 QRect SlotCell::textArea() const
 {
-    const int left = kPad + kDigitBox + kDigitGap;
-    return QRect(left, 0, qMax(0, width() - left - kPad), height());
+    const QRect body = rect().adjusted(kFocusMargin, kFocusMargin, -kFocusMargin, -kFocusMargin);
+    const int left = body.left() + kPad + kDigitBox + kDigitGap;
+    return QRect(left, body.top(), qMax(0, body.right() + 1 - kPad - left), body.height());
 }
 
 void SlotCell::relayout()
@@ -104,7 +106,8 @@ void SlotCell::paintEvent(QPaintEvent *)
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing, true);
     const qreal radius = Theme::radiusControl;
-    QRectF box(rect());
+    const QRect body = rect().adjusted(kFocusMargin, kFocusMargin, -kFocusMargin, -kFocusMargin);
+    QRectF box(body);
 
     QColor fill(Theme::panelRaised);
     QColor edge(Theme::border);
@@ -118,8 +121,6 @@ void SlotCell::paintEvent(QPaintEvent *)
     } else if (m_selected) {
         edge = QColor(Theme::cyan);
         bw = Theme::borderFocus;
-    } else if (m_current) {
-        edge = QColor(Theme::cyan);
     } else if (m_empty) {
         style = Qt::DashLine;
     }
@@ -131,7 +132,7 @@ void SlotCell::paintEvent(QPaintEvent *)
 
     // Slot digit in a rounded square.
     const QColor digitCol(m_empty ? Theme::disabledText : Theme::textDim);
-    const QRectF digitBox(kPad, (height() - kDigitBox) / 2.0, kDigitBox, kDigitBox);
+    const QRectF digitBox(body.left() + kPad, body.top() + (body.height() - kDigitBox) / 2.0, kDigitBox, kDigitBox);
     p.setBrush(Qt::NoBrush);
     p.setPen(QPen(digitCol, 1));
     p.drawRoundedRect(digitBox.adjusted(0.5, 0.5, -0.5, -0.5), Theme::radiusPill, Theme::radiusPill);
@@ -145,7 +146,7 @@ void SlotCell::paintEvent(QPaintEvent *)
         p.setPen(QColor(Theme::disabledText));
         p.drawText(ta, Qt::AlignLeft | Qt::AlignVCenter | Qt::TextSingleLine, QStringLiteral("EMPTY"));
     } else {
-        const int top = (height() - kNameLine - kSmallLine) / 2;
+        const int top = body.top() + (body.height() - kNameLine - kSmallLine) / 2;
         if (!m_edit || !m_edit->isVisible()) {
             p.setFont(m_fontName);
             p.setPen(QColor(Theme::text));
@@ -157,12 +158,13 @@ void SlotCell::paintEvent(QPaintEvent *)
     }
 
     if (m_current)
-        Glyphs::triangleRight(p, QRectF(width() - 6 - 8, 4, 6, 8), QColor(Theme::cyan));
+        Glyphs::triangleRight(p, QRectF(body.right() + 1 - 6 - 8, body.top() + 4, 6, 8), QColor(Theme::cyan));
 
     if (hasFocus()) {
         p.setBrush(Qt::NoBrush);
         p.setPen(QPen(QColor(Theme::cyan), Theme::borderFocus));
-        p.drawRoundedRect(QRectF(rect()).adjusted(3, 3, -3, -3), radius - 2, radius - 2);
+        // 2 px ring on the outer 2 px of the widget rect, 2 px clear of the 4 px inset border.
+        p.drawRoundedRect(QRectF(rect()).adjusted(1, 1, -1, -1), radius + 3, radius + 3);
     }
 }
 
@@ -188,15 +190,30 @@ void SlotCell::mousePressEvent(QMouseEvent *e)
     e->accept();
 }
 
+QMimeData *SlotCell::makeDragMime() const
+{
+    if (m_empty)
+        return nullptr;
+    auto *mime = new QMimeData;
+    mime->setData(SlotMime::slot(), QByteArray::number(m_index));
+    return mime;
+}
+
+bool SlotCell::dragWanted(const QPoint &pos) const
+{
+    return m_pressed && !m_empty && (pos - m_pressPos).manhattanLength() >= QApplication::startDragDistance();
+}
+
 void SlotCell::mouseMoveEvent(QMouseEvent *e)
 {
     if (!m_pressed || !(e->buttons() & Qt::LeftButton) || m_empty)
         return;
-    if ((e->pos() - m_pressPos).manhattanLength() < QApplication::startDragDistance())
+    if (!dragWanted(e->pos()))
         return;
     m_pressed = false;
-    auto *mime = new QMimeData;
-    mime->setData(SlotMime::slot(), QByteArray::number(m_index));
+    QMimeData *mime = makeDragMime();
+    if (!mime)
+        return;
     auto *drag = new QDrag(this);
     drag->setMimeData(mime);
     drag->setPixmap(grab());
@@ -312,11 +329,45 @@ void SlotCell::finishEdit(bool commit)
         emit labelCommitted(m_index, text);
 }
 
+namespace {
+// Keys the label field may keep: typing, caret movement, deleting, and the standard edit shortcuts.
+bool isTextEditingKey(const QKeyEvent *k)
+{
+    switch (k->key()) {
+    case Qt::Key_Left: case Qt::Key_Right: case Qt::Key_Home: case Qt::Key_End:
+    case Qt::Key_Backspace: case Qt::Key_Delete:
+        return true;
+    default:
+        break;
+    }
+    static const QKeySequence::StandardKey standard[] = {
+        QKeySequence::Copy, QKeySequence::Cut, QKeySequence::Paste, QKeySequence::SelectAll,
+        QKeySequence::Undo, QKeySequence::Redo};
+    for (QKeySequence::StandardKey s : standard)
+        if (k->matches(s))
+            return true;
+    const Qt::KeyboardModifiers mods = k->modifiers() & ~(Qt::ShiftModifier | Qt::KeypadModifier);
+    const QString text = k->text();
+    return mods == Qt::NoModifier && !text.isEmpty() && text.at(0).isPrint();
+}
+} // namespace
+
 bool SlotCell::eventFilter(QObject *watched, QEvent *event)
 {
-    if (watched == m_edit && event->type() == QEvent::KeyPress && static_cast<QKeyEvent *>(event)->key() == Qt::Key_Escape) {
-        finishEdit(false);
-        return true;
+    if (watched == m_edit && event->type() == QEvent::KeyPress) {
+        const auto *k = static_cast<QKeyEvent *>(event);
+        if (k->key() == Qt::Key_Escape) {
+            finishEdit(false);
+            return true;
+        }
+        if (k->key() == Qt::Key_Return || k->key() == Qt::Key_Enter) {
+            finishEdit(true);
+            return true;
+        }
+        // Everything else that is not text editing stops here: it must not reach the browse
+        // shortcuts (PgUp/PgDn, Ctrl+arrows, Ctrl+1..8, Ctrl+D, F5 send MIDI or change slots).
+        if (!isTextEditingKey(k))
+            return true;
     }
     return QWidget::eventFilter(watched, event);
 }

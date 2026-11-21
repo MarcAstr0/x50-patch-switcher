@@ -126,9 +126,8 @@ void triangleRight(QPainter &p, const QRectF &r, const QColor &color)
     Scope scope(p);
     p.setPen(Qt::NoPen);
     p.setBrush(color);
-    QPolygonF tri;
-    tri << r.topLeft() << QPointF(r.right(), r.center().y()) << r.bottomLeft();
-    p.drawPolygon(tri);
+    const QPointF tri[3] = {r.topLeft(), QPointF(r.right(), r.center().y()), r.bottomLeft()};
+    p.drawPolygon(tri, 3);  // a stack array: nothing is allocated in a paint path
 }
 
 QIcon icon(Kind kind, const QSize &size, const QColor &color)

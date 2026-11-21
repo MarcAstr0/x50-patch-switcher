@@ -312,6 +312,100 @@ private slots:
         QVERIFY(!ed().cell(2)->isEmpty());
     }
 
+    // Key isolation (CLAUDE.md: MIDI only on an explicit action). Keys typed in the label
+    // editor or on a focused cell are not browse shortcuts. No bytes involved: the claim is
+    // that FakeX50 received nothing (cleanup() asserts it too) and the slots did not change.
+    void expectKeysInert(QWidget *target)
+    {
+        m_view->setSearchText(QStringLiteral("piano"));
+        QVERIFY(m_view->highlight(m_view->resultModel()->address(0)));
+        const SetModel before = set();
+        int live = 0;
+        connect(m_view.get(), &BrowseView::liveRequested, this, [&live]() { ++live; });
+        const struct { Qt::Key key; Qt::KeyboardModifiers mods; } keys[] = {
+            {Qt::Key_PageDown, Qt::NoModifier}, {Qt::Key_PageUp, Qt::NoModifier},
+            {Qt::Key_Right, Qt::ControlModifier}, {Qt::Key_Left, Qt::ControlModifier},
+            {Qt::Key_1, Qt::ControlModifier}, {Qt::Key_3, Qt::ControlModifier},
+            {Qt::Key_D, Qt::ControlModifier}, {Qt::Key_F5, Qt::NoModifier},
+        };
+        for (const auto &k : keys) {
+            QTest::keyClick(target, k.key, k.mods);
+            QVERIFY(m_fake->received().isEmpty());
+        }
+        QCOMPARE(live, 0);
+        for (int i = 0; i < 8; ++i) {
+            QCOMPARE(set().slot(i).address.has_value(), before.slot(i).address.has_value());
+            if (before.slot(i).address)
+                QCOMPARE(*set().slot(i).address, *before.slot(i).address);
+            QCOMPARE(set().slot(i).label, before.slot(i).label);
+        }
+        QVERIFY(!m_library->isFavourite(*m_view->highlighted()));
+    }
+
+    void keysInLabelEditorAreIsolated()
+    {
+        QTest::keyClick(ed().cell(0), Qt::Key_F2);
+        QVERIFY(ed().cell(0)->isEditing());
+        expectKeysInert(ed().cell(0)->editor());
+        QVERIFY(ed().cell(0)->isEditing());
+        // Typing still works and Return still commits.
+        QLineEdit *e = ed().cell(0)->editor();
+        e->setText(QString());
+        QTest::keyClicks(e, QStringLiteral("Hi 5"));
+        QCOMPARE(e->text(), QStringLiteral("Hi 5"));
+        QTest::keyClick(e, Qt::Key_Return);
+        QVERIFY(!ed().cell(0)->isEditing());
+        QCOMPARE(set().slot(0).label, QStringLiteral("Hi 5"));
+        QVERIFY(m_fake->received().isEmpty());
+    }
+
+    void keysOnFocusedCellAreIsolated()
+    {
+        ed().cell(2)->setFocus();
+        QVERIFY(ed().cell(2)->hasFocus());
+        expectKeysInert(ed().cell(2));
+        QTest::keyClick(ed().cell(2), Qt::Key_Return);
+        QTest::keyClick(ed().cell(2), Qt::Key_Enter);
+        QVERIFY(m_fake->received().isEmpty());
+        QVERIFY(set().slot(2).isEmpty());
+    }
+
+    void dragPayloadAndThreshold()
+    {
+        SlotCell *c = ed().cell(1);
+        std::unique_ptr<QMimeData> mime(c->makeDragMime());
+        QVERIFY(mime);
+        QCOMPARE(mime->data(SlotMime::slot()), QByteArray("1"));
+        // No press yet: no drag.
+        QVERIFY(!c->dragWanted(QPoint(60, 40)));
+        QTest::mousePress(c, Qt::LeftButton, Qt::NoModifier, QPoint(10, 10));
+        QVERIFY(!c->dragWanted(QPoint(10, 10 + QApplication::startDragDistance() - 1)));
+        QVERIFY(c->dragWanted(QPoint(10, 10 + QApplication::startDragDistance())));
+        // An empty cell never drags.
+        SlotCell *empty = ed().cell(5);
+        QVERIFY(empty->isEmpty());
+        QVERIFY(!empty->makeDragMime());
+        QTest::mousePress(empty, Qt::LeftButton, Qt::NoModifier, QPoint(10, 10));
+        QVERIFY(!empty->dragWanted(QPoint(100, 40)));
+    }
+
+    void resultTableDragSetup()
+    {
+        auto *table = m_view->findChild<QTableView *>(QStringLiteral("resultList"));
+        QVERIFY(table);
+        QVERIFY(table->dragEnabled());
+        QCOMPARE(table->dragDropMode(), QAbstractItemView::DragOnly);
+    }
+
+    void shrinkClampsSelection()
+    {
+        ed().selectSlot(7);
+        QCOMPARE(ed().selectedSlot(), 7);
+        QVERIFY(ed().resizeCurrent(6));
+        QCOMPARE(ed().selectedSlot(), 5);
+        QVERIFY(ed().cell(5)->isSelected());
+    }
+
     void screenshotSmoke()
     {
         m_library->setSlot(m_setId, 2, combi(B::C, 96));

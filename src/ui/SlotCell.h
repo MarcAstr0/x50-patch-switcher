@@ -18,12 +18,16 @@ QString sound();
 // One cell of the set editor grid (DESIGN 7.9): painted from Theme, no QSS. It shows what
 // it is told and reports what the user did; it knows nothing about Library or MIDI.
 // States: normal, empty (dashed), selected (2 px cyan), drop (while a drag is over it) and
-// `current` (cyan border and a corner triangle: the sound the X50 is on).
+// `current` (a 6 x 8 corner triangle only: the sound the X50 is on).
 // Texts are elided when set or resized, never in paintEvent. Repaints only on a state change.
 class SlotCell : public QWidget
 {
     Q_OBJECT
 public:
+    // The cell body is drawn this many px inside the widget rect so the 2 px focus ring can
+    // sit 2 px outside the border (DESIGN 7.9) without leaving the widget.
+    static constexpr int kFocusMargin = 4;
+
     explicit SlotCell(int index, QWidget *parent = nullptr);
 
     int index() const { return m_index; }  // 0-based; the digit shown is index + 1
@@ -39,6 +43,12 @@ public:
     bool isDropTarget() const { return m_drop; }
     QString line1() const { return m_line1; }
     QString line2() const { return m_line2; }
+
+    // Drag support, factored for tests. The payload is the slot index as text; null for an empty cell.
+    // The caller owns the result.
+    QMimeData *makeDragMime() const;
+    // True when a left press happened and `pos` is far enough from it to start a drag (never for an empty cell).
+    bool dragWanted(const QPoint &pos) const;
 
     // Inline label editor (DESIGN 7.9: a field in `field` style).
     void beginEdit(const QString &text);

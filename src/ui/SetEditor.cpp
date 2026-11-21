@@ -36,7 +36,8 @@ protected:
         p.setRenderHint(QPainter::Antialiasing, true);
         p.setPen(QPen(QColor(Theme::textDim), 2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
         const QPointF c(width() - 18, height() / 2.0);
-        p.drawPolyline(QPolygonF({QPointF(c.x() - 4, c.y() - 2), QPointF(c.x(), c.y() + 2), QPointF(c.x() + 4, c.y() - 2)}));
+        p.drawLine(QPointF(c.x() - 4, c.y() - 2), QPointF(c.x(), c.y() + 2));
+        p.drawLine(QPointF(c.x(), c.y() + 2), QPointF(c.x() + 4, c.y() - 2));
     }
 };
 
@@ -118,8 +119,11 @@ void SetEditor::build()
     root->addLayout(header);
 
     m_grid = new QGridLayout;
-    m_grid->setContentsMargins(0, 0, 0, 0);
-    m_grid->setSpacing(Theme::s2);
+    // Each cell keeps a 4 px margin inside its widget rect for the focus ring (DESIGN 7.9: 2 px
+    // ring, offset 2), so the grid has no spacing of its own and bleeds 4 px into the panel
+    // padding: the visible cells and the 8 px gaps are exactly the designed size.
+    m_grid->setContentsMargins(-SlotCell::kFocusMargin, -SlotCell::kFocusMargin, -SlotCell::kFocusMargin, -SlotCell::kFocusMargin);
+    m_grid->setSpacing(0);
     for (int i = 0; i < 8; ++i) {
         auto *c = new SlotCell(i, this);
         m_cells.append(c);
@@ -220,6 +224,8 @@ void SetEditor::refresh()
         m_shownSetId = id;
     }
     const int size = set ? set->size() : 8;
+    if (m_selected >= size)
+        m_selected = size - 1;  // a shrink 8 -> 6 must not leave the selection on a hidden cell
     if (size != m_visible)
         layoutGrid(size);
     m_size6->setChecked(size == 6);
@@ -379,13 +385,14 @@ bool SetEditor::moveSlot(int from, int to)
     const SetModel *set = m_library->currentSet();
     if (!set || from == to)
         return false;
+    const int before = m_selected;
+    m_selected = to;  // set first: Library::changed() refreshes the cells with it
     const SetModel::Result r = m_library->moveSlot(set->id(), from, to);
     if (!r.ok()) {
+        m_selected = before;
         fail(r.error);
         return false;
     }
-    m_selected = to;
-    updateCells();
     say(QStringLiteral("Moved slot %1 to slot %2").arg(from + 1).arg(to + 1));
     return true;
 }
@@ -398,13 +405,14 @@ bool SetEditor::dropSound(int to, const SoundAddress &address)
         return false;
     }
     const QString setName = set->name();
+    const int before = m_selected;
+    m_selected = to;  // set first: Library::changed() refreshes the cells with it
     const SetModel::Result r = m_library->setSlot(set->id(), to, address);
     if (!r.ok()) {
+        m_selected = before;
         fail(r.error);
         return false;
     }
-    m_selected = to;
-    updateCells();
     say(QStringLiteral("Put %1 in slot %2 of %3").arg(describe(address)).arg(to + 1).arg(setName));
     return true;
 }
