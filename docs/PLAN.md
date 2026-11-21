@@ -410,3 +410,10 @@ fixes go back to the builder as T5.x tasks.
   (accepted: re-send is the recovery move). Note: clickSendsExactBytes compares to bytes
   the foreman checked against MIDI.md §3 (B0 00 3F, B0 20 00, C0 02 for COMBI A002, GM).
   (foreman)
+- 2026-11-21 · Codex R3 (ran at 18:20, covered up to the T4.2 commits): 1 P1 + 5 P2, all
+  foreman-checked and accepted: held press survives a same-size set switch (unintended
+  send on release); persisted unit names never applied to the catalogue at startup;
+  library load error overwritten by link status at startup; manual Settings controls
+  disabled before any probe; dialog shows saved channel instead of the effective one;
+  full-screen browse state not restored after live. Folded into the R-T4.2 follow-up
+  round. With these, R3 is reconciled. (foreman)
