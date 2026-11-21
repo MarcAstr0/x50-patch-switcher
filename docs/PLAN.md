@@ -241,3 +241,12 @@ fixes go back to the builder as T5.x tasks.
   CC/PC are ignored until a 4E or a probe tells the mode; unplug is detected only on a
   failed send or a backend error (no polling while connected). G1 must confirm that a
   whole bank dump (~65-80 KB) arrives as one SysEx through WinMM. (foreman)
+- 2026-11-21 · **G2 passed** (owner): design approved. Live-view button names use the
+  dot-matrix face (Pixel Operator X50) too, "option B", chosen by the owner over the
+  brief's legibility-first default; the designer folds it into DESIGN.md as the spec.
+  (owner)
+- 2026-11-21 · R-T1.7 (reviewer, verified in RtMidi 6.0.0 source): WinMM hands each
+  filled SysEx buffer to the callback as a separate chunk (no reassembly; ALSA does
+  reassemble). Bank dumps of 65-80 KB would arrive in 1 KB pieces. Fix: larger
+  `setBufferSize()` before `openPort()` plus F0..F7 reassembly in the backend, tested
+  with a fragmenting fake. (foreman)
