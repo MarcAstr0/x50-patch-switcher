@@ -67,6 +67,7 @@ MidiBackend::Status FakeX50::openOutput(int index)
     if (m_busy)
         return Status::failure(portBusyText(), QStringLiteral("fake: busy"));
     m_outOpen = true;
+    ++m_generation;
     return Status::success();
 }
 
@@ -77,6 +78,8 @@ MidiBackend::Status FakeX50::openInput(int index)
     if (m_busy)
         return Status::failure(portBusyText(), QStringLiteral("fake: busy"));
     m_inOpen = true;
+    m_assembler.reset();
+    ++m_generation;
     return Status::success();
 }
 
@@ -84,11 +87,15 @@ void FakeX50::closePorts()
 {
     m_outOpen = false;
     m_inOpen = false;
+    m_assembler.reset();
+    ++m_generation;
 }
 
-void FakeX50::unplug()
+void FakeX50::unplug(bool raisePortError)
 {
     m_present = false;
+    if (!raisePortError)
+        return;
     const bool wasOpen = m_outOpen || m_inOpen;
     closePorts();
     if (wasOpen) {
@@ -102,8 +109,13 @@ MidiBackend::Status FakeX50::send(const QByteArray &message)
 {
     if (!m_outOpen)
         return Status::failure(QStringLiteral("MIDI output is not open"));
+    if (m_failSend)
+        return Status::failure(QStringLiteral("could not send to the X50"), QStringLiteral("fake: write failed"));
     m_received.append(message);
-    QMetaObject::invokeMethod(this, [this, message]() { handle(message); }, Qt::QueuedConnection);
+    const unsigned int gen = m_generation;
+    QMetaObject::invokeMethod(
+        this, [this, message, gen]() { if (gen == m_generation) handle(message); },
+        Qt::QueuedConnection);
     return Status::success();
 }
 
@@ -176,7 +188,7 @@ void FakeX50::panelChangeMode(Mode mode)
     m_mode = mode;
     const auto n = buildModeChangeNotice(m_channel, mode);
     if (n.ok)
-        QMetaObject::invokeMethod(this, [this, b = n.value]() { deliver(b); }, Qt::QueuedConnection);
+        queueDeliver(n.value);
 }
 
 void FakeX50::panelSelect(const SoundAddress &address)
@@ -194,15 +206,33 @@ void FakeX50::panelSelect(const SoundAddress &address)
     if (!msgs.ok)
         return;
     for (const QByteArray &b : msgs.value)
-        QMetaObject::invokeMethod(this, [this, b]() { deliver(b); }, Qt::QueuedConnection);
+        queueDeliver(b);
 }
 
 // ---------------------------------------------------------------- X50 side
 
+void FakeX50::queueDeliver(const QByteArray &bytes)
+{
+    const unsigned int gen = m_generation;
+    QMetaObject::invokeMethod(
+        this, [this, bytes, gen]() { if (gen == m_generation) deliver(bytes); },
+        Qt::QueuedConnection);
+}
+
 void FakeX50::deliver(const QByteArray &bytes)
 {
-    if (m_inOpen)
+    if (!m_inOpen)
+        return;
+    if (m_fragmentSize <= 0 || bytes.size() <= m_fragmentSize || bytes.at(0) != static_cast<char>(0xF0)) {
         emit messageReceived(bytes);
+        return;
+    }
+    // WinMM style: chunks, reassembled before the listener sees them.
+    for (qsizetype pos = 0; pos < bytes.size(); pos += m_fragmentSize) {
+        const QList<QByteArray> msgs = m_assembler.feed(bytes.mid(pos, m_fragmentSize));
+        for (const QByteArray &m : msgs)
+            emit messageReceived(m);
+    }
 }
 
 void FakeX50::reply(Reply kind, const QByteArray &bytes)
@@ -214,10 +244,12 @@ void FakeX50::reply(Reply kind, const QByteArray &bytes)
                          (kind == Reply::Ack && m_dropAck) || (kind == Reply::Dump && m_dropDump);
     if (dropped)
         return;
-    if (m_replyDelayMs > 0)
-        QTimer::singleShot(m_replyDelayMs, this, [this, bytes]() { deliver(bytes); });
-    else
+    if (m_replyDelayMs > 0) {
+        const unsigned int gen = m_generation;
+        QTimer::singleShot(m_replyDelayMs, this, [this, bytes, gen]() { if (gen == m_generation) deliver(bytes); });
+    } else {
         deliver(bytes);
+    }
 }
 
 void FakeX50::replyNak(int code)

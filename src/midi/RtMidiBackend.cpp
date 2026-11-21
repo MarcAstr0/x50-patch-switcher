@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include <QDebug>
 #include <QMetaObject>
 
 namespace {
@@ -74,6 +75,16 @@ MidiBackend::Status RtMidiBackend::openInput(int index)
         // SysEx on, timing and active sensing off: X50Protocol rejects any byte
         // >= 0x80 inside a SysEx, so real-time bytes must never reach it.
         in->ignoreTypes(false, true, true);
+        // WinMM (RtMidi 6.0.0) hands every filled SysEx buffer to the callback as its own
+        // chunk; the default buffers are small, so a bank dump arrives in many pieces.
+        // The assembler below joins them. 16 buffers of 16 KB = 256 KB of driver buffering,
+        // more than the largest dump (a combination bank: 128 x 544 internal bytes in
+        // 7-bit form is about 80 KB), so a burst never starves the driver while the callback
+        // thread copies. Must be set before openPort (WinMM allocates at open); other
+        // APIs ignore it.
+        in->setBufferSize(16384, 16);
+        m_assembler.reset();
+        ++m_generation;
         in->setCallback(&RtMidiBackend::inputCallback, this);
         // No error callback: with one set RtMidi stops throwing, and the open
         // failure below is how "port busy" is detected.
@@ -94,6 +105,7 @@ MidiBackend::Status RtMidiBackend::openInput(int index)
 
 void RtMidiBackend::closePorts()
 {
+    ++m_generation;
     // Destroying the input cancels the callback and joins RtMidi's thread
     // before anything it points to goes away.
     try {
@@ -104,6 +116,7 @@ void RtMidiBackend::closePorts()
     } catch (...) {
     }
     m_in.reset();
+    m_assembler.reset();
     try {
         if (m_out)
             m_out->closePort();
@@ -131,14 +144,26 @@ MidiBackend::Status RtMidiBackend::send(const QByteArray &message)
     }
 }
 
-// RtMidi's thread. Copy and post; touch nothing else.
+// RtMidi's thread. Reassemble, copy and post; touch nothing else.
 void RtMidiBackend::inputCallback(double, std::vector<unsigned char> *message, void *user)
 {
     if (!message || message->empty())
         return;
     auto *self = static_cast<RtMidiBackend *>(user);
-    const QByteArray bytes(reinterpret_cast<const char *>(message->data()),
+    const QByteArray chunk(reinterpret_cast<const char *>(message->data()),
                            static_cast<qsizetype>(message->size()));
-    QMetaObject::invokeMethod(
-        self, [self, bytes]() { emit self->messageReceived(bytes); }, Qt::QueuedConnection);
+    QStringList problems;
+    const QList<QByteArray> msgs = self->m_assembler.feed(chunk, &problems);
+    for (const QString &p : problems)
+        qWarning().noquote() << "MIDI input:" << p;
+    const unsigned int generation = self->m_generation.load();
+    for (const QByteArray &bytes : msgs) {
+        QMetaObject::invokeMethod(
+            self,
+            [self, bytes, generation]() {
+                if (generation == self->m_generation.load())
+                    emit self->messageReceived(bytes);
+            },
+            Qt::QueuedConnection);
+    }
 }

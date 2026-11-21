@@ -1,8 +1,10 @@
 #pragma once
 
+#include <atomic>
 #include <memory>
 
 #include "midi/MidiBackend.h"
+#include "midi/SysExAssembler.h"
 
 class RtMidiIn;
 class RtMidiOut;
@@ -30,6 +32,13 @@ public:
 
 private:
     static void inputCallback(double timestamp, std::vector<unsigned char> *message, void *user);
+
+    // Bumped on every open and close (GUI thread). A message queued by the callback
+    // carries the value it saw and is dropped if the connection has changed since.
+    std::atomic<unsigned int> m_generation{0};
+    // Touched only by RtMidi's callback thread, and by the GUI thread while no
+    // callback can run (before openPort, after the input is destroyed).
+    SysExAssembler m_assembler;
 
     std::unique_ptr<RtMidiIn> m_in;
     std::unique_ptr<RtMidiOut> m_out;

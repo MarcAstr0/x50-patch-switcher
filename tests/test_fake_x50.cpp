@@ -151,6 +151,45 @@ private slots:
         QCOMPARE(spy.at(3).at(0).toByteArray(), H({0xC0, 0x03}));
     }
 
+    // R-T1.7 item 1. MIDI.md section 7: request F0 42 3g 7A 1C 1b 00 00 F7 (b=0 is bank A),
+    // answered by a 4C dump. Fragmented delivery (WinMM style) is joined before the listener.
+    void fragmentedDumpArrivesWhole() {
+        FakeX50 whole;
+        openBoth(whole);
+        QSignalSpy w(&whole, &MidiBackend::messageReceived);
+        whole.send(H({0xF0, 0x42, 0x30, 0x7A, 0x1C, 0x10, 0x00, 0x00, 0xF7}));
+        QTRY_COMPARE(w.count(), 1);
+
+        FakeX50 f;
+        f.setSysExFragmentSize(1024);
+        openBoth(f);
+        QSignalSpy spy(&f, &MidiBackend::messageReceived);
+        f.send(H({0xF0, 0x42, 0x30, 0x7A, 0x1C, 0x10, 0x00, 0x00, 0xF7}));
+        QTRY_COMPARE(spy.count(), 1);
+        const QByteArray dump = spy.at(0).at(0).toByteArray();
+        QVERIFY(dump.size() > 60000);
+        QCOMPARE(dump, w.at(0).at(0).toByteArray());
+    }
+
+    // R-T1.7 item 8: messages queued before a close/reopen are dropped.
+    // MIDI.md section 3: panel selection is CC0, CC32, PC; section 6: inquiry request.
+    void staleQueuedMessagesAreDroppedAfterReopen() {
+        FakeX50 f;
+        openBoth(f);
+        QSignalSpy spy(&f, &MidiBackend::messageReceived);
+        const unsigned int g = f.generation();
+        f.panelSelect(A(A::Kind::Prog, A::Bank::B, 2));
+        f.send(H({0xF0, 0x7E, 0x7F, 0x06, 0x01, 0xF7}));
+        f.closePorts();
+        openBoth(f);
+        QVERIFY(f.generation() > g);
+        QTest::qWait(50);
+        QCOMPARE(spy.count(), 0);
+        // New traffic on the new connection still works.
+        f.send(H({0xF0, 0x7E, 0x7F, 0x06, 0x01, 0xF7}));
+        QTRY_COMPARE(spy.count(), 1);
+    }
+
     void portsAndBusy() {
         FakeX50 f;
         QCOMPARE(f.ports().outputs.size(), 1);

@@ -30,7 +30,13 @@
 //
 // Only one activity runs at a time (probe, waiting for a Mode Change reply, or a
 // names read). A send during a probe or a read is refused with an error. A send
-// during the mode wait supersedes the earlier one (the newest sound wins).
+// during the mode wait replaces the pending sound (the newest wins) but the in-flight
+// Mode Change still counts: when the wait ends the believed mode is its target, and
+// another Mode Change follows if the newest sound needs a different mode.
+//
+// Learned state (channel, Bank Map, mode, bank-select bytes, current sound, echo) is
+// cleared on disconnect, stop and at the start of every probe. The manual channel and
+// Bank Map live in separate fields that learned values never overwrite.
 class X50Link : public QObject
 {
     Q_OBJECT
@@ -147,6 +153,7 @@ private:
         QString label;
     };
 
+    using Mode = X50Protocol::Mode;
     void onMessage(const QByteArray &msg);
     void onBackendError(const QString &message);
     void onTimeout();
@@ -169,6 +176,12 @@ private:
     // send
     void failSend(const SoundAddress &a, const QString &reason, const QByteArray &raw = QByteArray());
     void transmit(const SoundAddress &address);
+    void startModeChange(Mode target, const SoundAddress &address);
+    // Ends the wait for a Mode Change reply. `failure` non-empty: the change was refused.
+    void finishModeWait(const QString &failure, const QByteArray &raw = QByteArray());
+    void clearLearned();
+    // True when the configured ports are no longer listed by the backend.
+    bool portsGone();
 
     // follow
     void onChannelMessage(const QByteArray &msg);
@@ -194,14 +207,20 @@ private:
     bool m_started = false;
     QString m_outSub, m_inSub, m_portName, m_status, m_lastRaised;
 
+    // Effective values: learned from the X50, or the manual ones when nothing is learned.
     int m_channel = 1;
     BankMap m_bankMap = BankMap::Gm;
+    int m_manualChannel = 1;
+    BankMap m_manualBankMap = BankMap::Gm;
     bool m_bankMapKnown = false;
     std::optional<X50Protocol::Mode> m_mode;
     std::optional<SoundAddress> m_current;
     std::optional<int> m_msb, m_lsb;
     bool m_echoActive = false;
-    std::optional<SoundAddress> m_pendingSend;
+    QList<QByteArray> m_echoExpected;  // the CC0, CC32, PC we just sent, in order
+    int m_echoIndex = 0;
+    std::optional<SoundAddress> m_pendingSend;  // the newest sound waiting for the mode wait
+    std::optional<Mode> m_inflightMode;         // target of the Mode Change on the wire
 
     ProbeResult m_probe, m_lastProbe;
 

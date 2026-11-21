@@ -10,6 +10,7 @@
 #include "core/BankMap.h"
 #include "core/SoundAddress.h"
 #include "midi/MidiBackend.h"
+#include "midi/SysExAssembler.h"
 #include "midi/X50Protocol.h"
 
 // An in-process X50 behind the MidiBackend interface (docs/MIDI.md section 10).
@@ -56,7 +57,9 @@ public:
     // ---- configuration
     void setPortName(const QString &name) { m_portName = name; }
     void setPortBusy(bool busy) { m_busy = busy; }      // opens fail with "port busy"
-    void unplug();                                      // ports vanish; open ports die
+    // Ports vanish. With raisePortError the open ports die and portError is emitted;
+    // without, the driver says nothing (the link must notice by itself).
+    void unplug(bool raisePortError = true);
     void plug() { m_present = true; }
     void setGlobalChannel(int channel) { m_channel = channel; }  // 1-16
     void setMicroX(bool microX) { m_microX = microX; }
@@ -73,6 +76,13 @@ public:
     void setNakModeChange(std::optional<int> code) { m_nakModeChange = code; }
     void setNakDumps(std::optional<int> code) { m_nakDumps = code; }
     void setMalformedDump(Malformation m) { m_malformation = m; }
+    // Deliver SysEx the way WinMM does: in chunks of at most `bytes` (0 = whole), joined
+    // again by a SysExAssembler exactly as RtMidiBackend does.
+    void setSysExFragmentSize(int bytes) { m_fragmentSize = bytes; }
+    // send() reports a write failure while set.
+    void setFailSend(bool fail) { m_failSend = fail; }
+    // Bumped on every open and close; messages queued before are dropped.
+    unsigned int generation() const { return m_generation; }
 
     // Memory image. Names are ASCII, truncated or space padded to 16.
     void setProgramName(int bank, int number, const QString &name);
@@ -100,6 +110,7 @@ private:
     void handleChannelMessage(const X50Protocol::ChannelMessage &m);
     void reply(Reply kind, const QByteArray &bytes);
     void deliver(const QByteArray &bytes);
+    void queueDeliver(const QByteArray &bytes);
     void replyNak(int code);
     QByteArray buildModeAndStateReply() const;
     void replyDump(int function, int bank);
@@ -119,6 +130,10 @@ private:
     bool m_dropAll = false;
     bool m_dropInquiry = false, m_dropState = false, m_dropAck = false, m_dropDump = false;
     int m_replyDelayMs = 0;
+    int m_fragmentSize = 0;
+    bool m_failSend = false;
+    unsigned int m_generation = 0;
+    SysExAssembler m_assembler;
     std::optional<int> m_nakModeChange, m_nakDumps;
     Malformation m_malformation = Malformation::None;
 

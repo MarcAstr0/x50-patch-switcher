@@ -712,7 +712,6 @@ private slots:
         QTest::newRow("127 records") << FakeX50::Malformation::FewerRecords;
         QTest::newRow("odd length") << FakeX50::Malformation::OddLength;
         QTest::newRow("status byte in data") << FakeX50::Malformation::StatusByteInData;
-        QTest::newRow("wrong bank") << FakeX50::Malformation::WrongBank;
         QTest::newRow("no F7") << FakeX50::Malformation::NoEnd;
     }
     void malformedDump() {
@@ -783,6 +782,233 @@ private slots:
         fake->unplug();
         QTRY_COMPARE(failed.count(), 1);
         QCOMPARE(link->state(), X50Link::State::Disconnected);
+    }
+
+    // ============================================================ R-T1.7 fix round
+
+    // Item 1. MIDI.md section 7: bank dumps; delivered in 1024-byte WinMM-style fragments
+    // and reassembled before X50Link sees them: a full read still completes.
+    void fullReadThroughFragments() {
+        fake->setSysExFragmentSize(1024);
+        fake->setProgramName(1, 5, QStringLiteral("My Lead"));
+        connectLink();
+        QSignalSpy finished(link, &X50Link::readFinished);
+        link->readNames();
+        QTRY_COMPARE_WITH_TIMEOUT(finished.count(), 1, 10000);
+        const X50Link::ReadResult res = finished.at(0).at(0).value<X50Link::ReadResult>();
+        QVERIFY(res.complete);
+        QCOMPARE(res.names.size(), 7 * 128);
+        QCOMPARE(res.names.value(A(K::Prog, B::B, 5)).name, QStringLiteral("My Lead"));
+        QCOMPARE(link->rawDumps().size(), 8);
+    }
+
+    // Item 2. Learned mode is forgotten on disconnect: with the replies dropped on
+    // reconnect (manual mode) a COMBI send must start with a Mode Change again.
+    // MIDI.md section 4: Mode Change F0 42 3g 7A 4E 0m F7, m = 0 COMBI PLAY.
+    void learnedStateIsClearedOnDisconnect() {
+        connectLink();
+        QSignalSpy sent(link, &X50Link::sent);
+        link->send(A(K::Combi, B::A, 1));
+        QTRY_COMPARE(sent.count(), 1);
+        QVERIFY(fake->received().contains(kToCombi));
+        QCOMPARE(*link->believedMode(), Mode::CombiPlay);
+        link->stop();
+        QVERIFY(!link->believedMode());
+        QVERIFY(!link->currentSound());
+        QVERIFY(!link->bankMapKnown());
+        fake->setDropReplies(true);
+        link->setManualChannel(1);
+        link->start();
+        QTRY_COMPARE_WITH_TIMEOUT(link->state(), X50Link::State::Manual, 3000);
+        QVERIFY(!link->believedMode());
+        fake->clearReceived();
+        link->send(A(K::Combi, B::A, 2));
+        QTRY_COMPARE(sent.count(), 2);
+        QCOMPARE(fake->received().first(), kToCombi);
+    }
+
+    // Item 2: manual values are never overwritten by learned ones.
+    void manualFallbacksSurviveLearning() {
+        fake->setGlobalChannel(5);
+        fake->setBankMap(BankMap::Korg);
+        link->setManualChannel(2);
+        link->setManualBankMap(BankMap::Gm);
+        connectLink();
+        QCOMPARE(link->channel(), 5);
+        QCOMPARE(link->bankMap(), BankMap::Korg);
+        link->stop();
+        QCOMPARE(link->channel(), 2);
+        QCOMPARE(link->bankMap(), BankMap::Gm);
+    }
+
+    // Item 3. MIDI.md section 3/4: PROG believed, send COMBI A011, then PROG B022 before
+    // the ACK: the wire ends with a PROG Mode Change then the B022 select; `sent` is B022.
+    void sendDuringModeChangeKeepsTheInflightEffect() {
+        connectLink();  // PROG PLAY
+        QSignalSpy sent(link, &X50Link::sent);
+        link->send(A(K::Combi, B::A, 11));
+        link->send(A(K::Prog, B::B, 22));
+        QTRY_COMPARE(sent.count(), 1);
+        QCOMPARE(sent.at(0).at(0).value<SoundAddress>(), A(K::Prog, B::B, 22));
+        const QList<QByteArray> wire = afterProbe();
+        QCOMPARE(wire, (QList<QByteArray>{kToCombi, kToProg, H({0xB0, 0x00, 0x3F}),
+                                          H({0xB0, 0x20, 0x01}), H({0xC0, 0x16})}));
+        QTRY_COMPARE(fake->currentSound(), A(K::Prog, B::B, 22));
+        QCOMPARE(*link->believedMode(), Mode::ProgPlay);
+        QTest::qWait(150);
+        QCOMPARE(sent.count(), 1);
+    }
+
+    // Item 3, same-kind variant: the second send needs no further Mode Change.
+    void sendDuringModeChangeSameKindNeedsOneChange() {
+        connectLink();
+        QSignalSpy sent(link, &X50Link::sent);
+        link->send(A(K::Combi, B::A, 11));
+        link->send(A(K::Combi, B::B, 22));
+        QTRY_COMPARE(sent.count(), 1);
+        QCOMPARE(afterProbe().first(), kToCombi);
+        QCOMPARE(afterProbe().count(kToCombi), 1);
+        QVERIFY(!afterProbe().contains(kToProg));
+    }
+
+    // Item 4. MIDI.md section 3 (GM): A001 is B0 00 3F, B0 20 00, C0 01; B002 is
+    // B0 00 3F, B0 20 01, C0 02. A panel change within 300 ms of our send is not swallowed.
+    void echoSuppressionConsumesOnlyTheExpectedEcho() {
+        connectLink();
+        QSignalSpy sent(link, &X50Link::sent);
+        QSignalSpy sound(link, &X50Link::followedSound);
+        link->send(A(K::Prog, B::A, 1));
+        QTRY_COMPARE(sent.count(), 1);
+        fake->panelSelect(A(K::Prog, B::B, 2));
+        QTRY_COMPARE(sound.count(), 1);
+        QCOMPARE(sound.at(0).at(0).value<SoundAddress>(), A(K::Prog, B::B, 2));
+        QCOMPARE(*link->currentSound(), A(K::Prog, B::B, 2));
+    }
+
+    // Item 4: the same bytes after the echo was consumed are a real panel change.
+    void echoIsConsumedOnce() {
+        connectLink();
+        QSignalSpy sent(link, &X50Link::sent);
+        QSignalSpy sound(link, &X50Link::followedSound);
+        link->send(A(K::Prog, B::A, 1));
+        QTRY_COMPARE(sent.count(), 1);
+        emit fake->messageReceived(H({0xB0, 0x00, 0x3F}));
+        emit fake->messageReceived(H({0xB0, 0x20, 0x00}));
+        emit fake->messageReceived(H({0xC0, 0x01}));
+        QCOMPARE(sound.count(), 0);
+        emit fake->messageReceived(H({0xB0, 0x00, 0x3F}));
+        emit fake->messageReceived(H({0xB0, 0x20, 0x00}));
+        emit fake->messageReceived(H({0xC0, 0x03}));
+        QCOMPARE(sound.count(), 1);
+        QCOMPARE(sound.at(0).at(0).value<SoundAddress>(), A(K::Prog, B::A, 3));
+    }
+
+    // Item 5. The port vanishes without a driver error; the read times out and the link
+    // notices the ports are gone, goes Disconnected, and polling resumes.
+    void timeoutWithVanishedPortDisconnects() {
+        X50Link::Timing t = fastTiming();
+        t.bankMs = 150;
+        link->setTiming(t);
+        connectLink();
+        fake->setDrop(FakeX50::Reply::Dump, true);
+        QSignalSpy failed(link, &X50Link::readFailed);
+        link->readNames();
+        fake->unplug(false);
+        QTRY_COMPARE(failed.count(), 1);
+        QVERIFY(failed.at(0).at(1).toString().contains(QStringLiteral("gone")));
+        QCOMPARE(link->state(), X50Link::State::Disconnected);
+        const int calls = fake->portListCount();
+        QTest::qWait(100);
+        QVERIFY(fake->portListCount() > calls);  // polling again
+        fake->plug();
+        QTRY_COMPARE_WITH_TIMEOUT(link->state(), X50Link::State::Connected, 3000);
+    }
+
+    // Item 5, probe variant: ports gone while the Device Inquiry is unanswered.
+    void probeTimeoutWithVanishedPortDisconnects() {
+        fake->setDropReplies(true);
+        link->start();
+        QCOMPARE(link->state(), X50Link::State::Probing);
+        fake->unplug(false);
+        QTRY_COMPARE(link->state(), X50Link::State::Disconnected);
+    }
+
+    // Item 6. MIDI.md section 7. A well-formed dump for another bank is ignored; the
+    // step's timeout decides (here: "no reply"), not a parse failure.
+    void wrongBankDumpIsIgnoredUntilTimeout() {
+        X50Link::Timing t = fastTiming();
+        t.bankMs = 150;
+        link->setTiming(t);
+        fake->setMalformedDump(FakeX50::Malformation::WrongBank);
+        connectLink();
+        QSignalSpy failed(link, &X50Link::readFailed);
+        link->readNames();
+        QTRY_COMPARE(failed.count(), 1);
+        QCOMPARE(failed.at(0).at(0).toString(), QStringLiteral("Program A"));
+        QVERIFY(failed.at(0).at(1).toString().contains(QStringLiteral("no reply")));
+        QCOMPARE(link->rawDumps().size(), 0);
+    }
+
+    // Item 6: cancel mid-bank, read again at once with delayed dumps: the late dump of the
+    // first request is harmless and the new read completes.
+    void lateDumpAfterCancelDoesNotBreakTheNextRead() {
+        connectLink();
+        fake->setReplyDelayMs(40);
+        QSignalSpy cancelled(link, &X50Link::readCancelled);
+        QSignalSpy failed(link, &X50Link::readFailed);
+        QSignalSpy finished(link, &X50Link::readFinished);
+        link->readNames();
+        link->cancelRead();
+        QCOMPARE(cancelled.count(), 1);
+        link->readNames();
+        QTRY_COMPARE_WITH_TIMEOUT(finished.count(), 1, 10000);
+        QCOMPARE(failed.count(), 0);
+        const X50Link::ReadResult res = finished.at(0).at(0).value<X50Link::ReadResult>();
+        QVERIFY(res.complete);
+        QCOMPARE(res.names.size(), 7 * 128);
+    }
+
+    // Item 7: the Mode Change write fails.
+    void modeChangeWriteFailureEmitsSendFailed() {
+        connectLink();
+        fake->setFailSend(true);
+        QSignalSpy failed(link, &X50Link::sendFailed);
+        QSignalSpy sent(link, &X50Link::sent);
+        link->send(A(K::Combi, B::A, 1));
+        QCOMPARE(failed.count(), 1);
+        QCOMPARE(failed.at(0).at(0).value<SoundAddress>(), A(K::Combi, B::A, 1));
+        QCOMPARE(sent.count(), 0);
+        QCOMPARE(link->state(), X50Link::State::Disconnected);
+        link->stop();
+    }
+
+    // Item 7: the port dies while the Mode Change wait is pending.
+    void portDeathDuringModeWaitEmitsSendFailed() {
+        X50Link::Timing t = fastTiming();
+        t.modeChangeWaitMs = 2000;
+        link->setTiming(t);
+        connectLink();
+        fake->setDrop(FakeX50::Reply::Ack, true);
+        QSignalSpy failed(link, &X50Link::sendFailed);
+        QSignalSpy sent(link, &X50Link::sent);
+        link->send(A(K::Combi, B::A, 1));
+        fake->unplug();
+        QTRY_COMPARE(failed.count(), 1);
+        QCOMPARE(failed.at(0).at(0).value<SoundAddress>(), A(K::Combi, B::A, 1));
+        QCOMPARE(sent.count(), 0);
+        QCOMPARE(link->state(), X50Link::State::Disconnected);
+    }
+
+    // Item 8, at link level: after stop() and a restart, anything the fake had queued for
+    // the old connection never reaches the link.
+    void staleMessagesFromTheOldConnectionAreDropped() {
+        connectLink();
+        QSignalSpy sound(link, &X50Link::followedSound);
+        fake->panelSelect(A(K::Prog, B::C, 7));  // queued, not yet delivered
+        link->stop();
+        link->start();                           // reopen before the event loop runs
+        QTest::qWait(100);
+        QCOMPARE(sound.count(), 0);
     }
 };
 

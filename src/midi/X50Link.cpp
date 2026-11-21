@@ -1,5 +1,6 @@
 #include "midi/X50Link.h"
 
+#include <QDebug>
 #include <QMetaObject>
 
 using namespace X50Protocol;
@@ -76,12 +77,16 @@ void X50Link::setPortNames(const QString &out, const QString &in)
 
 void X50Link::setManualChannel(int channel)
 {
-    if (channel >= 1 && channel <= 16 && m_state != State::Connected)
+    if (channel < 1 || channel > 16)
+        return;
+    m_manualChannel = channel;
+    if (m_state != State::Connected)
         m_channel = channel;
 }
 
 void X50Link::setManualBankMap(BankMap map)
 {
+    m_manualBankMap = map;
     if (m_state != State::Connected) {
         m_bankMap = map;
         m_bankMapKnown = false;
@@ -125,13 +130,39 @@ bool X50Link::sendRaw(const QByteArray &bytes)
     return false;
 }
 
+void X50Link::clearLearned()
+{
+    m_channel = m_manualChannel;
+    m_bankMap = m_manualBankMap;
+    m_bankMapKnown = false;
+    m_mode.reset();
+    m_msb.reset();
+    m_lsb.reset();
+    m_current.reset();
+    m_echoActive = false;
+    m_echoExpected.clear();
+    m_echoIndex = 0;
+    m_echoTimer.stop();
+}
+
+bool X50Link::portsGone()
+{
+    const MidiBackend::Ports p = m_backend->ports();
+    if (!p.error.isEmpty())
+        return false;  // cannot tell
+    return findPort(p.outputs, m_outSub) < 0 || findPort(p.inputs, m_inSub) < 0;
+}
+
 void X50Link::disconnectWith(const QString &reason, const QByteArray &raw)
 {
     m_timer.stop();
     const Activity was = m_activity;
+    const std::optional<SoundAddress> pending = m_pendingSend;
     m_activity = Activity::Idle;
     m_pendingSend.reset();
+    m_inflightMode.reset();
     m_backend->closePorts();
+    clearLearned();
     if (was == Activity::Reading) {
         const QString bank = m_stepIndex < m_steps.size() ? m_steps.at(m_stepIndex).label : QString();
         emit readFailed(bank, reason, raw);
@@ -143,6 +174,8 @@ void X50Link::disconnectWith(const QString &reason, const QByteArray &raw)
         m_lastProbe = m_probe;
         emit probeFinished(m_probe);
     }
+    if (was == Activity::ModeWait && pending)
+        emit sendFailed(*pending, reason);
     setState(State::Disconnected);
     raise(reason, raw);
 }
@@ -170,8 +203,15 @@ void X50Link::stop()
     m_started = false;
     m_poll.stop();
     m_timer.stop();
+    const Activity was = m_activity;
+    const std::optional<SoundAddress> pending = m_pendingSend;
     m_activity = Activity::Idle;
+    m_pendingSend.reset();
+    m_inflightMode.reset();
     m_backend->closePorts();
+    clearLearned();
+    if (was == Activity::ModeWait && pending)
+        emit sendFailed(*pending, QStringLiteral("Disconnected from the X50"));
     setState(State::Disconnected);
 }
 
@@ -242,6 +282,8 @@ void X50Link::beginProbe()
 {
     m_timer.stop();
     m_pendingSend.reset();
+    m_inflightMode.reset();
+    clearLearned();
     m_probe = ProbeResult();
     m_activity = Activity::Probing;
     m_probeStage = ProbeStage::Inquiry;
@@ -404,22 +446,14 @@ void X50Link::onMessage(const QByteArray &msg)
     case MessageKind::Nak:
         if (m_activity == Activity::ModeWait) {
             const auto a = parseAckNak(msg, m_channel);
-            const std::optional<SoundAddress> pending = m_pendingSend;
-            m_timer.stop();
-            m_activity = Activity::Idle;
-            m_pendingSend.reset();
-            if (!a.ok) {
-                if (pending)
-                    failSend(*pending, QStringLiteral("Mode Change reply refused: %1").arg(a.error), a.raw);
-            } else if (!a.value.ack) {
-                if (pending)
-                    failSend(*pending,
-                             QStringLiteral("The X50 refused the mode change: %1")
-                                 .arg(nakCodeText(a.value.errorCode)),
-                             msg);
-            } else if (pending) {
-                transmit(*pending);
-            }
+            if (!a.ok)
+                finishModeWait(QStringLiteral("Mode Change reply refused: %1").arg(a.error), a.raw);
+            else if (!a.value.ack)
+                finishModeWait(QStringLiteral("The X50 refused the mode change: %1")
+                                   .arg(nakCodeText(a.value.errorCode)),
+                               msg);
+            else
+                finishModeWait(QString());
         } else if (m_activity == Activity::Reading && c.kind == MessageKind::Nak) {
             onReadNak(msg);
         } else if (m_activity == Activity::Probing && m_probeStage == ProbeStage::ModeState &&
@@ -453,6 +487,10 @@ void X50Link::onTimeout()
 {
     switch (m_activity) {
     case Activity::Probing:
+        if (portsGone()) {
+            disconnectWith(QStringLiteral("The X50 port is gone: check the USB cable"));
+            break;
+        }
         if (m_probeStage == ProbeStage::Inquiry) {
             probeFailedStage(
                 QStringLiteral("No reply. Is the X50 on, the USB cable in, and GLOBAL 1: MIDI \"Exclusive\" ticked?"),
@@ -463,16 +501,15 @@ void X50Link::onTimeout()
         }
         finishProbe(State::Manual);
         break;
-    case Activity::ModeWait: {
+    case Activity::ModeWait:
         // No ACK within the wait: carry on (MIDI.md section 3 step 1).
-        const std::optional<SoundAddress> pending = m_pendingSend;
-        m_activity = Activity::Idle;
-        m_pendingSend.reset();
-        if (pending)
-            transmit(*pending);
+        finishModeWait(QString());
         break;
-    }
     case Activity::Reading:
+        if (portsGone()) {
+            disconnectWith(QStringLiteral("The X50 port is gone: check the USB cable"));
+            break;
+        }
         stepFailed(QStringLiteral("no reply within %1 s").arg(m_timing.bankMs / 1000.0, 0, 'g', 3),
                    QByteArray());
         break;
@@ -512,21 +549,57 @@ void X50Link::send(const SoundAddress &address)
         failSend(address, QStringLiteral("Busy reading names from the X50"));
         return;
     }
-    // A send during the mode wait supersedes the earlier one: the newest sound wins.
-    m_timer.stop();
-    m_activity = Activity::Idle;
-    m_pendingSend.reset();
-
+    // A send during the mode wait only replaces the pending sound: the Mode Change on
+    // the wire still counts and finishModeWait() re-evaluates the mode for the newest.
+    if (m_activity == Activity::ModeWait) {
+        m_pendingSend = address;
+        return;
+    }
     const Mode target = modeForKind(address.kind());
     if (m_mode && *m_mode == target) {
         transmit(address);
         return;
     }
+    startModeChange(target, address);
+}
+
+void X50Link::startModeChange(Mode target, const SoundAddress &address)
+{
     const auto mc = modeChange(m_channel, target);
     m_activity = Activity::ModeWait;
     m_pendingSend = address;
+    m_inflightMode = target;
     m_timer.start(m_timing.modeChangeWaitMs);
-    sendRaw(mc.value);
+    sendRaw(mc.value);  // on failure disconnectWith() reports sendFailed for the pending sound
+}
+
+void X50Link::finishModeWait(const QString &failure, const QByteArray &raw)
+{
+    m_timer.stop();
+    const std::optional<SoundAddress> pending = m_pendingSend;
+    const std::optional<Mode> inflight = m_inflightMode;
+    m_activity = Activity::Idle;
+    m_pendingSend.reset();
+    m_inflightMode.reset();
+    if (!failure.isEmpty()) {
+        if (pending)
+            failSend(*pending, failure, raw);
+        return;
+    }
+    if (inflight) {
+        // ACK or silence: the X50 is now in the mode we asked for.
+        m_mode = inflight;
+        const auto k = kindOfMode(*inflight);
+        if (m_current && (!k || *k != m_current->kind()))
+            m_current.reset();
+    }
+    if (!pending)
+        return;
+    const Mode target = modeForKind(pending->kind());
+    if (m_mode && *m_mode == target)
+        transmit(*pending);
+    else
+        startModeChange(target, *pending);
 }
 
 void X50Link::transmit(const SoundAddress &address)
@@ -542,6 +615,10 @@ void X50Link::transmit(const SoundAddress &address)
             return;
         }
     }
+    m_echoExpected.clear();
+    for (const QByteArray &m : msgs.value)
+        m_echoExpected.append(m);
+    m_echoIndex = 0;
     const auto bs = address.bankSelect(m_bankMap);
     m_msb = bs->msb;
     m_lsb = bs->lsb;
@@ -574,8 +651,17 @@ void X50Link::onChannelMessage(const QByteArray &msg)
 {
     if (m_state != State::Connected && m_state != State::Manual)
         return;
-    if (m_echoActive)
-        return;  // the echo of our own send (SPEC 4.4)
+    if (m_echoActive) {
+        // Only the echo we expect is swallowed (SPEC 4.4): the next byte triple member of
+        // our own send. Anything else is the player on the panel and ends suppression.
+        if (m_echoIndex < m_echoExpected.size() && msg == m_echoExpected.at(m_echoIndex)) {
+            if (++m_echoIndex >= m_echoExpected.size())
+                m_echoActive = false;
+            return;
+        }
+        m_echoActive = false;
+        m_echoTimer.stop();
+    }
     const auto r = parseChannelMessage(msg, m_channel);
     if (!r.ok)
         return;
@@ -702,9 +788,9 @@ void X50Link::onDump(const QByteArray &msg)
                              : step.type == ReadStep::Type::Combination ? MessageKind::CombinationDump
                                                                         : MessageKind::GlobalDump;
     if (got != want) {
-        // A dump of the wrong kind is not the answer to this request.
-        m_rawDumps.append({step.label, msg});
-        stepFailed(QStringLiteral("unexpected dump type instead of the %1 dump").arg(step.label), msg);
+        // Not the answer to this request (a late dump of an earlier one): the step's own
+        // timeout decides.
+        qDebug().noquote() << "X50Link: ignored a dump of another kind while reading" << step.label;
         return;
     }
     m_rawDumps.append({step.label, msg});
@@ -734,9 +820,10 @@ void X50Link::onDump(const QByteArray &msg)
         return;
     }
     if (d.value.kind != 1 || d.value.bank != step.bank) {
-        stepFailed(QStringLiteral("dump is for kind %1 bank %2, expected one bank, bank %3")
-                       .arg(d.value.kind).arg(d.value.bank).arg(step.bank),
-                   msg);
+        // Well formed but for another bank: ignore, do not fail the step.
+        qDebug().noquote() << "X50Link: ignored a dump for kind" << d.value.kind << "bank"
+                           << d.value.bank << "while reading" << step.label;
+        m_rawDumps.removeLast();  // not this step's dump
         return;
     }
     const auto recs = combi ? sliceCombinationRecords(d.value.data) : sliceProgramRecords(d.value.data);
