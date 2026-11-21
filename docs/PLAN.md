@@ -388,3 +388,8 @@ fixes go back to the builder as T5.x tasks.
   failure. Process from here: every push is followed by `gh run watch --exit-status`,
   and commits only after `ctest` exits 0 (checked by exit code, not grep). Fixing now.
   (foreman)
+- 2026-11-21 · CI green again at c05192e (run 44946788437): pixel font forced
+  NoAntialias (CoreText smoothed it on macOS); buttons with a DESIGN width rule get an
+  exact fixed width (Qt 6.8's sizeHint added 3 px); a test read slot 7 of a 6-slot set.
+  That last one exposes a core gap for the next round: SetModel::slot(i) must
+  bounds-check (QVector::at asserts only in debug). (foreman)
