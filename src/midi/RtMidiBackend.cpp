@@ -13,28 +13,45 @@ namespace {
 QString describe(const std::exception &e) { return QString::fromUtf8(e.what()); }
 }
 
+namespace {
+template <typename Client>
+void enumerate(std::unique_ptr<Client> &client, QStringList &names, QStringList &errors)
+{
+    try {
+        if (!client)
+            client = std::make_unique<Client>();
+        for (unsigned int i = 0; i < client->getPortCount(); ++i)
+            names << QString::fromStdString(client->getPortName(i));
+    } catch (const RtMidiError &e) {
+        client.reset();
+        names.clear();
+        errors << QString::fromStdString(e.getMessage());
+    } catch (const std::exception &e) {
+        client.reset();
+        names.clear();
+        errors << describe(e);
+    }
+}
+}
+
 RtMidiBackend::Ports RtMidiBackend::listPorts()
+{
+    std::unique_ptr<RtMidiOut> out;
+    std::unique_ptr<RtMidiIn> in;
+    Ports result;
+    QStringList errors;
+    enumerate(out, result.outputs, errors);
+    enumerate(in, result.inputs, errors);
+    result.error = errors.join(QStringLiteral("; "));
+    return result;
+}
+
+MidiBackend::Ports RtMidiBackend::ports()
 {
     Ports result;
     QStringList errors;
-    try {
-        RtMidiOut out;
-        for (unsigned int i = 0; i < out.getPortCount(); ++i)
-            result.outputs << QString::fromStdString(out.getPortName(i));
-    } catch (const RtMidiError &e) {
-        errors << QString::fromStdString(e.getMessage());
-    } catch (const std::exception &e) {
-        errors << describe(e);
-    }
-    try {
-        RtMidiIn in;
-        for (unsigned int i = 0; i < in.getPortCount(); ++i)
-            result.inputs << QString::fromStdString(in.getPortName(i));
-    } catch (const RtMidiError &e) {
-        errors << QString::fromStdString(e.getMessage());
-    } catch (const std::exception &e) {
-        errors << describe(e);
-    }
+    enumerate(m_enumOut, result.outputs, errors);
+    enumerate(m_enumIn, result.inputs, errors);
     result.error = errors.join(QStringLiteral("; "));
     return result;
 }

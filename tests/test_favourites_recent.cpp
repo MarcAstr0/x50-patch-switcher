@@ -69,6 +69,8 @@ private slots:
         m_link = std::make_unique<X50Link>(m_fake.get());
         m_link->setPortNames(QStringLiteral("X50"));
         m_view = std::make_unique<BrowseView>(&m_catalogue, m_library.get(), m_link.get());
+        // MainWindow records uses on `sent` (not BrowseView); do the same here.
+        connect(m_link.get(), &X50Link::sent, m_library.get(), [this](const SoundAddress &a) { m_library->recordUse(a); });
         m_view->resize(1000, 560);
         m_view->show();
         QVERIFY(QTest::qWaitForWindowExposed(m_view.get()));

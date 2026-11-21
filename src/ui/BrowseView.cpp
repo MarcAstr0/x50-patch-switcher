@@ -681,7 +681,7 @@ void BrowseView::addHighlightedToSlot(int slot)
 
 void BrowseView::onSent(const SoundAddress &address)
 {
-    m_library->recordUse(address);  // on a successful send only (the `sent` signal)
+    // The use is recorded by MainWindow on the same `sent` signal (so the live view records too).
     syncCurrent();
     emit statusMessage(QStringLiteral("Sent %1").arg(describe(address)), false);
 }

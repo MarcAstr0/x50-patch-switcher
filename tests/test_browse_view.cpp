@@ -7,6 +7,8 @@
 
 #include <QApplication>
 #include <QDateTime>
+#include <QDir>
+#include <QFile>
 #include <QHeaderView>
 #include <QImage>
 #include <QKeyEvent>
@@ -24,6 +26,7 @@
 #include "core/Library.h"
 #include "core/SearchQuery.h"
 #include "midi/FakeX50.h"
+#include "midi/RtMidiBackend.h"
 #include "midi/X50Link.h"
 #include "ui/BrowseView.h"
 #include "ui/DisplayStrip.h"
@@ -57,6 +60,17 @@ int countStatus(const QList<QByteArray> &msgs, int status)
 int programChanges(const FakeX50 &f) { return countStatus(f.received(), 0xC0); }
 int bankSelects(const FakeX50 &f) { return countStatus(f.received(), 0xB0); }
 } // namespace
+
+// A backend whose enumeration fails, as when the MIDI system is unavailable.
+class ErrorPortsFake : public FakeX50 {
+public:
+    Ports ports() override
+    {
+        Ports p;
+        p.error = QStringLiteral("no ALSA sequencer");
+        return p;
+    }
+};
 
 class TestBrowseView : public QObject {
     Q_OBJECT
@@ -125,6 +139,8 @@ private slots:
         m_link = std::make_unique<X50Link>(m_fake.get());
         m_link->setPortNames(QStringLiteral("X50"));
         m_view = std::make_unique<BrowseView>(&m_catalogue, m_library.get(), m_link.get());
+        // MainWindow records uses on `sent` (not BrowseView); do the same here.
+        connect(m_link.get(), &X50Link::sent, m_library.get(), [this](const SoundAddress &a) { m_library->recordUse(a); });
         m_statuses.clear();
         m_statusErrors.clear();
         connect(m_view.get(), &BrowseView::statusMessage, this, [this](const QString &t, bool e) {
@@ -574,6 +590,66 @@ private slots:
         QVERIFY(view().highlighted().has_value() == view().results().contains(combi(B::C, 96)));
     }
 
+    // R3: a failed connect at startup shows its reason in the strip and the status line.
+    void noPortAtStartupShowsReason()
+    {
+        m_fake->unplug(false);
+        MainWindow w(&m_catalogue, m_library.get(), m_link.get());
+        m_link->start();
+        QVERIFY(w.displayStrip()->connectionText().startsWith(QStringLiteral("No X50 port found")));
+        QVERIFY(w.statusText().startsWith(QStringLiteral("No X50 port found")));
+        QVERIFY(w.statusIsError());
+        // The 2 s poll must not respawn it: a later message stays.
+        w.showStatus(QStringLiteral("other"), false);
+        QTest::qWait(30);
+        QCOMPARE(w.statusText(), QStringLiteral("other"));
+    }
+
+    void midiUnavailableShowsReason()
+    {
+        ErrorPortsFake bad;
+        X50Link link(&bad);
+        link.setPortNames(QStringLiteral("X50"));
+        MainWindow w(&m_catalogue, m_library.get(), &link);
+        link.start();
+        QVERIFY(w.displayStrip()->connectionText().startsWith(QStringLiteral("MIDI is unavailable")));
+        QVERIFY(w.statusText().contains(QStringLiteral("no ALSA sequencer")));
+        link.stop();
+    }
+
+    // R3: an old error never outlives its state (error, then a microX refusal).
+    void staleErrorReplacedByMicroX()
+    {
+        X50Link::Timing t;
+        t.pollMs = 20;
+        m_link->setTiming(t);
+        m_fake->unplug(false);
+        MainWindow w(&m_catalogue, m_library.get(), m_link.get());
+        m_link->start();
+        QVERIFY(w.displayStrip()->connectionText().startsWith(QStringLiteral("No X50 port found")));
+        m_fake->setMicroX(true);
+        m_fake->plug();
+        QTRY_COMPARE_WITH_TIMEOUT(m_link->state(), X50Link::State::Refused, 3000);
+        QVERIFY(w.displayStrip()->connectionText().contains(QStringLiteral("microX")));
+        m_link->stop();
+    }
+
+    // R3: MainWindow records the use on `sent`, once.
+    void windowRecordsUse()
+    {
+        FakeX50 fake;  // own link: the fixture's link also records, to stand in for this window
+        X50Link link(&fake);
+        link.setPortNames(QStringLiteral("X50"));
+        Library lib;
+        MainWindow w(&m_catalogue, &lib, &link);
+        link.start();
+        QTRY_COMPARE_WITH_TIMEOUT(link.state(), X50Link::State::Connected, 3000);
+        link.send(combi(B::C, 96));
+        QTRY_COMPARE(lib.recents().size(), 1);
+        QCOMPARE(lib.recents().first().address, combi(B::C, 96));
+        link.stop();
+    }
+
     // SPEC 4.4: the strip follows the link (own sends and panel changes); BrowseView marks the row.
     void windowFollowsLink()
     {
@@ -749,6 +825,30 @@ private slots:
 
     // DESIGN 7.3, 7.5, 7.7 against docs/design/mockup-browse.png: sizes of the toolbar controls
     // and the result columns.
+    // R3: the cached enumerators give the same answer on every call (an error or not).
+    void rtMidiPortsRepeatable()
+    {
+        RtMidiBackend backend;
+        const MidiBackend::Ports first = backend.ports();
+        for (int i = 0; i < 5; ++i) {
+            const MidiBackend::Ports again = backend.ports();
+            QCOMPARE(again.outputs, first.outputs);
+            QCOMPARE(again.inputs, first.inputs);
+            QCOMPARE(again.error.isEmpty(), first.error.isEmpty());
+        }
+    }
+
+    // R3: aboutToQuit also saves the layout (idempotent with closeEvent).
+    void layoutSavedOnAboutToQuit()
+    {
+        QTemporaryDir dir;
+        MainWindow w(&m_catalogue, m_library.get(), nullptr);
+        w.restoreLayout(dir.path());
+        w.resize(900, 600);
+        QMetaObject::invokeMethod(QCoreApplication::instance(), "aboutToQuit", Qt::DirectConnection);
+        QVERIFY(QFile::exists(QDir(dir.path()).filePath(MainWindow::layoutFileName())));
+    }
+
     void toolbarAndColumnGeometry()
     {
         for (QToolButton *t : {view().combisToggle(), view().programsToggle(), view().gmToggle()}) {

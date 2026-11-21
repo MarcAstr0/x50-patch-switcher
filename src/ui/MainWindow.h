@@ -72,6 +72,7 @@ private:
     // DESIGN 7.1: the minimum height grows with the strip when k > 1; recomputed when it changes.
     void updateMinimumHeight();
     void syncFromLink();
+    static bool isConnectFailure(const QString &text);
 
     std::unique_ptr<Catalogue> m_ownedCatalogue;
     std::unique_ptr<Library> m_ownedLibrary;
@@ -84,6 +85,7 @@ private:
     QLabel *m_status = nullptr;
     bool m_statusError = false;
     bool m_settingsAllowed = true;
+    bool m_quitHooked = false;
     QString m_layoutPath;  // empty: layout is not remembered
     QString m_linkError;  // the link's last error while disconnected, shown in the strip
 };

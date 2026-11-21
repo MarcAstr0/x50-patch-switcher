@@ -22,7 +22,9 @@ public:
     explicit RtMidiBackend(QObject *parent = nullptr);
     ~RtMidiBackend() override;
 
-    Ports ports() override { return listPorts(); }
+    // Reuses one RtMidiOut/RtMidiIn pair between calls (the connect poll asks every 2 s);
+    // an enumerator that throws is dropped and rebuilt on the next call.
+    Ports ports() override;
     Status openOutput(int index) override;
     Status openInput(int index) override;
     void closePorts() override;
@@ -42,4 +44,6 @@ private:
 
     std::unique_ptr<RtMidiIn> m_in;
     std::unique_ptr<RtMidiOut> m_out;
+    std::unique_ptr<RtMidiIn> m_enumIn;
+    std::unique_ptr<RtMidiOut> m_enumOut;
 };

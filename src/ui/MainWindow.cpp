@@ -9,6 +9,7 @@
 #include "ui/Theme.h"
 
 #include <QCloseEvent>
+#include <QCoreApplication>
 #include <QDateTime>
 #include <QColor>
 #include <QDir>
@@ -68,11 +69,21 @@ MainWindow::MainWindow(Catalogue *catalogue, Library *library, X50Link *link, QW
 
     if (m_link) {
         connect(m_link, &X50Link::stateChanged, this, [this]() {
-            if (m_link->state() == X50Link::State::Connected || m_link->state() == X50Link::State::Manual)
-                m_linkError.clear();
+            m_linkError.clear();  // an error belongs to the state it was raised in
             syncFromLink();
         });
-        connect(m_link, &X50Link::sent, this, [this]() { syncFromLink(); });
+        connect(m_link, &X50Link::statusChanged, this, [this](const QString &text) {
+            // Connect failures are only status text (no errorOccurred): tell them once, here.
+            if (m_link->state() == X50Link::State::Disconnected && isConnectFailure(text)) {
+                showStatus(text, true);
+                syncFromLink();
+            }
+        });
+        // Every successful send counts as a use, whichever view made it.
+        connect(m_link, &X50Link::sent, this, [this](const SoundAddress &address) {
+            m_library->recordUse(address);
+            syncFromLink();
+        });
         connect(m_link, &X50Link::followedSound, this, [this]() { syncFromLink(); });
         connect(m_link, &X50Link::followedMode, this, [this]() { syncFromLink(); });
         connect(m_link, &X50Link::probeFinished, this, [this](const X50Link::ProbeResult &result) {
@@ -141,6 +152,12 @@ void MainWindow::showStatus(const QString &text, bool isError)
     m_status->setStyleSheet(isError ? QStringLiteral("color: %1;").arg(QColor(Theme::red).name()) : QString());
 }
 
+bool MainWindow::isConnectFailure(const QString &text)
+{
+    return text.startsWith(QStringLiteral("MIDI is unavailable")) || text.startsWith(QStringLiteral("No X50 port found"))
+        || text.startsWith(QStringLiteral("No MIDI port chosen"));
+}
+
 void MainWindow::syncFromLink()
 {
     if (!m_link)
@@ -163,7 +180,7 @@ void MainWindow::syncFromLink()
         m_strip->setConnection(false, m_linkError.isEmpty() ? m_link->statusText() : m_linkError);
         break;
     case X50Link::State::Disconnected:
-        m_strip->setConnection(false, m_linkError);
+        m_strip->setConnection(false, isConnectFailure(m_link->statusText()) ? m_link->statusText() : m_linkError);
         break;
     }
 }
@@ -181,6 +198,10 @@ void MainWindow::restoreLayout(const QString &configDir, const QRect &availableO
 {
     m_configDir = configDir;
     m_layoutPath = QDir(configDir).filePath(layoutFileName());
+    if (!m_quitHooked) {
+        m_quitHooked = true;
+        connect(qApp, &QCoreApplication::aboutToQuit, this, [this]() { saveLayout(); });
+    }
     const QSettings settings(m_layoutPath, QSettings::IniFormat);
     const QSize size(settings.value(QStringLiteral("window/width")).toInt(), settings.value(QStringLiteral("window/height")).toInt());
     if (size.width() > 0 && size.height() > 0 && settings.contains(QStringLiteral("window/x"))) {
@@ -208,6 +229,7 @@ void MainWindow::saveLayout()
 {
     if (m_layoutPath.isEmpty())
         return;
+    // aboutToQuit can run after the window was closed (hidden, geometry still valid): idempotent.
     QSettings settings(m_layoutPath, QSettings::IniFormat);
     // A maximized or minimized window remembers its normal size and position.
     const bool maximized = isMaximized();
