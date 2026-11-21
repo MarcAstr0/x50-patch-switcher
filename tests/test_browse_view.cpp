@@ -6,6 +6,7 @@
 #include <memory>
 
 #include <QApplication>
+#include <QDateTime>
 #include <QHeaderView>
 #include <QImage>
 #include <QKeyEvent>
@@ -416,6 +417,37 @@ private slots:
         view().clearHighlight();
         key(search(), Qt::Key_D, Qt::ControlModifier);
         QVERIFY(m_library->favourites().isEmpty());
+    }
+
+    // T3.3 pins what SPEC 3.2/4.1 and DESIGN 7.7 say: EDITED only when the unit name
+    // differs from the factory name after trimming; tooltip carries the factory name;
+    // the star column follows favourites live; none of it sends MIDI.
+    void editedMarkerAndFavouriteMarks()
+    {
+        connectLink();
+        searchPiano();
+        const SoundAddress a = view().results().at(0);
+        const Catalogue::Entry *e = m_catalogue.find(a);
+        QVERIFY(e);
+        const auto editedAt = [&](int row) { return model()->index(row, ResultModel::ColEdited).data(ResultModel::EditedRole).toBool(); };
+        QVERIFY(!editedAt(0));
+        // Same name plus trailing padding: not edited.
+        m_catalogue.setUnitName(a, e->name + QStringLiteral("  "), e->category, QDateTime::currentDateTimeUtc());
+        view().refreshNames();
+        QVERIFY(!editedAt(0));
+        // Different name: edited, shows the unit's name, tooltip has the factory name.
+        m_catalogue.setUnitName(a, QStringLiteral("My Piano"), e->category, QDateTime::currentDateTimeUtc());
+        view().refreshNames();
+        QVERIFY(editedAt(0));
+        QCOMPARE(model()->index(0, ResultModel::ColName).data().toString(), QStringLiteral("My Piano"));
+        const QString tip = model()->index(0, ResultModel::ColEdited).data(Qt::ToolTipRole).toString();
+        QVERIFY(tip.contains(e->name));
+        // Favourite star follows the library without a rebuild.
+        m_library->toggleFavourite(a);
+        QVERIFY(model()->index(0, ResultModel::ColStar).data(ResultModel::FavouriteRole).toBool());
+        m_catalogue.clearUnitNames();
+        view().refreshNames();
+        QVERIFY(m_fake->received().isEmpty());
     }
 
     // SPEC 4.1: Ctrl+1..8 puts the highlighted sound in that slot of the current set.
