@@ -154,7 +154,7 @@ fixes go back to the builder as T5.x tasks.
 
 ## M5 · Packaging, guide, v1.0.0
 
-- ☐ **T5.1 Windows polish** (builder): icon and version resources in the exe, portable
+- ☑ **T5.1 Windows polish** (builder): icon and version resources in the exe, portable
   mode, `Diagnose X50.bat` still included, SmartScreen note in the readme.
 - ☐ **T5.2 Linux AppImage and macOS dmg** (builder), as in the D-05 project.
 - ☐ **T5.3 One-page guide for the keyboard player** (clerk drafts from SPEC §4 and the
@@ -452,3 +452,8 @@ fixes go back to the builder as T5.x tasks.
 - 2026-11-21 · **G3 on hold** (owner): v0.9.0 beta zip (CI run 44958148618) and
   docs/gates/G3-checklist.md ready, also covering G1; not sent yet. M5 work that does not
   depend on the keyboard player continues: T5.1, T5.2. (owner)
+- 2026-11-21 · T5.1 done (CI run 44960672542): icon + VERSIONINFO 0.9.0.0 (CompanyName
+  empty, copyright as LICENSE); GUI subsystem with AttachConsole for CLI flags; Diagnose
+  X50.bat uses `start "" /wait`; windeployqt skips tls, networkinformation and generic
+  (the TUIO touch plugin was the only Qt6Network importer; Windows touch uses qwindows);
+  CI asserts no binary imports Qt6Network; portable mode verified on the runner. (foreman)
