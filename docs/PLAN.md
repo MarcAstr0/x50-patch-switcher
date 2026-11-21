@@ -304,3 +304,7 @@ fixes go back to the builder as T5.x tasks.
   VCToolsVersion), no vc_redist/dxcompiler/dxil in the zip, exact-first port selection,
   clearer refused-inquiry result. CI green, run 44935392424, artifact
   X50-Patch-Switcher-windows-966817a.zip (13 MB). Ready for G1. (foreman)
+- 2026-11-21 · For T5.1: windeployqt bundles Qt6Network.dll with the tls and
+  networkinformation plugins although the app links no network module (CLAUDE.md: no
+  network code). Find what pulls it in (likely Qt6Svg or the icon engine) and exclude it,
+  checking the staged smoke still passes. Not a G1 blocker. (foreman)
