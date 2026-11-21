@@ -107,7 +107,7 @@ code. M3's read-names UI (T3.5) waits for G1; nothing else does.
 
 Touches only `docs/design/` and `assets/`. No C++.
 
-- ☐ **T2.1 References** per the brief.
+- ☑ **T2.1 References** per the brief.
 - ☐ **T2.2 `DESIGN.md`** per the brief, complete enough that the builder never guesses.
 - ☐ **T2.3 Assets**: fonts with licences, icon set including `.ico`, `app.qss`.
 - ☐ **T2.4 Mockups**: live 8, live 6, browse, settings.
