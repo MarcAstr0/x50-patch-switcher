@@ -382,3 +382,9 @@ fixes go back to the builder as T5.x tasks.
   also saved on aboutToQuit. For M4 (from R3): route errorOccurred/sendFailed to the
   live top bar; keep browse widgets (set editor dialogs, context menu) unreachable while
   live; call setSettingsAllowed(false) on entering live. Codex R3 runs at 18:20. (foreman)
+- 2026-11-21 · **CI red since 468467f** (macOS pixel font antialiased; Qt 6.8 Linux
+  button widths; flaky test_favourites_recent). The foreman pushed ten commits without
+  watching CI (FOREMAN says watch every push) and committed f576373 with a local test
+  failure. Process from here: every push is followed by `gh run watch --exit-status`,
+  and commits only after `ctest` exits 0 (checked by exit code, not grep). Fixing now.
+  (foreman)
