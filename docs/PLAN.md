@@ -228,3 +228,11 @@ fixes go back to the builder as T5.x tasks.
   so extra strictness risks refusing a real unit's reply; revisit with G1 captures. Dump
   kind now fixes the record count (kind 1 = 128, kind 2 = 1) and X50 program dumps cap
   the bank at D; both done inside T1.7. (foreman)
+- 2026-11-21 · G2 typography (owner asked for the X50 LCD look, manual PDF p. 10): LCD
+  panels use a dot-matrix face (Pixel Operator, CC0, patched as "Pixel Operator X50" for
+  `&` and zero legibility) and the LCD's own layout ("PROG 0:Play", "Bank C",
+  "Category 00:Keyboard", inverse "096: Piano &Strings"). Live button names stay
+  Atkinson unless the owner picks the pixel-font variant. Category numbers are
+  zero-based as on the unit. Open for M3: the factory TSV has category names but not
+  their index; the index order must come from the unit's global dump or from VNL, never
+  alphabetical. (owner; foreman)
