@@ -376,3 +376,9 @@ fixes go back to the builder as T5.x tasks.
   decisions on its three questions: accept QSS-drawn borders blending at 1.25x
   (strict snapping only for QPainter items); manual Channel/Bank Map disabled after a
   passing check; Close below the card. Builder fix round D3-1 next. (foreman)
+- 2026-11-21 · R3 (reviewer: "ship M3"; MIDI-on-explicit-action holds across the GUI).
+  Fix round: show why "NO X50" at startup; reset stale link error per state; recordUse
+  owned by MainWindow (for live view); one RtMidi enumerator while polling; window.ini
+  also saved on aboutToQuit. For M4 (from R3): route errorOccurred/sendFailed to the
+  live top bar; keep browse widgets (set editor dialogs, context menu) unreachable while
+  live; call setSettingsAllowed(false) on entering live. Codex R3 runs at 18:20. (foreman)
