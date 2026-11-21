@@ -214,6 +214,7 @@ private:
     void buildTools();
     void syncScale();
     int dv(double designPx) const;            // round(round(v * u) * dpr)
+    int sd(double designPx) const;            // stroke width: max(1, round(v * u * dpr))
     int fontPx(double designPx) const;        // device px of a live text size, 11 px floor
     QRect toDevice(const QRect &logical) const;
     void prep(QStaticText &st, const QString &text, const QFont &font, int wrapWidth = -1) const;

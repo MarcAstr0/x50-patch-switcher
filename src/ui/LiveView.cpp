@@ -212,6 +212,9 @@ LiveView::ButtonState LiveView::stateOf(int i) const
 
 int LiveView::dv(double designPx) const { return qRound(qRound(designPx * m_u) * m_dpr); }
 
+// Stroke device width (DESIGN 3.5): max(1, round(w * u * dpr)), never rounded in logical px first.
+int LiveView::sd(double designPx) const { return qMax(1, qRound(designPx * m_u * m_dpr)); }
+
 int LiveView::fontPx(double designPx) const
 {
     // DESIGN 2.1: live text other than the big name never renders under 11 logical px.
@@ -279,7 +282,7 @@ void LiveView::buildTools()
     m_radiusBezel = dv(6);
     m_radiusField = dv(4);
     // DESIGN 3.5: stroke device width = max(1, round(w * dpr)), w already multiplied by u.
-    auto sw = [this](double v) { return qreal(qMax(1, dv(v))); };
+    auto sw = [this](double v) { return qreal(sd(v)); };
     m_wNormal = sw(Theme::borderLiveNormal);
     m_wLit = sw(Theme::borderLiveLit);
     m_wPressed = sw(Theme::borderLivePressed);
@@ -314,10 +317,10 @@ void LiveView::buildTools()
     m_penOnRed = QPen(QColor(Theme::onRed));
     m_penLcdInk = QPen(QColor(Theme::lcdInk));
     m_penLcdField = QPen(QColor(Theme::lcdFieldDim));
-    m_penTag = solid(Theme::cyanText, qMax(1, dv(2)));
-    m_penCap = solid(Theme::textDim, qMax(1, dv(2)));
-    m_penCapArmed = solid(Theme::text, qMax(1, dv(2)));
-    const qreal ringW = qMax(1, dv(3));
+    m_penTag = solid(Theme::cyanText, sd(2));
+    m_penCap = solid(Theme::textDim, sd(2));
+    m_penCapArmed = solid(Theme::text, sd(2));
+    const qreal ringW = sd(3);
     m_penRing = solid(Theme::red, ringW);
     m_penRing.setCapStyle(Qt::FlatCap);
     m_penRingOnRed = solid(Theme::onRed, ringW);
@@ -462,7 +465,7 @@ void LiveView::layoutBar()
     const int Wd = qRound(W * m_dpr);
     m_bar.rect = QRect(0, 0, W, L(Theme::liveTopBar));
     m_bar.dev = toDevice(m_bar.rect);
-    const int ruleH = qMax(1, dv(2));
+    const int ruleH = sd(2);
     m_bar.ruleDev = QRect(0, m_bar.dev.bottom() + 1 - ruleH, Wd, ruleH);
     const int pad = dv(Theme::liveMargin), gap24 = dv(24);
     const double cy = (m_bar.dev.height() - ruleH) / 2.0;

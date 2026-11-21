@@ -168,7 +168,7 @@ private slots:
         QCOMPARE(v.buttonState(0), LiveView::ButtonState::Normal);
         QVERIFY(!v.currentNotInSet());
         const QImage img = grab(v);
-        const int wLit = qMax(1, dv(v, 6)), wNorm = qMax(1, dv(v, 2));
+        const int wLit = qMax(1, qRound(6 * v.unit() * dpr())), wNorm = qMax(1, qRound(2 * v.unit() * dpr()));
 
         const QRect lit = v.buttonRectDevice(1), norm = v.buttonRectDevice(0);
         QCOMPARE(px(img, lit.center().x(), lit.top() + wLit / 2), Theme::text);                // white border
@@ -204,6 +204,36 @@ private slots:
             }
         QVERIFY(dark > 100);
         QCOMPARE(bright, 0);
+    }
+
+    // DESIGN 3.5 / 5.4 (review D4 item 2): stroke device width = max(1, round(w * u * dpr)),
+    // measured on the rendered image: lit border 6u, normal border 2u, top bar rule 2u.
+    void strokeThickness()
+    {
+        LiveView v(&m_cat);
+        v.setSet(friday());
+        v.setCurrentSound(prog(B::D, 104));
+        v.show();
+        const QSize sz = screenLogical(1920, 1080);
+        sizeTo(v, sz.width(), sz.height());
+        const QImage img = grab(v);
+        const double U = v.unit() * dpr();
+        auto run = [&](int x, int y0, int dy, QRgb colour) {
+            int n = 0;
+            for (int y = y0; y >= 0 && y < img.height() && px(img, x, y) == colour; y += dy)
+                ++n;
+            return n;
+        };
+        const QRect lit = v.buttonRectDevice(1), norm = v.buttonRectDevice(0);
+        const int expLit = qMax(1, qRound(6 * U)), expNorm = qMax(1, qRound(2 * U));
+        const int mLit = run(lit.center().x(), lit.top(), 1, Theme::text);
+        const int mNorm = run(norm.center().x(), norm.top(), 1, Theme::lineStrong);
+        const QRect bar = v.barRectDevice();
+        const int mRule = run(2, bar.bottom(), -1, Theme::line);
+        qInfo("scale %.2f: lit %d (exp %d), normal %d (exp %d), rule %d (exp %d)", dpr(), mLit, expLit, mNorm, expNorm, mRule, expNorm);
+        QCOMPARE(mLit, expLit);
+        QCOMPARE(mNorm, expNorm);
+        QCOMPARE(mRule, expNorm);
     }
 
     // DESIGN 5.4 "Empty": no fill, dashed 2u `line` border, "EMPTY" in text-empty, does nothing.

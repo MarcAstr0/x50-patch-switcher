@@ -144,7 +144,7 @@ on the live mockups, that is the moment to send them to her.
   CI-built, behaviour confirmed at G3.
 - ☑ **T4.4 Footprint.** `scripts/measure-footprint.sh` (Linux) and the CI Windows job
   printing working-set size after start; within SPEC §5.
-- ☐ **D4 Design review** of live view at 1×, 1.25×, 1.5×, 2×.
+- ☑ **D4 Design review** of live view at 1×, 1.25×, 1.5×, 2×.
 - ☐ **R4 Review** (reviewer + Codex), emphasis on input handling and repaint discipline.
 
 **Gate G3 (owner → keyboard player) · beta.** Pre-release `v0.9.0` zip. The foreman
