@@ -255,3 +255,22 @@ fixes go back to the builder as T5.x tasks.
   3 no matching port; 4 send failed (busy, NAK, lost) or diagnose could not write;
   5 microX answered. A bare `A000` is ambiguous for `--send` (exit 2). `--diagnose`
   enforces a send allow-list (inquiry, Mode and State, dump requests only). (foreman)
+- 2026-11-21 · **R-T1.7 fix round (next builder task, blocks G1):** (1) WinMM SysEx
+  fragments: `setBufferSize()` before `openPort()` and F0..F7 reassembly in
+  RtMidiBackend, test with a fragmenting fake; (2) clear learned mode, Bank Map, channel,
+  bank-select bytes and current sound on disconnect/stop/new probe, keep manual fallbacks
+  separate; (3) serialise a send that arrives during a Mode Change wait and re-evaluate the
+  target mode before CC0/CC32/PC; (4) echo suppression consumes only the expected
+  CC0/CC32/PC tuple; (5) on a request timeout, check the port still exists, else go
+  Disconnected; (6) ignore a well-formed dump for another bank/kind (late dump after
+  cancel or timeout); (7) emit `sendFailed` when a Mode Change write fails or the port
+  dies during the wait; (8) connection generation counter drops stale queued messages.
+  Reviewer + Codex, reconciled by the foreman. (foreman)
+- 2026-11-21 · **R-T1.8 fixes (before G1):** Diagnose X50.bat checks the exe exists
+  (message: unzip the whole folder first), branches its final message on
+  `report.txt` existing, and uses `[Environment]::GetFolderPath('Desktop')` (OneDrive,
+  localised desktop) with `%USERPROFILE%\Desktop` as fallback; DiagnoseRunner writes
+  report.txt first and records per-file write errors; Windows arguments via
+  `CommandLineToArgvW` (non-ANSI user names); tests for diagnose exit codes 1, 3, 4;
+  explicit restrict flag in LoggingBackend. Reviewer's "no diagnose test" claim was wrong
+  (`diagnoseFake` exists). (foreman)
