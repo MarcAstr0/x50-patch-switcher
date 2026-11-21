@@ -1,5 +1,6 @@
 """Live view mockups (DESIGN.md section 5), 1920x1080 at 100% scale, u = 1.5."""
 from lib import *
+import lcd
 
 W, H = 1920, 1080
 U = round(min(W / 1280.0, H / 720.0), 3)  # 1.5
@@ -89,6 +90,18 @@ def fit_name(text, wbox, hbox, slots):
     raise RuntimeError('no fit')
 
 
+def fit_pixel(text, wbox, hbox):
+    """Largest integer k (font px 16k, Pixel Operator Bold) that fits: one line, or the
+    balanced two-line break (line pitch 14k). Ties go to fewer lines."""
+    for k in range(12, 0, -1):
+        if adv(text, 'pb', 16 * k) <= wbox:
+            return k, [text]
+        ls = balanced_break(text, 16 * k, 'pb')
+        if ls and 2 * 14 * k <= hbox and all(adv(x, 'pb', 16 * k) <= wbox for x in ls):
+            return k, ls
+    return 1, [text]
+
+
 def fit_sound(text, wbox):
     for d in range(20, 13, -2):
         s = L(d)
@@ -97,7 +110,7 @@ def fit_sound(text, wbox):
     return L(14)
 
 
-def button(s, x, y, w, h, slot, n, st, slots, log):
+def button(s, x, y, w, h, slot, n, st, slots, log, pix=False):
     """st: normal | lit | empty. slot: dict(label, kind, addr, name) or None."""
     rad = L(14)
     pad = L(16)
@@ -149,13 +162,24 @@ def button(s, x, y, w, h, slot, n, st, slots, log):
     nby = iy + badge + L(8)
     nbh = h - 2 * pad - badge - L(8) - L(8) - L(48)
     big = slot['label'] or slot['name']
-    size, lines, stage, d = fit_name(big, iw, nbh, slots)
-    log.append('slot %d %-18s stage %s %2du = %2dpx, %d line(s), box %dx%d'
-               % (n, big, stage, d, size, len(lines), iw, nbh))
-    cy = nby + nbh / 2.0
-    lh = 1.1 * size
-    for i, ln in enumerate(lines):
-        s.text(ix + iw / 2.0, cy + (i - (len(lines) - 1) / 2.0) * lh, ln, 'ab', size, fg, anchor='middle')
+    if pix:
+        k, lines = fit_pixel(big, iw, nbh)
+        log.append('pix slot %d %-18s k=%d (%dpx) %d line(s)' % (n, big, k, 16 * k, len(lines)))
+        cy = nby + nbh / 2.0
+        pitch = 14 * k
+        for i, ln in enumerate(lines):
+            yb = cy + (i - (len(lines) - 1) / 2.0) * pitch
+            base = int(round(yb - 6 * k)) + 9 * k  # centre cap-top..descender box on yb
+            s.text(ix + iw / 2.0, base, ln, 'pb', 16 * k, fg, anchor='middle', base=True)
+        size = None
+    else:
+        size, lines, stage, d = fit_name(big, iw, nbh, slots)
+        log.append('slot %d %-18s stage %s %2du = %2dpx, %d line(s), box %dx%d'
+                   % (n, big, stage, d, size, len(lines), iw, nbh))
+        cy = nby + nbh / 2.0
+        lh = 1.1 * size
+        for i, ln in enumerate(lines):
+            s.text(ix + iw / 2.0, cy + (i - (len(lines) - 1) / 2.0) * lh, ln, 'ab', size, fg, anchor='middle')
 
     # bottom block (48u high, bottom aligned)
     bot = y + h - pad
@@ -178,33 +202,11 @@ def top_bar(s, setname, mode, addr, name, notinset, connected, log):
     ssz = L(24)
     s.text(pad, cy, setname, 'ab', ssz, C['text'])
     x = pad + adv(setname, 'ab', ssz) + L(24)
-    # LCD readout panel (DESIGN 5.5): bezel 2u, field-dim, inverse mode segment, ink text
-    stat = L(22)
-    ph = L(40)
-    bz = L(2)
-    inset = L(4)
+    # LCD readout panel (DESIGN 5.5): Pixel Operator, inverse mode segment and sound bar
     chip_h = L(32)
-    ctext = L(20)
-    chip_w = adv(mode, 'bs', ctext, L(1)) - L(1) + 2 * L(10)
-    nsz = L(26)
-    body_w = chip_w + L(12)
-    if addr:
-        body_w += adv(addr, 'bs', stat, L(1)) - L(1) + L(12) + adv(name, 'bs', nsz)
-    else:
-        body_w += adv('--', 'bs', nsz)
-    pw = bz + inset + body_w + L(12) + bz
-    s.rect(x, cy - ph / 2.0, pw, ph, fill=C['lcd_bezel'], rx=L(6))
-    s.rect(x + bz, cy - ph / 2.0 + bz, pw - 2 * bz, ph - 2 * bz, fill=C['lcd_field_dim'], rx=L(4))
-    px = x + bz + inset
-    s.rect(px, cy - chip_h / 2.0, chip_w, chip_h, fill=C['lcd_ink'], rx=L(3))
-    s.text(px + L(10), cy, mode, 'bs', ctext, C['lcd_field_dim'], trk=L(1))
-    px += chip_w + L(12)
-    if addr:
-        s.text(px, cy, addr, 'bs', stat, C['lcd_ink'], trk=L(1))
-        px += adv(addr, 'bs', stat, L(1)) + L(12) - L(1)
-        s.text(px, cy, name, 'bs', nsz, C['lcd_ink'])
-    else:
-        s.text(px, cy, '--', 'bs', nsz, C['lcd_ink'])
+    stat = L(22)
+    kind = mode if mode in ('PROG', 'COMBI') else None
+    pw = lcd.live_panel(s, x, cy, U, kind, addr, name, log)
     x += pw + L(16)
     if addr and notinset:
         tsz = L(18)
@@ -258,7 +260,7 @@ def grid(slots_n):
     return cols, xs, ws, ys, hs
 
 
-def render(path, slots, lit, setname, mode, addr, name, notinset, connected, log):
+def render(path, slots, lit, setname, mode, addr, name, notinset, connected, log, pix=False):
     n = len(slots)
     s = Svg(W, H, C['bg_live'])
     top_bar(s, setname, mode, addr, name, notinset, connected, log)
@@ -266,7 +268,7 @@ def render(path, slots, lit, setname, mode, addr, name, notinset, connected, log
     for i, sl in enumerate(slots):
         c, rw = i % cols, i // cols
         st = 'empty' if not sl else ('lit' if i == lit else 'normal')
-        button(s, xs[c], ys[rw], ws[c], hs[rw], sl, i + 1, st, n, log) if sl else \
+        button(s, xs[c], ys[rw], ws[c], hs[rw], sl, i + 1, st, n, log, pix) if sl else \
             button(s, xs[c], ys[rw], ws[c], hs[rw], None, i + 1, 'empty', n, log)
     hint(s)
     s.save(path)
@@ -301,6 +303,9 @@ def build(outdir):
     log = []
     render(outdir + '/live-8.svg', SET8, 1, 'Friday Set 2', 'PROG', 'D104', 'Classic E.Piano',
            False, True, log)
+    log.append('--- pixel-font comparison')
+    render(outdir + '/live-8-pixelfont.svg', SET8, 1, 'Friday Set 2', 'PROG', 'D104', 'Classic E.Piano',
+           False, True, log, pix=True)
     log.append('---')
     render(outdir + '/live-6.svg', SET6, None, 'Acoustic Night', 'PROG', 'D001', 'PianoMezzoDark',
            True, True, log)

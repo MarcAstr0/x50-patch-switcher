@@ -55,7 +55,7 @@ Same names in both.
 | `lcd-field-dim` | `#BFC3BA` | live top bar readout panel: the same LCD, dimmed so it does not glow on a dark stage |
 | `lcd-ink` | `#111411` | LCD text, inverse (reversed) segment fill, LCD LED and borders |
 | `lcd-bezel` | `#3A413B` | the thin dark bezel round both LCD panels (2px browse, 2u live) |
-| `lcd-warn` | `#8A1414` | disconnected ring and text inside the browse LCD only (`red` is too light on a pale field) |
+| `lcd-warn` | `#8A1414` | reserved for red text on a pale LCD field; currently unused (connection status moved outside the LCD panels) |
 | `placeholder` | `#8A97A2` | search placeholder text |
 
 ### 1.2 Contrast table (live view, target 7:1 for text)
@@ -95,8 +95,8 @@ Rule: never put `text-dim` on `sel-row` in anything smaller than 14px; use `text
 
 ## 2. Fonts
 
-Two families, four files, all OFL 1.1, committed under `assets/fonts/` with their
-licence files. Justification: Atkinson Hyperlegible keeps I/l/1 and O/0 distinct in
+Three families, six files, committed under `assets/fonts/` with their licence files:
+Atkinson and Barlow are OFL 1.1, Pixel Operator is CC0 1.0 (§2.2). Justification: Atkinson Hyperlegible keeps I/l/1 and O/0 distinct in
 sound names read at a distance; Barlow Semi Condensed gives the tracked, uppercase,
 hardware-silkscreen feel for labels, addresses and numerals in a narrow width.
 
@@ -107,10 +107,16 @@ hardware-silkscreen feel for labels, addresses and numerals in a narrow width.
 | `BarlowSemiCondensed-Medium.ttf` | Barlow Semi Condensed | 500 | https://raw.githubusercontent.com/jpt/barlow/master/fonts/ttf/BarlowSemiCondensed-Medium.ttf |
 | `BarlowSemiCondensed-SemiBold.ttf` | Barlow Semi Condensed | 600 | https://raw.githubusercontent.com/jpt/barlow/master/fonts/ttf/BarlowSemiCondensed-SemiBold.ttf |
 
+| `PixelOperator.ttf` | Pixel Operator | 400 | https://www.dafont.com/pixel-operator.font (zip `https://dl.dafont.com/dl/?f=pixel_operator`; upstream https://notabug.org/HarvettFox96/ttf-pixeloperator, not reachable from the design machine) |
+| `PixelOperator-Bold.ttf` | Pixel Operator | 700 | same zip |
+
 Licences (T2.3 fetches, saves beside the fonts):
 
 - `assets/fonts/OFL-AtkinsonHyperlegible.txt` from https://raw.githubusercontent.com/googlefonts/atkinson-hyperlegible/main/OFL.txt
 - `assets/fonts/OFL-Barlow.txt` from https://raw.githubusercontent.com/jpt/barlow/master/OFL.txt
+- `assets/fonts/CC0-PixelOperator.txt`: the `LICENSE.txt` shipped in the Pixel Operator zip,
+  Creative Commons CC0 1.0 Universal (also stated in the font's name table, ID 13). CC0 is a
+  public-domain dedication, so it meets the "OFL or equivalent" rule.
 
 I verified on 2026-11-21 that these four TTFs and both OFL.txt files exist at those
 URLs (GitHub tree listing) and that the four files download (sizes 54 KB, 55 KB,
@@ -148,21 +154,90 @@ Line height is a multiple of the pixel size.
 | `live-sound` | Atkinson Regular | fitted 20u down to 14u | 0 | 1.1 | as typed |
 | `bar-set` | Atkinson Bold | 24u (shrinks to 18u, §6.2) | 0 | 1.1 | as typed |
 | `bar-status` | Barlow SemiBold | 22u | 1u | 1.0 | upper |
-| `bar-now` | Barlow SemiBold | 26u (name), 22u `live-addr` style (address), 20u tracked 1u (mode, in the inverse segment) | 0 | 1.1 | as typed |
+| `bar-now` | superseded by the `lcd-*` roles below (Pixel Operator) | | | | |
 | `hint` | Barlow Medium | 18u | 0.5u | 1.2 | sentence |
 | `body` | Atkinson Regular | 15px | 0 | 1.3 | as typed |
 | `body-strong` | Atkinson Bold | 15px | 0 | 1.3 | as typed |
 | `small` | Atkinson Regular | 13px | 0 | 1.3 | as typed |
 | `label` | Barlow SemiBold | 12px | 1.5px | 1.2 | upper |
 | `address` | Barlow SemiBold | 15px | 0.5px | 1.2 | as typed |
-| `strip-main` | Barlow SemiBold | 26px (name), 20px tracked 0.5px (address), 13px tracked 1.5px (mode) | 0 | 1.1 | as typed |
+| `strip-main` | superseded by the `lcd-*` roles below (Pixel Operator) | | | | |
+| `lcd-row` | Pixel Operator Regular (Bold where §7.2 says) | `16k` device px | 0 | cell grid, §2.2 | as typed |
+| `lcd-bar-browse` | Pixel Operator Regular | `32k` device px | 0 | cell grid | as typed |
+| `lcd-live-bar` | Pixel Operator Bold | `16*kb` device px | 0 | cell grid | as typed |
+| `lcd-live-mode` | Pixel Operator Bold | `16*km` device px | 0 | cell grid | as typed |
 | `title` | Atkinson Bold | 20px | 0 | 1.2 | as typed |
+
+`k`, `kb`, `km` are whole numbers of device pixels per font pixel (§2.2).
 
 Floor: any live text other than `live-name` never renders under 11 logical px (so
 `max(11, round(size*u))`). `live-name` has no floor, it shrinks by the §5.3 rule.
 
-Text rendering: `QFont::PreferDefaultHinting`, antialiasing on for text and shapes.
+Text rendering: `QFont::PreferDefaultHinting`, antialiasing on for text and shapes, for
+every face except Pixel Operator (§2.2 has its own rules).
 Sound names are never uppercased.
+
+### 2.2 Pixel Operator (LCD panels only)
+
+Used in exactly two places: the browse display strip (§7.2) and the live top-bar readout
+(§5.5). It is never used for buttons, lists, labels, dialogs or the connection status.
+
+Why this face (research, 2026-11-21, against the Operation Guide screenshots, "PROG
+0:Play" printed p.2 and "COMBI 0:Play" p.4): the X50 LCD has a chunky proportional bitmap face in
+two weights, bold for the header and the bank, regular for the category line and the big
+sound bar, with a slashed or dotted zero. Pixel Operator is a proportional 16-pixel
+face with a Regular and a Bold, a slashed zero, 9-pixel capitals and 7-pixel lowercase,
+and it covers every character in `data/x50-factory.tsv` (checked with fontTools against
+every character of every name and category in the file, including `& ' ( ) / . : + !`) and `…` (U+2026). It is not the KORG
+face and carries no trademark. Known weakness: `&` is drawn like a `6` with a hook, so
+`&Strings` can read as `6Strings` (visible in the mockups). It is acceptable only because
+the same name is also shown in Atkinson on the button and in the lists.
+
+Grid. `unitsPerEm` is 1600 and every outline coordinate is a multiple of 100, so one font
+pixel is `size / 16` px. The face is crisp only when the pixel size is `16 * k` with `k` a
+whole number of **device** pixels (16, 32, 48, 64 ... px). Metrics in font pixels: ascent
+13, descent 3, cap height 9, x-height 7, so ink runs from 9 above the baseline to 3
+below it (12 rows). Advances are whole multiples of 100 units (space 4, `i` 5 regular or
+6 bold, digits 7 regular or 8 bold, `M` and `w` 9), so text widths are whole multiples of
+`k`.
+
+Rendering rules for the builder:
+
+1. Paint the LCD panels in device-pixel space: take `QTransform tr = p.transform()`, map
+   the panel's logical origin with `tr` and round it to whole device pixels, then
+   `p.save(); p.resetTransform();` and paint with integer device coordinates only.
+   Every panel dimension below is a whole number of device pixels. This is what keeps
+   1.25x and 1.5x on the grid. `p.restore()` afterwards.
+2. `QFont f(family); f.setPixelSize(16 * k)` with `k` a whole number (never a fractional
+   point size); `f.setHintingPreference(QFont::PreferNoHinting)`;
+   `f.setStyleStrategy(QFont::StyleStrategy(QFont::PreferAntialias | QFont::NoSubpixelAntialias))`;
+   `f.setKerning(false)`; `f.setLetterSpacing(QFont::AbsoluteSpacing, 0)`. Draw with
+   `drawText(QPoint(x, baseline), text)` where `x` and `baseline` are integers. Subpixel
+   (ClearType) antialiasing is off so no coloured fringes appear on the inverse bars.
+3. Do not measure with `QFontMetricsF` in logical pixels. Use `QFontMetrics` on the same
+   device-space font; with no hinting the advance is exactly `k` times the font-pixel
+   advance.
+4. Baseline inside a box of height `h` device px, for ink centred (cap top to descender
+   bottom): `baseline = top + round((h - 12k) / 2) + 9k`. §7.2 gives the browse
+   positions as fixed offsets that this formula reproduces.
+5. Family registration like Barlow: log `applicationFontFamilies()`; the Bold file reports
+   family `Pixel Operator` style `Bold` (name ID 1 and 2), so one family string with
+   weight Bold works. `Theme` holds the string. If loading fails the panels fall back to
+   Barlow SemiBold at `16*k` px and the same boxes (they only look different).
+
+Sizes in use (device px per font pixel `k`; the font px size is `16k`):
+
+| Place | `k` | Font px | Cap height (px) | Rule |
+|---|---|---|---|---|
+| Browse strip, header, bank, category rows | `k = max(1, round(scale))` | `16k` | `9k` | `scale` is the screen's device pixel ratio |
+| Browse strip, sound bar | `2k` | `32k` | `18k` | |
+| Live readout, sound bar | `kb = max(1, round(1.8 * U))` | `16*kb` | `9*kb` | `U = u * devicePixelRatio` |
+| Live readout, mode segment | `km = min(kb, max(1, round(1.2 * U)))` | `16*km` | `9*km` | |
+
+At 1x, 1.25x, 1.5x, 2x on a 1080p screen: browse `k` = 1, 1, 2, 2 (font 16 and 32, 16 and
+32, 32 and 64, 32 and 64 px); the live `U` is 1.5 in every row of §5.7 for 1920x1080, so
+`kb = 3` (48 px, cap 27 px), `km = 2` (32 px). On a 1366x768 panel `U` = 1.067, so `kb = 2`,
+`km = 1`. The size changes only when `u` or the screen changes (§6.5), never per paint.
 
 ---
 
@@ -380,33 +455,50 @@ Three zones in one row, vertically centred:
    wider, shrink 24u down to 18u in steps of 2u; at 18u elide with `…`. Eliding is
    acceptable here because the set name is the player's own text, shown in full in
    browse. [decided]
-2. **Centre, now readout: an LCD panel.** The top bar stays dark; only this readout is
-   an LCD, a compact panel echoing the unit's black-on-pale display (owner direction,
-   2026-11-21). Starts after the set name zone with 24u gap; the panel is as wide as its
-   content, at most the remaining width less the right zone. Painted with rectangles
-   only, no gradient, no pixel grid:
-   - Panel: height 40u, vertically centred; outer rounded rect radius 6u fill
-     `lcd-bezel` (the 2u bezel), inside it a rect inset 2u, radius 4u, fill
-     `lcd-field-dim` (`#BFC3BA`, deliberately dimmer than the browse strip so it does not
-     glow on a dark stage). Inner padding: 4u left of the mode segment, 12u right of the
-     name.
-   - Mode segment (LCD inverse): rounded rect radius 3u, height 32u, fill `lcd-ink`,
-     padding 10u horizontal, text `COMBI`, `PROG` or `--` in Barlow SemiBold 20u tracked
-     1u, colour `lcd-field-dim`. Then 12u gap.
-   - Address `live-addr` style (Barlow SemiBold 22u, tracked 1u), `lcd-ink`, bank and
-     number only (`D104`: the segment already says the mode; the same applies to the
-     browse display strip), 12u gap, then the sound name in Barlow SemiBold 26u,
-     `lcd-ink`, for example `PROG D104  Classic E.Piano`. The name shrinks 26u to 18u in
-     steps of 2u to fit the panel's available width, then elides with `…` (it is a
-     duplicate of the button text, which never truncates).
-   - Contrast: `lcd-ink` on `lcd-field-dim` 10.4:1, `lcd-field-dim` on `lcd-ink` 10.4:1
-     (both >= 7:1).
+2. **Centre, now readout: an LCD panel in Pixel Operator (§2.2).** The top bar stays
+   dark; only this readout is an LCD, echoing the unit's black-on-pale display, whose
+   header row reads `PROG 0:Play` in an inverse block with the sound as a big inverse bar
+   (owner direction 2026-11-21; Operation Guide printed pages 2 and 4). One compact line: an inverse
+   **mode segment** then an inverse **sound bar**. Starts after the set name zone with a
+   24u gap. Painted with rectangles and device-space text only (§2.2 rule 1); no
+   gradient, no dot grid. `U = u * devicePixelRatio`, `kb`, `km` from §2.2.
+   - Panel: height 40u, vertically centred in the bar content (above the 2u rule); outer
+     rounded rect radius 6u fill `lcd-bezel` (`#3A413B`, the 2u bezel), inside it a rect
+     inset 2u, radius 4u, fill `lcd-field-dim` (`#BFC3BA`, deliberately dimmer than the
+     browse strip so it does not glow on a dark stage). Inner padding 4u on all sides
+     between the field and the two segments. Width = 2u + 4u + mode segment + 6u gap +
+     sound bar + 4u + 2u, as wide as its content.
+   - Mode segment: plain rectangle (radius 0), height 32u, fill `lcd-ink`, horizontal
+     padding 8u each side, text Pixel Operator Bold `16*km` px in `lcd-field-dim`. Text
+     is exactly `PROG 0:Play` or `COMBI 0:Play` (the X50 writes the page as `0:Play`;
+     it is a constant).
+   - Gap between segment and bar: 6u of `lcd-field-dim` showing through.
+   - Sound bar: plain rectangle, height 32u, fill `lcd-ink`, horizontal padding 10u each
+     side, text Pixel Operator **Bold** `16*kb` px in `lcd-field-dim` (Bold in live view
+     for legibility; the unit's own bar is regular). Text is exactly
+     `<bank letter><number>: <name>`: bank letter `A` to `D`, `G` or `g(d)`, number as
+     three digits, a colon, one space, the sound's name as typed. Examples: `D104: Classic
+     E.Piano`, `C096: Piano &Strings`, `A000: StereophonicKeys`, `G001: Acoustic Piano`
+     (the manual gives GM numbers as 001 to 128, Operation Guide, specifications: "Program banks G:
+     001-128, g(d): 001-128", so `001`; the bank letter is kept here because live view has no separate
+     bank row). If the name is unknown (an address read from the unit before names were
+     read), the name part is `---`.
+   - Vertical text position in both segments: the §2.2 rule 4 baseline formula with
+     `h = 32u` (rounded to whole device px); ink height `12k` is at most 22u at `kb`,
+     so it always fits.
+   - Fit: the panel's available width is the bar width minus left padding, set zone, 24u
+     gaps, the right zone and (when shown) the `NOT IN SET` tag and its 16u gap. If the
+     panel is wider, lower `kb` by 1 (and `km = min(km, kb)`) until it fits or `kb = 1`;
+     if still too wide, drop characters from the end of the name and append `…`
+     (U+2026, present in the font). Never lower the mode segment text on its own.
+   - Contrast: `lcd-field-dim` on `lcd-ink` 10.4:1 (both texts, >= 7:1).
    - When the X50 is on a sound **not in the set**: after the panel (16u gap, so outside
      it), a tag `NOT IN SET` (`live-tag` style at 18u, `cyan-text` text, 2u `cyan-text`
      border, radius 6u, height 32u, padding 10u horizontal) on the dark bar.
-   - When the current sound is unknown (nothing sent, nothing followed): the panel
-     shows the segment `--` and then the single word `--` in Barlow SemiBold 26u
-     `lcd-ink`, no address.
+   - When the current sound is unknown (nothing sent, nothing followed): mode segment
+     text `--`; the bar is not filled but drawn as a `max(1, round(2u))` device-px
+     `lcd-ink` outline on the field, with the text `--` in Pixel Operator Regular
+     `16*kb` px, `lcd-ink`, padding as above.
 3. **Right, connection.** Right-aligned. LED 16u diameter, 12u gap, then `bar-status`
    text. States:
    - `X50 CONNECTED`: LED filled disc `cyan`; text `text`.
@@ -460,6 +552,11 @@ smallest big-text step (max1 for 8 slots, 28u):
 (Name max is 52u (8 slots) or 60u (6 slots) times `u` times the scale factor; name min
 is 28u times the same. Check any cell with §5.1 to §5.3; the screenshot tests use these
 cells.)
+
+LCD readout pixel sizes (§2.2, §5.5) on these cells: 1920x1080 at every scale has
+`U = u * scale = 1.5`, so `kb = 3` (48 px font, 27 px caps) and `km = 2` (32 px); the
+1366x768 cells all have `U = 1.067`, so `kb = 2` (32 px) and `km = 1` (16 px). Always whole
+device pixels.
 
 Because `u` follows the window, a 1920x1080 screen looks the same at every scale; what
 changes is physical sharpness. Smaller physical screens at the same logical size (1366)
@@ -530,7 +627,7 @@ Vertical stack, top to bottom:
 
 | Region | Height | Stretches |
 |---|---|---|
-| Display strip | 64 | width |
+| Display strip | `74k` device px = `74k / scale` px (74 at 1x), `k` from §2.2 | width |
 | Toolbar row (search, kind toggles, buttons) | 40 | width |
 | Main area (category list left; result list over set editor right) | rest | both |
 | Status line | 24 | width |
@@ -540,35 +637,72 @@ handle 6 wide, `line` colour), remaining width is the right column. The right co
 top to bottom: **result list** (stretches), **transport bar** (56 fixed), **set editor
 panel** (fixed 200). Everything fixed keeps its height; the result list takes all
 slack. At the minimum window (700 high): 16 + 64 + 12 + 40 + 12 + [main] + 12 + 24 + 16 =
-196 + main, so main = 504; the result list = 504 - 56 - 200 - 2*12 = 224: a 28 header plus 5 rows of 36 (196). That is the floor; below it the window cannot shrink.
+196 + main with a 64 strip; with the 74 strip it is 206 + main, so main = 494 and the result list = 494 - 56 - 200 - 2*12 = 214: a 28 header plus 5 rows of 36 (208). That is the floor. At scale 1.5 and 2 (`k` = 2) the strip is 148 device px = 98.7 px at 1.5x and 74 px at 2x; the window minimum height must grow by `strip - 74` so the 5-row floor still holds (setMinimumHeight is recomputed when `k` changes). Below it the window cannot shrink.
 
 ### 7.2 Display strip (what the X50 is on, and the connection)
 
-Height 64, full width. An LCD panel (owner direction, 2026-11-21: keep the look of the
-unit's black-on-pale backlit display; REFERENCES §1 is superseded where it said cyan).
-Painted with QPainter rectangles only; no gradient, no pixel grid, no logo.
+Height `74k` device px (74 at 1x), full width row. Left: an LCD panel in Pixel Operator
+(§2.2) that echoes the X50's display (Operation Guide printed pages 2 and 4: inverse header row,
+"Bank" and "Category" line, then the sound as a large inverse bar). Right, **outside the
+panel**, on the dark `bg-browse`: the connection LED and status. Painted with QPainter
+rectangles and device-space text only (§2.2 rule 1), no gradient, no dot grid, no logo.
+All numbers below are device pixels with `k = max(1, round(scale))`; at 1x `k = 1`, so
+they are also logical px.
 
-- Bezel: outer rounded rect radius 8, fill `lcd-bezel` (`#3A413B`), so a 2px dark frame.
-- Field: inside it, inset 2px, radius 6, fill `lcd-field` (`#E6E8E1`). Padding 6 vertical
-  from the field, 12 horizontal (the bar below is at 8 from the outer edge).
+Panel box: `480k` wide, `74k` high (clipped to the available width on a narrow window),
+left aligned at the window margin. Bezel: outer rounded rect radius `4k`, fill
+`lcd-bezel` (`#3A413B`), and the field inside it inset `2k`, radius `2k`, fill
+`lcd-field` (`#E6E8E1`). Field size `476k x 70k`. Coordinates below are inside the
+field (origin top-left). Segments and the bar have radius 0.
 
-Left to right:
+| Element | Box (x, y, w, h) | Text | Colours |
+|---|---|---|---|
+| Mode segment (left) | `4k, 3k, textW + 8k, 16k` | `PROG 0:Play` or `COMBI 0:Play`, Bold `16k`, x = 8k, baseline y = 14k | fill `lcd-ink`, text `lcd-field` |
+| Page segment (right) | right edge at `472k` (4k from the field edge), `y 3k, w textW + 8k, h 16k` | `Program` Bold + `:Program Select` Regular (PROG), or `Combination` Bold + `:Combi Select` Regular (COMBI), both `16k`, x = segment left + 4k, baseline y = 14k | fill `lcd-ink`, text `lcd-field` |
+| Bank | text only | `Bank A` Bold `16k`, x = 8k, baseline y = 32k | `lcd-ink` on field |
+| Category | text only | `Category 00:Keyboard` Regular `16k`, x = 160k, baseline y = 32k | `lcd-ink` on field |
+| Sound bar | `4k, 37k, 468k, 30k` | `096: Piano &Strings` Regular `32k` (`2k` per font pixel), x = 10k, baseline y = 37k + 21k = 58k | fill `lcd-ink`, text `lcd-field` |
 
-1. **Inverse segment** (the LCD reversed line): rounded rect radius 4, fill `lcd-ink`
-   (`#111411`), height 48, padding 16 horizontal, auto width, max 62% of strip width.
-   Contents, text `lcd-field`: mode `COMBI` / `PROG` / `--` in Barlow SemiBold 13px upper,
-   tracked 1.5px; 12 gap; address in Barlow SemiBold 20px tracked 0.5px; 12 gap; sound
-   name in Barlow SemiBold 26px (`strip-main`), shrinking to 16px then eliding `…`.
-2. Gap 12. If the sound is unknown (nothing sent or followed) the inverse segment is not
-   filled: it is drawn as a 1px `lcd-ink` outline on the field and shows `--` in
-   `lcd-ink`.
-3. Right aligned: connection LED and text as the live bar (§5.5) but Barlow SemiBold
-   15px tracked 1.5px (`label` style), LED 16px diameter. Connected: filled disc
-   `lcd-ink`, text `lcd-ink`. Disconnected: hollow ring 2px with a diagonal bar in
-   `lcd-warn`, text `NO X50` in `lcd-warn` (ring and bar make it not colour only).
+`textW` is the measured advance of the segment text (a whole multiple of `k`); the field
+bottom padding is 3k below the bar.
 
-Contrast: `lcd-ink` on `lcd-field` 15.0:1; `lcd-field` on `lcd-ink` 15.0:1; `lcd-warn` on
-`lcd-field` 7.8:1.
+Exact strings:
+
+- Mode segment: `PROG 0:Play` in Program mode, `COMBI 0:Play` in Combination mode. The
+  page `0:Play` is constant.
+- Page segment: `Program:Program Select` (word Bold) or `Combination:Combi Select`.
+- Bank: `Bank ` plus the bank as the app writes it: `A`, `B`, `C`, `D`, `G`, `g(d)`
+  (Combination banks `A` to `C`). Example `Bank C`.
+- Category: `Category ` + two-digit zero-based category index + `:` + category name, for
+  example `Category 00:Keyboard`. The index is the category's position (zero-based) in the
+  unit's category table. The manual proves two points only: `Keyboard` is `00` in both
+  modes (printed p.3 "00: Keyboard"; p.4 `Category 00:Keyboard`) and PROG `SlowSynth` is `09`
+  (p.2 `Category 09:SlowSynth`). The rest of the order is **not verified here**: take it from
+  the unit's category-name table once read, or from the VNL page order, and never
+  from an alphabetical sort. If the index is not known show `Category --:Keyboard`.
+  If the category is unknown show `Category --:--`.
+- Sound bar: three-digit number (`000` to `127`, GM `001` to `128`), a colon, one space,
+  the name as typed: `096: Piano &Strings`, `001: Acoustic Piano`. The bank is not
+  repeated (it is in the Bank row). Unknown name: `096: ---`.
+- Names never shrink here: the bar is 468k wide, and the widest factory name
+  (`OrchestraMaximus`, bar text `000: OrchestraMaximus`) measures `286k` at the `2k`
+  size against `456k` available (measured with the committed font). If a name still
+  does not fit, clip with `…` at the end.
+- Unknown sound (nothing sent, nothing followed): mode segment `--` (padding as above),
+  no page segment, no Bank or Category text, and the sound bar is an outline: `k` thick
+  `lcd-ink` stroke inside the box, no fill, text `--` Regular `32k` in `lcd-ink`.
+
+Connection zone (right aligned, vertically centred on the strip, 16 from the right
+margin of the window, on `bg-browse`): same LED and text as the live bar (§5.5, right
+zone), at browse size: LED 16px diameter, 12px gap, text `label` style (Barlow SemiBold
+15px tracked 1.5px, upper). Connected: filled disc `cyan`, text `text`. Disconnected:
+hollow ring 3px `red` with a diagonal bar, text `NO X50` in `red`. Errors replace the
+text with the app's message in `red`, up to two lines, right zone at most 40% of the
+window width (the panel is clipped first).
+
+Contrast: `lcd-ink` on `lcd-field` 15.0:1; `lcd-field` on `lcd-ink` 15.0:1.
+The token `lcd-warn` is no longer used in the strip (its use moved to `red` on the dark
+background); keep the token.
 
 ### 7.3 Toolbar row (height 40)
 
@@ -832,6 +966,9 @@ Every value the builder needs and where it is. Nothing below is left to choose.
       Toolbar, search, toggles: §7.3 to §7.5. Category list: §7.6. Result row delegate
       with exact row height and columns, edited and favourite markers: §7.7. Transport,
       Play: §7.8. Set editor grid and cell: §7.9. Status line: §7.10.
+- [x] LCD font (Pixel Operator), grid sizes, Qt rendering settings, baseline formula:
+      §2.2. LCD readout in live top bar, exact strings, colours, padding, fit: §5.5.
+      Browse display strip with exact boxes, offsets, strings, unknown state: §7.2.
 - [x] Settings dialog, probe checklist states with glyph shapes, fix hint style: §8.
 - [x] Icon brief: §9. QSS object names and properties: §10.
 
@@ -841,6 +978,10 @@ exact names of C++ constants (mirror the token names with `camelCase`). The mock
 mockup and this text disagree, this text wins and the mockup is a bug.
 
 ### Re-read pass: values I originally left implicit, now filled
+
+0. (G2 typography) Pixel size at each scale and how it snaps (§2.2); the category index
+   rule and its unverified order (§7.2); GM number format (§5.5, §7.2); unknown-sound
+   look of both panels; what is outside the panels (connection, NOT IN SET).
 
 1. Name box height formula and what happens to leftover height: §5.3 (button height - 140).
 2. The inset rule for borders so thick borders do not shift content: §3.5.
@@ -852,6 +993,11 @@ mockup and this text disagree, this text wins and the mockup is a bug.
 8. Scale behaviour on non-16:9 windows: §5.7.
 
 ### Not fixable from here (needs the owner or hardware)
+
+- Category index order (§7.2): only `Keyboard` = 00 (both modes) and PROG `SlowSynth` =
+  09 are proven by the manual. The mockup's program category list (§7.6) puts SlowSynth
+  at position 8, so its order is wrong somewhere; it must come from the unit or the VNL.
+- Pixel Operator's `&` reads like `6` (§2.2). Decision for the owner.
 
 - Whether Barlow Semi Condensed registers under the family name `Barlow Semi Condensed`
   on Windows Qt: check at first run (§2); not verified.
@@ -872,6 +1018,7 @@ the committed files). Text is measured with the same font files, so the §5.3 fi
 |---|---|---|
 | `docs/design/mockup/live-8.svg`, `docs/design/mockup-live-8.png` | 1920x1080, `u` = 1.5 | 8 slots; slot 2 lit (NOW), slot 3 `Piano &Strings` on two lines at 44u (balanced break), slot 6 empty, 16-character `StereophonicKeys` (one line at 30u), connected top bar with the LCD readout panel |
 | `docs/design/mockup/live-6.svg`, `docs/design/mockup-live-6.png` | 1920x1080, `u` = 1.5 | 6 slots; X50 on a sound not in the set: `NOT IN SET` tag beside the LCD readout panel, no lit button |
+| `docs/design/mockup/live-8-pixelfont.svg`, `docs/design/mockup-live-8-pixelfont.png` | 1920x1080, `u` = 1.5 | comparison only, not for the builder: `live-8` with the button names in Pixel Operator Bold at the largest whole-`k` size that fits (`k` 3 to 7, 48 to 112 px; two lines at 14k pitch) |
 | `docs/design/mockup/browse.svg`, `docs/design/mockup-browse.png` | 1920x1080 client area (maximised window) | search `piano`, Combis and Programs on, GM off, program category list, 16 of 32 result rows, favourite stars, `EDITED` pill, selected row, current-sound triangle, display strip, transport bar, 8-slot set editor |
 | `docs/design/mockup/settings.svg`, `docs/design/mockup-settings.png` | 520x709 (content height; minimum is 560) | ports, manual settings, check running: pass, fail with hint, pass, unknown with hint, running |
 
@@ -927,6 +1074,24 @@ Change round G2 (2026-11-21, owner-approved changes):
   `lcd-bg` and `lcd-text` are gone. Readout fonts are Barlow Semi Condensed. The lit
   button cyan is unchanged. Regenerated: `mockup-live-8.png`, `mockup-live-6.png`,
   `mockup-browse.png`.
+
+Change round G2b (2026-11-21, owner follow-up on typography):
+
+- New font Pixel Operator (CC0), Regular and Bold, for the two LCD panels only (§2.2);
+  files and licence in `assets/fonts/`, listed in `assets/README.md`. Live buttons stay
+  Atkinson Hyperlegible.
+- §7.2 rewritten: the strip is an LCD panel `480k x 74k` echoing the X50 display (inverse
+  mode and page segments, `Bank` and `Category` row, inverse sound bar). Strip height 64 ->
+  `74k` (§7.1 arithmetic updated: result list floor 214, 5 rows). Connection status moved
+  outside the panel onto `bg-browse` (cyan LED, `text`).
+- §5.5 centre zone rewritten: one-line readout, inverse mode segment `PROG 0:Play` plus
+  inverse sound bar `D104: Classic E.Piano`, both Pixel Operator Bold; panel field
+  `lcd-field-dim` unchanged; `kb`, `km` formula; fit rule lowers `kb` then elides.
+- §2.1: roles `bar-now` and `strip-main` superseded by `lcd-*` roles; token `lcd-warn`
+  unused. The display strip shows `Category 00:Keyboard` using the manual's zero-based
+  index (the brief said 01; the manual says 00).
+- `mockup-live-8-pixelfont.png` added for the owner to compare names in Pixel Operator.
+  Regenerated: `mockup-live-8.png`, `mockup-live-6.png`, `mockup-browse.png`.
 
 Open question for the owner, not changed: at wide browse windows the `EDITED` pill sits at
 the right edge of the very wide `Name` column, far from the name it describes (§7.7 puts

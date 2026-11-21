@@ -3,12 +3,12 @@
 <rect x="0" y="0" width="1920" height="84" fill="#12171B"/>
 <rect x="0" y="81" width="1920" height="3" fill="#2A3238"/>
 <text x="36" y="52.38" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:700;font-size:36px;fill:#F2F5F7;">Friday Set 2</text>
-<rect x="277.31" y="10.5" width="461.06" height="60" rx="9" fill="#3A413B"/>
-<rect x="280.31" y="13.5" width="455.06" height="54" rx="6" fill="#BFC3BA"/>
-<rect x="286.31" y="16.5" width="98.91" height="48" rx="5" fill="#111411"/>
-<text x="301.31" y="52.5" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:30px;fill:#BFC3BA;letter-spacing:2px;">PROG</text>
-<text x="403.22" y="53.7" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:33px;fill:#111411;letter-spacing:2px;">D104</text>
-<text x="488.2" y="56.1" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:39px;fill:#111411;">Classic E.Piano</text>
+<rect x="277.31" y="11" width="691" height="60" rx="9" fill="#3A413B"/>
+<rect x="280.31" y="14" width="685" height="54" rx="6" fill="#BFC3BA"/>
+<rect x="286.31" y="17" width="184" height="48" fill="#111411"/>
+<text x="298.31" y="47" text-anchor="start" style="font-family:'Pixel Operator';font-weight:700;font-size:32px;fill:#BFC3BA;">PROG 0:Play</text>
+<rect x="479.31" y="17" width="480" height="48" fill="#111411"/>
+<text x="494.31" y="50" text-anchor="start" style="font-family:'Pixel Operator';font-weight:700;font-size:48px;fill:#BFC3BA;">D104: Classic E.Piano</text>
 <text x="1886" y="53.7" text-anchor="end" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:33px;fill:#F2F5F7;letter-spacing:2px;">X50 CONNECTED</text>
 <circle cx="1619.59" cy="40.5" r="12" fill="#5DB0D0"/>
 <rect x="36" y="114" width="440" height="429" rx="21" fill="#1A1F24"/>

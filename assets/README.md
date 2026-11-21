@@ -4,6 +4,8 @@
 |---|---|---|
 | `fonts/AtkinsonHyperlegible-Regular.ttf`, `-Bold.ttf` | https://github.com/googlefonts/atkinson-hyperlegible (`fonts/ttf/`) | SIL OFL 1.1, `fonts/OFL-AtkinsonHyperlegible.txt` |
 | `fonts/BarlowSemiCondensed-Medium.ttf`, `-SemiBold.ttf` | https://github.com/jpt/barlow (`fonts/ttf/`) | SIL OFL 1.1, `fonts/OFL-Barlow.txt` |
+| `fonts/PixelOperator.ttf`, `-Bold.ttf` | Pixel Operator by Jayvee Enaguas (HarvettFox96), zip from https://www.dafont.com/pixel-operator.font (upstream https://notabug.org/HarvettFox96/ttf-pixeloperator); used for the LCD panels only | CC0 1.0, `fonts/CC0-PixelOperator.txt` |
+| `fonts/CC0-PixelOperator.txt` | `LICENSE.txt` from the same zip | CC0 1.0 Universal legal text |
 | `fonts/OFL-AtkinsonHyperlegible.txt` | https://raw.githubusercontent.com/googlefonts/atkinson-hyperlegible/main/OFL.txt | OFL 1.1 text |
 | `fonts/OFL-Barlow.txt` | https://raw.githubusercontent.com/jpt/barlow/master/OFL.txt | OFL 1.1 text |
 | `icons/app.svg` | hand-written for this project (docs/design/DESIGN.md section 9), 32 px and larger | project licence |

@@ -58,31 +58,19 @@ def build(outdir):
     rows = load_rows()
     log.append('browse: %d matching rows for "piano" (GM excluded), 16 visible' % len(rows))
 
-    # display strip ------------------------------------------------------
-    s.rect(M, M, W - 2 * M, 64, fill=C['lcd_bezel'], rx=8)
-    s.rect(M + 2, M + 2, W - 2 * M - 4, 60, fill=C['lcd_field'], rx=6)
-    bx, by, bh = M + 12, M + 8, 48
-    mode, addr, name = 'COMBI', 'C096', 'Piano &Strings'
-    lab_w = adv(mode, 'bs', 13, 1.5) - 1.5
-    addr_w = adv(addr, 'bs', 20, 0.5) - 0.5
-    name_w = adv(name, 'bs', 26)
-    bw = 16 + lab_w + 12 + addr_w + 12 + name_w + 16
-    s.rect(bx, by, bw, bh, fill=C['lcd_ink'], rx=4)
-    cy = by + bh / 2.0
-    x = bx + 16
-    s.text(x, cy, mode, 'bs', 13, C['lcd_field'], trk=1.5)
-    x += lab_w + 12
-    s.text(x, cy, addr, 'bs', 20, C['lcd_field'], trk=0.5)
-    x += addr_w + 12
-    s.text(x, cy, name, 'bs', 26, C['lcd_field'])
+    # display strip: LCD panel (Pixel Operator, k = 1 at 1x) + connection outside it (DESIGN 7.2)
+    import lcd
+    SH = 74
+    lcd.strip_panel(s, M, M, 1, 'COMBI', 'C096', 'Piano &Strings', 0, 'Keyboard', log)
     label = 'X50 CONNECTED'
-    right = W - M - 12
-    s.text(right, M + 32, label, 'bs', 15, C['lcd_ink'], anchor='end', trk=1.5)
+    right = W - M
+    cyy = M + SH / 2.0
+    s.text(right, cyy, label, 'bs', 15, C['text'], anchor='end', trk=1.5)
     tw = adv(label, 'bs', 15, 1.5) - 1.5
-    led(s, right - tw - 12 - 8, M + 32, 16, True, 2, C['lcd_ink'], C['lcd_warn'])
+    led(s, right - tw - 12 - 8, cyy, 16, True, 3, C['cyan'], C['red'])
 
     # toolbar ------------------------------------------------------------
-    ty = M + 64 + 12
+    ty = M + 74 + 12
     sw_ = W - 2 * M - (308 + 120 + 100 + 100) - 4 * 8
     s.rect(M, ty, sw_, 40, fill=C['field'], stroke=C['cyan'], sw=2, rx=6)
     # magnifier
