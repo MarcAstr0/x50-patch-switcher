@@ -308,3 +308,11 @@ fixes go back to the builder as T5.x tasks.
   networkinformation plugins although the app links no network module (CLAUDE.md: no
   network code). Find what pulls it in (likely Qt6Svg or the icon engine) and exclude it,
   checking the staged smoke still passes. Not a G1 blocker. (foreman)
+- 2026-11-21 · **G1 on hold** (owner): zip X50-Patch-Switcher-windows-966817a.zip and
+  the message are ready in docs/gates/; not sent yet. M3 starts meanwhile. (owner)
+- 2026-11-21 · Category numbers: neither VNL nor the Operation Guide lists the factory
+  category order (only two data points from the LCD figures: COMBI 00 = Keyboard,
+  PROG 09 = SlowSynth). Until the unit's global dump has been read (or G1's global.syx
+  becomes a fixture), the LCD shows "Category:Keyboard" without a number, and the browse
+  category list uses the order of first appearance in the factory catalogue per kind.
+  After a read, the unit's 16 + 16 names and their order are used. (foreman)
