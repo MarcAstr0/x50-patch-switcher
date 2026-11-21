@@ -47,7 +47,8 @@ target_include_directories(x50core PUBLIC src)
 target_link_libraries(x50core PUBLIC Qt6::Core)
 x50_target_options(x50core)
 
-add_library(x50midi STATIC src/midi/RtMidiBackend.cpp src/midi/RtMidiBackend.h)
+add_library(x50midi STATIC src/midi/RtMidiBackend.cpp src/midi/RtMidiBackend.h
+  src/midi/X50Protocol.cpp src/midi/X50Protocol.h)
 target_include_directories(x50midi PUBLIC src)
 target_link_libraries(x50midi PUBLIC x50core Qt6::Core rtmidi)
 x50_target_options(x50midi)

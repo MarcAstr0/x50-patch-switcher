@@ -71,7 +71,7 @@ No GUI beyond the scaffold window. Everything testable headless.
   operations: create, rename, duplicate, delete, resize 6↔8 (resize to 6 keeps slots
   1-6 and refuses if 7-8 are filled, saying so), move slot, set/clear slot and label.
   Tests in a temp dir for all of it.
-- ☐ **T1.6 `X50Protocol`.** Pure functions for every message in MIDI.md §3-§7: builders
+- ☑ **T1.6 `X50Protocol`.** Pure functions for every message in MIDI.md §3-§7: builders
   with exact-byte tests; parsers that validate markers and lengths and return errors
   carrying the raw bytes; the 7/8 codec with round-trip tests over every tail length
   1-7 and random data; record slicing for 444- and 544-byte records with name and
@@ -210,3 +210,12 @@ fixes go back to the builder as T5.x tasks.
   that no longer parses drops that entry with a load warning, a structural error
   sidelines the file; `moveSlot` onto an occupied slot swaps; `duplicateSet` names the
   copy "<name> copy". (foreman, detail)
+- 2026-11-21 · X50Protocol strictness where MIDI.md is silent (T1.6), each to be checked
+  against the G1 captures: global dump accepted if decoded length >= 840 (IMP TABLE 4
+  runs to 849); a 7/8 final group of one lone header byte, or with header bits set for
+  absent bytes, is rejected; program dump byte 5 must be 00; dump number byte exposed,
+  not constrained; non-printable name bytes kept raw and flagged; incoming `4E 7F`
+  (DEMO) rejected, Mode and State accepts 7F. (foreman)
+- 2026-11-21 · G2 (owner): mockups approved with changes: no NEXT state in live view;
+  long names break onto two larger lines before shrinking on one; browse results in
+  catalogue order (COMBI A-C, PROG A-D, G, g(d), by number). (owner)
