@@ -1,0 +1,5 @@
+<RCC>
+  <qresource prefix="/data">
+    <file>x50-factory.tsv</file>
+  </qresource>
+</RCC>

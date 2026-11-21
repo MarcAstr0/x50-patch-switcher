@@ -14,3 +14,9 @@ target_compile_definitions(test_factory_table PRIVATE
 x50_add_test(test_sound_address test_sound_address.cpp)
 target_compile_definitions(test_sound_address PRIVATE
   X50_FACTORY_TSV="${CMAKE_SOURCE_DIR}/data/x50-factory.tsv")
+x50_add_test(test_catalogue test_catalogue.cpp)
+target_compile_definitions(test_catalogue PRIVATE
+  X50_FACTORY_TSV="${CMAKE_SOURCE_DIR}/data/x50-factory.tsv")
+x50_add_test(test_search_query test_search_query.cpp)
+target_compile_definitions(test_search_query PRIVATE
+  X50_FACTORY_TSV="${CMAKE_SOURCE_DIR}/data/x50-factory.tsv")

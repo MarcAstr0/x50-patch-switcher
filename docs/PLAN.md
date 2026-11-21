@@ -63,7 +63,7 @@ No GUI beyond the scaffold window. Everything testable headless.
   MIDI.md §3 table; ordering for prev/next. Tests: round trip of all 1 033 addresses;
   every grammar form in SPEC §3.1; rejects `A128`, `COMBI D000`,
   `G000`, `G129`, `E000`; bank-select table for both maps, every row.
-- ☐ **T1.4 `Catalogue` and `SearchQuery`.** Factory names, unit-name overlay, *edited*
+- ☑ **T1.4 `Catalogue` and `SearchQuery`.** Factory names, unit-name overlay, *edited*
   flag, categories per kind. Search per SPEC §4.1: at least 25 table cases including
   accents, multi-token AND, address tokens, `cat:`, bare address matching both kinds.
 - ☐ **T1.5 `Library` and `SetModel`.** JSON per SPEC §3.3, `QSaveFile`, 500 ms debounce,
@@ -193,3 +193,9 @@ fixes go back to the builder as T5.x tasks.
 - 2026-11-21 · Windows subsystem: the exe is a console app for now so CLI output works.
   Before G3, T1.8/T5.1 must make a double-clicked GUI launch open no console window
   (GUI subsystem plus `AttachConsole` for CLI flags, or a second target). (foreman)
+- 2026-11-21 · Search details where SPEC §4.1 is silent (T1.4): NFD fold then lower case;
+  free text matches displayed name or category; edited slots search the unit name only;
+  `cat:` matches a category prefix **or** the prefix of any `/`-separated part
+  (`cat:mallet` finds Bell/Mallet), quoted values allowed; adjacent tokens joined (up to
+  3) when they parse as an address; an out-of-range address token matches nothing.
+  (foreman, detail)
