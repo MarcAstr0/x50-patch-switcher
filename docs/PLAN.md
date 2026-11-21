@@ -83,7 +83,7 @@ No GUI beyond the scaffold window. Everything testable headless.
   `FakeX50` answers everything per MIDI.md and can be configured to: be a microX, have
   Bank Map KORG, have each enable flag off, NAK, drop replies, send malformed dumps,
   change mode from its "panel". Tests on the fake for each of those.
-- ☐ **T1.8 Command line.** Every flag in SPEC §6 with its exit codes. `--diagnose`
+- ☑ **T1.8 Command line.** Every flag in SPEC §6 with its exit codes. `--diagnose`
   writes `report.txt` (probe checklist, port list, versions, timings) and one `.syx` per
   bank read. `packaging/windows/Diagnose X50.bat` runs it into
   `%USERPROFILE%\Desktop\X50-diagnose-<date>` and opens that folder.
@@ -250,3 +250,8 @@ fixes go back to the builder as T5.x tasks.
   reassemble). Bank dumps of 65-80 KB would arrive in 1 KB pieces. Fix: larger
   `setBufferSize()` before `openPort()` plus F0..F7 reassembly in the backend, tested
   with a fragmenting fake. (foreman)
+- 2026-11-21 · CLI exit codes (T1.8), extending SPEC §6: 0 ok; 1 probe check failed /
+  diagnose incomplete / port enumeration failed; 2 bad or ambiguous address, bad option;
+  3 no matching port; 4 send failed (busy, NAK, lost) or diagnose could not write;
+  5 microX answered. A bare `A000` is ambiguous for `--send` (exit 2). `--diagnose`
+  enforces a send allow-list (inquiry, Mode and State, dump requests only). (foreman)

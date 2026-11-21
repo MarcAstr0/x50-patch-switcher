@@ -1,4 +1,6 @@
+#include "app/CliRunner.h"
 #include "app/CommandLine.h"
+#include "app/DiagnoseRunner.h"
 #include "core/ConfigLocation.h"
 #include "core/Library.h"
 #include "core/Version.h"
@@ -23,9 +25,14 @@ int main(int argc, char *argv[])
     switch (cli.process(args)) {
     case CommandLine::Result::Exit:
         return cli.exitCode();
-    // Hook for later flags (SPEC 6): --send, --probe and --diagnose are
-    // non-GUI and would construct a QCoreApplication here and run its loop;
-    // --screenshot needs QApplication on the offscreen platform.
+    case CommandLine::Result::Run: {
+        // --send, --probe, --diagnose: no widgets, but X50Link needs an event loop.
+        // Hook for M3: --screenshot needs QApplication on the offscreen platform.
+        QCoreApplication app(argc, argv);
+        if (cli.options().job == CliOptions::Job::Diagnose)
+            return DiagnoseRunner(cli.options()).run();
+        return CliRunner(cli.options()).run();
+    }
     case CommandLine::Result::Gui:
         break;
     }
