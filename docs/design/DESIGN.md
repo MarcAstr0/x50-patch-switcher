@@ -948,7 +948,9 @@ vertically centred; gap **8** between chevron and text; chevron and text togethe
 centred in the button (padding at least 16). `Prev`: chevron then text; `Next`: text then
 chevron. (The build had 5 and 3 px gaps.) Play 120 and Star 88 as listed; the same
 `max(listed, advance + 32)` rule as §7.3 applies (Star's painted star 14 + gap 8 count as
-advance).
+advance). Accepted at the second look: the build uses a 16 px icon with Qt's own icon-to-text
+gap (ink 12.5 wide, about 5 px to the text, button still 88); the star is a secondary control
+and the difference is not visible at arm's length.
 
 Primary state set: normal fill `cyan`; hover fill `#6FBFDE`; pressed fill `cyan-text`;
 focus 2px `text` outline offset 2; disabled fill `panel-raised`, text `disabled-text`.
@@ -967,8 +969,8 @@ Background `panel`, radius 8, padding 12. Two rows:
    state's cyan border and `sel-row` fill carry the state; the on state is also bold).
 2. Gap 8. **Slot grid**, remaining height (200 - 24 - 36 - 8 = 132): the grid's outer
    edges are the panel's content edges, i.e. flush with the header row (left edge of the
-   set picker, right edge of the `8` toggle). No extra inset: focus rings (offset 2) may
-   overflow into the 12 px panel padding. Cell top = header bottom + 8, last row bottom =
+   set picker, right edge of the `8` toggle). No extra inset: the slot focus ring is drawn **inside**
+   the cell (see Focus below), because the cells are flush with the panel. Cell top = header bottom + 8, last row bottom =
    panel bottom - 12. 2 rows by 4 columns
    (8 slots) or 3 columns (6 slots), the same shape as the live layout, gap 8. Cell
    height (132 - 8) / 2 = 62, width = (panel inner width - gaps) / columns (about 170 at
@@ -981,8 +983,9 @@ address (`small` 13px `text-dim`) and, if a label is set, the sound name instead
 nothing on line 2 as `address - name`. Empty: dashed 1px `border`, text `EMPTY` `label`
 style `disabled-text`. Selected (clicked): 2px `cyan` border. Drag target while
 dragging: fill `sel-row`, 2px `cyan` dashed. Lit-equivalent (the slot that is current on
-the X50): a 6 x 8 solid triangle at the cell's top-right, `cyan`. Focus: 2px `cyan`
-outline offset 2. Double-click edits the label in place (an inline field in `field`
+the X50): a 6 x 8 solid triangle at the cell's top-right, `cyan`. Focus: 2px `cyan` ring drawn
+inside the cell, its outer edge 2 px inside the cell's outer edge (so it sits within the
+8 px cell padding and never overflows). Double-click edits the label in place (an inline field in `field`
 style). `Del` empties the slot (no confirmation).
 
 ### 7.10 Status line (24 high)
@@ -1110,8 +1113,12 @@ Browse and settings use QSS from `assets/theme/app.qss` loaded once with
 
 Box model (D3): QSS `min-/max-height` and `min-/max-width` are **content-box**; the border
 is added outside. A 40 px control with a 1px border writes `min-height: 38px` in the QSS
-(toggle: `min-width: 110px`, total 112 with the 1px border; the checked 2px border is
-absorbed by `setFixedSize` and a 1px smaller padding in C++). The `QHeaderView::section`
+(toggle: content width = total 112 - `padding-left` 20 - both borders, so `min-width: 90px`
+unchecked (1px border) and `min-width: 88px; min-height: 36px` in `:checked` (2px border);
+padding is added too, which the first D3 wording missed and made the toggle 132 wide).
+`app.qss` now states both, so the widget-level override in `KindToggle` and `SetEditor`
+(the `6 | 8` toggles use `padding-left: 0`, so there content = total - borders: 34 and 32)
+can be deleted. The `QHeaderView::section`
 height is 27 (the list's 1px border is the 28th). `app.qss` is already written this way;
 its header comment lists the same tokens as §1.1 (the old `lcd-bg`, `lcd-text` are gone).
 

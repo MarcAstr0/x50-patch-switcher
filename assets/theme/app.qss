@@ -47,7 +47,8 @@ QLineEdit#searchField:disabled { color: #6B7780; background: #1B2024; }
 
 /* ---- kind toggles (7.5) ---- */
 QToolButton#kindToggle {
-    min-width: 110px; min-height: 38px;
+    /* content box: 112 total - 20 padding-left - 2 x 1px border = 90 */
+    min-width: 90px; min-height: 38px;
     background: #232A30;
     color: #AEB8C2;
     border: 1px solid #46525A;
@@ -58,7 +59,8 @@ QToolButton#kindToggle {
 }
 QToolButton#kindToggle:hover { background: #2C353C; }
 QToolButton#kindToggle:pressed { background: #2A333A; }
-QToolButton#kindToggle:checked { background: #1E4A5C; color: #F2F5F7; border: 2px solid #5DB0D0; }
+/* checked: 112 - 20 - 2 x 2px border = 88 wide, 40 - 2 x 2 = 36 high */
+QToolButton#kindToggle:checked { background: #1E4A5C; color: #F2F5F7; border: 2px solid #5DB0D0; min-width: 88px; min-height: 36px; }
 QToolButton#kindToggle:focus { outline: 2px solid #5DB0D0; }
 QToolButton#kindToggle:disabled { background: #1B2024; color: #6B7780; }
 
