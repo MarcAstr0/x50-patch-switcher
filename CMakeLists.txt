@@ -104,6 +104,19 @@ if(WIN32)
   target_sources(x50-patch-switcher PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/x50-patch-switcher.rc")
 endif()
 
+# Linux packaging (AppImage via linuxdeploy, see .github/workflows/ci.yml). Component x50app keeps RtMidi's own install rules out of the AppDir.
+install(TARGETS x50-patch-switcher RUNTIME DESTINATION bin COMPONENT x50app)
+if(UNIX AND NOT APPLE)
+  install(FILES packaging/linux/x50-patch-switcher.desktop DESTINATION share/applications COMPONENT x50app)
+  install(FILES packaging/linux/com.marcastr0.x50_patch_switcher.metainfo.xml
+          DESTINATION share/metainfo COMPONENT x50app)
+  install(FILES assets/icons/app-256.png DESTINATION share/icons/hicolor/256x256/apps
+          COMPONENT x50app RENAME x50-patch-switcher.png)
+  install(FILES assets/icons/app.svg DESTINATION share/icons/hicolor/scalable/apps
+          COMPONENT x50app RENAME x50-patch-switcher.svg)
+  install(FILES LICENSE DESTINATION share/doc/x50-patch-switcher COMPONENT x50app)
+endif()
+
 if(X50_BUILD_TESTS)
   enable_testing()
   add_subdirectory(tests)

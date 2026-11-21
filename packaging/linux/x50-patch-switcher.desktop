@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=X50 Patch Switcher
+Comment=Find and select programs and combinations on a KORG X50 over MIDI
+Exec=x50-patch-switcher
+Icon=x50-patch-switcher
+Terminal=false
+Categories=AudioVideo;Audio;Midi;
+Keywords=MIDI;synthesizer;KORG;X50;program;combination;

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.marcastr0.x50_patch_switcher</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>X50 Patch Switcher</name>
+  <summary>Find and select sounds on a KORG X50 over MIDI</summary>
+  <description>
+    <p>A small desktop app that finds programs and combinations by name or address and selects them on a KORG X50 over USB-MIDI, with a full-screen live view of large buttons for the sounds of the current set.</p>
+    <p>It never writes to the synthesizer. It is not affiliated with or endorsed by KORG Inc.</p>
+  </description>
+  <url type="homepage">https://github.com/MarcAstr0/x50-patch-switcher</url>
+  <developer id="com.marcastr0"><name>Mario Castro Squella</name></developer>
+  <launchable type="desktop-id">x50-patch-switcher.desktop</launchable>
+  <provides><binary>x50-patch-switcher</binary></provides>
+  <categories><category>Audio</category><category>Midi</category></categories>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.9.0" date="2026-11-21" type="development"/>
+  </releases>
+</component>
