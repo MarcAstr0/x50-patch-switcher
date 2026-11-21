@@ -9,6 +9,7 @@
 #include "ui/Glyphs.h"
 #include "ui/KindToggle.h"
 #include "ui/PanelFrame.h"
+#include "ui/SetEditor.h"
 #include "ui/ResultDelegate.h"
 #include "ui/ResultModel.h"
 #include "ui/ResultTable.h"
@@ -217,6 +218,9 @@ void BrowseView::buildUi()
     m_table->setCornerButtonEnabled(false);
     m_table->setWordWrap(false);
     m_table->setMouseTracking(true);
+    m_table->setDragEnabled(true);  // a row can be dropped on a set editor cell (copy)
+    m_table->setDragDropMode(QAbstractItemView::DragOnly);
+    m_table->setDefaultDropAction(Qt::CopyAction);
     m_table->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_table->setContextMenuPolicy(Qt::CustomContextMenu);
     m_table->verticalHeader()->hide();
@@ -283,11 +287,11 @@ void BrowseView::buildUi()
     connect(m_star, &QPushButton::clicked, this, [this]() { toggleFavouriteHighlighted(); });
     rightLayout->addWidget(transport);
 
-    // Set editor: placement only; the panel's content is T3.6.
-    m_setEditor = new PanelFrame(right);
-    m_setEditor->setObjectName(QStringLiteral("setEditor"));
-    m_setEditor->setFixedHeight(Theme::browseSetEditorHeight);
-    rightLayout->addWidget(m_setEditor);
+    // Set editor (T3.6): its messages go to the status line like ours.
+    m_editor = new SetEditor(m_catalogue, m_library, right);
+    m_editor->setFixedHeight(Theme::browseSetEditorHeight);
+    connect(m_editor, &SetEditor::statusMessage, this, &BrowseView::statusMessage);
+    rightLayout->addWidget(m_editor);
 
     split->addWidget(catPanel);
     split->addWidget(right);
@@ -379,6 +383,7 @@ void BrowseView::refreshNames()
 {
     m_model->refreshAll();
     refreshCategories();
+    m_editor->refreshNames();
 }
 
 QStringList BrowseView::categoryNames() const
@@ -479,9 +484,14 @@ void BrowseView::updateControls()
     m_next->setEnabled(m_model->rowCount() > 0 && row != m_model->rowCount() - 1);
 }
 
+PanelFrame *BrowseView::setEditorPanel() const { return m_editor; }
+
 void BrowseView::syncCurrent()
 {
-    m_model->setCurrent(m_link ? m_link->currentSound() : std::nullopt);
+    const std::optional<SoundAddress> cur = m_link ? m_link->currentSound() : std::nullopt;
+    m_model->setCurrent(cur);
+    if (m_editor)
+        m_editor->setCurrentSound(cur);
 }
 
 QString BrowseView::describe(const SoundAddress &a) const

@@ -50,3 +50,6 @@ set_tests_properties(test_browse_view_2x PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM
 x50_add_test(test_settings_dialog test_settings_dialog.cpp)
 add_test(NAME test_settings_dialog_2x COMMAND test_settings_dialog)
 set_tests_properties(test_settings_dialog_2x PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_SCALE_FACTOR=2")
+x50_add_test(test_set_editor test_set_editor.cpp)
+add_test(NAME test_set_editor_2x COMMAND test_set_editor)
+set_tests_properties(test_set_editor_2x PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_SCALE_FACTOR=2")

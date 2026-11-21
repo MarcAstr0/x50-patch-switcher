@@ -127,7 +127,7 @@ on the live mockups, that is the moment to send them to her.
 - ☑ **T3.4 Settings and probe checklist.** Ports, Test, Check X50, the checklist with
   per-line fix hints, manual channel and Bank Map when the probe fails.
 - ☐ **T3.5 Read names** UI with progress and cancel (after G1 / T1.10).
-- ☐ **T3.6 SetEditor.** Set picker and operations, slot grid, drag reorder, labels,
+- ☑ **T3.6 SetEditor.** Set picker and operations, slot grid, drag reorder, labels,
   `Ctrl+1…8`.
 - ☐ **D3 Design review** (designer): screenshots of every state at 1×, 1.25× and 2×
   against DESIGN.md; numbered deviations; one fix round, a second at most.

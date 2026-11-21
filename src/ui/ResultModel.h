@@ -51,6 +51,10 @@ public:
     QVariant data(const QModelIndex &index, int role) const override;
     QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
     Qt::ItemFlags flags(const QModelIndex &index) const override;
+    // Drag source for the set editor: one row as SlotMime::sound() (the canonical address).
+    QStringList mimeTypes() const override;
+    QMimeData *mimeData(const QModelIndexList &indexes) const override;
+    Qt::DropActions supportedDragActions() const override { return Qt::CopyAction; }
 
 private:
     struct Row {

@@ -23,10 +23,11 @@ class QToolButton;
 class QLineEdit;
 class ResultDelegate;
 class ResultModel;
+class SetEditor;
 class X50Link;
 
 // The browse page (SPEC 4.1, DESIGN 7.3-7.9): search, kind toggles, category list, the
-// result list, the transport bar and a placeholder for the set editor (T3.6). The display
+// result list, the transport bar and the set editor panel (SetEditor, T3.6). The display
 // strip (DESIGN 7.2) and the status line (7.10) belong to MainWindow, which listens to
 // statusMessage().
 //
@@ -99,7 +100,8 @@ public:
     QPushButton *settingsButton() const { return m_settings; }
     QPushButton *readNamesButton() const { return m_readNames; }
     QPushButton *liveButton() const { return m_live; }
-    PanelFrame *setEditorPanel() const { return m_setEditor; }
+    PanelFrame *setEditorPanel() const;
+    SetEditor *setEditor() const { return m_editor; }
 
 signals:
     // A message for the status line. isError: it means something is wrong (red).
@@ -144,7 +146,7 @@ private:
     ResultModel *m_model = nullptr;
     ResultDelegate *m_delegate = nullptr;
     QPushButton *m_prev = nullptr, *m_next = nullptr, *m_play = nullptr, *m_star = nullptr;
-    PanelFrame *m_setEditor = nullptr;
+    SetEditor *m_editor = nullptr;
 
     QIcon m_starOn, m_starOff;
     QString m_category;  // empty = All

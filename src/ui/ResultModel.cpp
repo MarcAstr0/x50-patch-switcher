@@ -1,4 +1,6 @@
 #include "ui/ResultModel.h"
+#include "ui/SlotCell.h"
+#include <QMimeData>
 
 #include "core/Catalogue.h"
 #include "core/Library.h"
@@ -145,5 +147,22 @@ QVariant ResultModel::headerData(int section, Qt::Orientation orientation, int r
 
 Qt::ItemFlags ResultModel::flags(const QModelIndex &index) const
 {
-    return index.isValid() ? (Qt::ItemIsEnabled | Qt::ItemIsSelectable) : Qt::NoItemFlags;
+    return index.isValid() ? (Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsDragEnabled) : Qt::NoItemFlags;
+}
+
+QStringList ResultModel::mimeTypes() const
+{
+    return {SlotMime::sound()};
+}
+
+QMimeData *ResultModel::mimeData(const QModelIndexList &indexes) const
+{
+    for (const QModelIndex &i : indexes) {
+        if (!i.isValid() || i.row() >= m_rows.size())
+            continue;
+        auto *mime = new QMimeData;
+        mime->setData(SlotMime::sound(), m_rows.at(i.row()).address.format().toUtf8());
+        return mime;
+    }
+    return nullptr;
 }

@@ -66,6 +66,7 @@ add_library(x50ui STATIC src/ui/MainWindow.cpp src/ui/MainWindow.h
   src/ui/CategoryDelegate.cpp src/ui/CategoryDelegate.h
   src/ui/ProbeChecklist.cpp src/ui/ProbeChecklist.h src/ui/SettingsDialog.cpp src/ui/SettingsDialog.h
   src/ui/ConnectionSettings.cpp src/ui/ConnectionSettings.h
+  src/ui/SetEditor.cpp src/ui/SetEditor.h src/ui/SlotCell.cpp src/ui/SlotCell.h
   src/ui/x50ui.qrc)
 set_target_properties(x50ui PROPERTIES AUTORCC ON)
 target_include_directories(x50ui PUBLIC src)

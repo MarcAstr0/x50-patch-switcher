@@ -220,6 +220,8 @@ int run(const CliOptions &options)
             link.send(combi(SoundAddress::Bank::C, 96));
             waitFor([&] { return link.currentSound().has_value(); }, 3000);
         }
+        if (!library.sets().isEmpty())
+            library.setCurrentSet(library.sets().first().id());  // Friday Set 2, as in the mockup
         BrowseView *bv = window.browseView();
         if (options.screenshotState == QLatin1String("browse-search")) {
             bv->setKinds(true, true, false);
