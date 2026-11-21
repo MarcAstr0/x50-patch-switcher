@@ -11,5 +11,6 @@
 | `icons/app.svg` | hand-written for this project (docs/design/DESIGN.md section 9), 32 px and larger | project licence |
 | `icons/app-small.svg` | hand-written, 2 x 2 variant used for the 16 and 24 px frames | project licence |
 | `icons/app-256.png` | rendered from `app.svg` with Inkscape | project licence |
+| `icons/app-512.png`, `icons/app-1024.png` | rendered from `app.svg` with Inkscape (`inkscape app.svg -w 1024 -h 1024 -o app-1024.png`); 1024 is the master for the macOS .icns | project licence |
 | `icons/app.ico` | 16, 24, 32, 48, 64, 128, 256 px frames, assembled with ImageMagick | project licence |
 | `theme/app.qss` | hand-written from DESIGN.md section 10 | project licence |
