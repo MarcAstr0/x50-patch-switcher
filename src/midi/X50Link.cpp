@@ -1,0 +1,795 @@
+#include "midi/X50Link.h"
+
+#include <QMetaObject>
+
+using namespace X50Protocol;
+
+namespace {
+
+const SoundAddress::Bank kBanks[] = {SoundAddress::Bank::A, SoundAddress::Bank::B,
+                                     SoundAddress::Bank::C, SoundAddress::Bank::D};
+
+// Which kind of sound a mode selects, if it selects one (MIDI.md section 4).
+std::optional<SoundAddress::Kind> kindOfMode(Mode m)
+{
+    if (m == Mode::CombiPlay) return SoundAddress::Kind::Combi;
+    if (m == Mode::ProgPlay) return SoundAddress::Kind::Prog;
+    return std::nullopt;
+}
+
+QString versionString(const DeviceInquiryReply &r)
+{
+    // Assumption (flagged to the foreman): vv.nn.rr = major, minor (two digits), release.
+    QString v = QStringLiteral("%1.%2").arg(r.major).arg(r.minor, 2, 10, QLatin1Char('0'));
+    if (r.release != 0)
+        v += QStringLiteral(".%1").arg(r.release);
+    return v;
+}
+
+const QString kMicroXText = QStringLiteral(
+    "This is a microX; X50 Patch Switcher supports the X50 only");
+
+}  // namespace
+
+bool X50Link::ProbeResult::allOk() const
+{
+    if (items.isEmpty())
+        return false;
+    for (const CheckItem &i : items)
+        if (i.status != CheckItem::Status::Ok)
+            return false;
+    return true;
+}
+
+void X50Link::ReadResult::applyTo(Catalogue &catalogue) const
+{
+    for (auto it = names.cbegin(); it != names.cend(); ++it)
+        catalogue.setUnitName(it.key(), it.value().name, it.value().category, it.value().readAt);
+    if (haveCategories)
+        catalogue.setUnitCategories(programCategories, combinationCategories);
+}
+
+X50Link::X50Link(MidiBackend *backend, QObject *parent) : QObject(parent), m_backend(backend)
+{
+    m_timer.setSingleShot(true);
+    m_echoTimer.setSingleShot(true);
+    m_poll.setSingleShot(false);
+    m_poll.setInterval(m_timing.pollMs);
+    connect(&m_timer, &QTimer::timeout, this, &X50Link::onTimeout);
+    connect(&m_echoTimer, &QTimer::timeout, this, [this]() { m_echoActive = false; });
+    connect(&m_poll, &QTimer::timeout, this, &X50Link::onPoll);
+    connect(m_backend, &MidiBackend::messageReceived, this, &X50Link::onMessage);
+    connect(m_backend, &MidiBackend::portError, this, &X50Link::onBackendError);
+}
+
+void X50Link::setTiming(const Timing &t)
+{
+    m_timing = t;
+    m_poll.setInterval(t.pollMs);
+}
+
+void X50Link::setPortNames(const QString &out, const QString &in)
+{
+    m_outSub = out;
+    m_inSub = in.isEmpty() ? out : in;
+}
+
+void X50Link::setManualChannel(int channel)
+{
+    if (channel >= 1 && channel <= 16 && m_state != State::Connected)
+        m_channel = channel;
+}
+
+void X50Link::setManualBankMap(BankMap map)
+{
+    if (m_state != State::Connected) {
+        m_bankMap = map;
+        m_bankMapKnown = false;
+    }
+}
+
+// ------------------------------------------------------------ plumbing
+
+void X50Link::setState(State s)
+{
+    if (m_state == s)
+        return;
+    m_state = s;
+    if (s == State::Disconnected && m_started)
+        m_poll.start();
+    else
+        m_poll.stop();
+    emit stateChanged(s);
+}
+
+void X50Link::setStatus(const QString &text)
+{
+    if (m_status == text)
+        return;
+    m_status = text;
+    emit statusChanged(text);
+}
+
+void X50Link::raise(const QString &message, const QByteArray &raw)
+{
+    setStatus(message);
+    emit errorOccurred(message, raw);
+}
+
+bool X50Link::sendRaw(const QByteArray &bytes)
+{
+    const MidiBackend::Status st = m_backend->send(bytes);
+    if (st.ok)
+        return true;
+    disconnectWith(st.detail.isEmpty() ? st.error : st.error + QStringLiteral(": ") + st.detail);
+    return false;
+}
+
+void X50Link::disconnectWith(const QString &reason, const QByteArray &raw)
+{
+    m_timer.stop();
+    const Activity was = m_activity;
+    m_activity = Activity::Idle;
+    m_pendingSend.reset();
+    m_backend->closePorts();
+    if (was == Activity::Reading) {
+        const QString bank = m_stepIndex < m_steps.size() ? m_steps.at(m_stepIndex).label : QString();
+        emit readFailed(bank, reason, raw);
+    } else if (was == Activity::Probing) {
+        CheckItem item;
+        item.status = CheckItem::Status::Failed;
+        item.text = reason;
+        m_probe.items.append(item);
+        m_lastProbe = m_probe;
+        emit probeFinished(m_probe);
+    }
+    setState(State::Disconnected);
+    raise(reason, raw);
+}
+
+void X50Link::onBackendError(const QString &message)
+{
+    if (m_state != State::Disconnected)
+        disconnectWith(message);
+}
+
+// ------------------------------------------------------- connection
+
+void X50Link::start()
+{
+    m_started = true;
+    if (m_state == State::Disconnected) {
+        attemptConnect();
+        if (m_state == State::Disconnected)
+            m_poll.start();
+    }
+}
+
+void X50Link::stop()
+{
+    m_started = false;
+    m_poll.stop();
+    m_timer.stop();
+    m_activity = Activity::Idle;
+    m_backend->closePorts();
+    setState(State::Disconnected);
+}
+
+void X50Link::onPoll()
+{
+    if (m_state == State::Disconnected)
+        attemptConnect();
+}
+
+int X50Link::findPort(const QStringList &names, const QString &sub) const
+{
+    if (sub.isEmpty())
+        return -1;
+    for (int i = 0; i < names.size(); ++i)
+        if (names.at(i).contains(sub, Qt::CaseInsensitive))
+            return i;
+    return -1;
+}
+
+void X50Link::attemptConnect()
+{
+    const MidiBackend::Ports ports = m_backend->ports();
+    const int out = findPort(ports.outputs, m_outSub);
+    const int in = findPort(ports.inputs, m_inSub);
+    if (out < 0 || in < 0) {
+        const QString why = !ports.error.isEmpty()
+            ? QStringLiteral("MIDI is unavailable: %1").arg(ports.error)
+            : (m_outSub.isEmpty() ? QStringLiteral("No MIDI port chosen")
+                                  : QStringLiteral("No X50 port found (looking for \"%1\")").arg(m_outSub));
+        setStatus(why);
+        return;
+    }
+    MidiBackend::Status st = m_backend->openOutput(out);
+    if (st.ok)
+        st = m_backend->openInput(in);
+    if (!st.ok) {
+        m_backend->closePorts();
+        const QString why = st.error;
+        // The poll retries every 2 s: only report a changed message.
+        if (why != m_lastRaised) {
+            m_lastRaised = why;
+            raise(why, QByteArray());
+        }
+        return;
+    }
+    m_lastRaised.clear();
+    m_portName = ports.outputs.at(out);
+    setStatus(QStringLiteral("Connected to %1; checking the X50").arg(m_portName));
+    beginProbe();
+}
+
+// ---------------------------------------------------------------- probe
+
+void X50Link::probe()
+{
+    if (m_state == State::Disconnected) {
+        raise(QStringLiteral("Not connected: no X50 port is open"));
+        return;
+    }
+    if (m_activity == Activity::Reading) {
+        raise(QStringLiteral("Busy reading names from the X50"));
+        return;
+    }
+    beginProbe();
+}
+
+void X50Link::beginProbe()
+{
+    m_timer.stop();
+    m_pendingSend.reset();
+    m_probe = ProbeResult();
+    m_activity = Activity::Probing;
+    m_probeStage = ProbeStage::Inquiry;
+    setState(State::Probing);
+    m_timer.start(m_timing.requestMs);  // started first so a failed send cannot leave it running
+    if (!sendRaw(deviceInquiryRequest()))
+        return;
+}
+
+void X50Link::probeFailedStage(const QString &text, const QString &fix, const QByteArray &raw)
+{
+    CheckItem item;
+    item.status = CheckItem::Status::Failed;
+    item.text = text;
+    item.fix = fix;
+    item.raw = raw;
+    m_probe.items.append(item);
+}
+
+void X50Link::finishProbe(State finalState)
+{
+    m_timer.stop();
+    m_activity = Activity::Idle;
+    m_lastProbe = m_probe;
+    setState(finalState);
+    switch (finalState) {
+    case State::Connected:
+        setStatus(QStringLiteral("X50 connected"));
+        break;
+    case State::Refused:
+        setStatus(kMicroXText);
+        break;
+    default:
+        setStatus(QStringLiteral("Could not confirm an X50: manual mode (channel %1, Bank Map %2)")
+                      .arg(m_channel).arg(m_bankMap == BankMap::Gm ? QStringLiteral("GM")
+                                                                    : QStringLiteral("KORG")));
+        break;
+    }
+    emit probeFinished(m_probe);
+}
+
+void X50Link::onInquiryReply(const QByteArray &msg)
+{
+    const auto r = parseDeviceInquiryReply(msg);
+    if (!r.ok) {
+        probeFailedStage(QStringLiteral("Device Inquiry reply refused: %1").arg(r.error),
+                         QStringLiteral("Report the raw bytes"), r.raw);
+        raise(QStringLiteral("Device Inquiry reply refused: %1").arg(r.error), r.raw);
+        finishProbe(State::Manual);
+        return;
+    }
+    m_probe.inquiry = r.value;
+    m_probe.versionText = versionString(r.value);
+    m_channel = r.value.channel;
+    using F = DeviceInquiryReply::Family;
+    if (r.value.family == F::MicroX) {
+        m_probe.microX = true;
+        probeFailedStage(kMicroXText, QString(), QByteArray());
+        finishProbe(State::Refused);
+        return;
+    }
+    if (r.value.family != F::X50) {
+        probeFailedStage(
+            QStringLiteral("Could not confirm an X50 (device code %1)").arg(r.value.memberCode, 2, 16, QLatin1Char('0')),
+            QStringLiteral("Working in manual mode: choose the channel and Bank Map yourself"),
+            msg);
+        finishProbe(State::Manual);
+        return;
+    }
+    m_probe.x50Confirmed = true;
+    CheckItem ok;
+    ok.text = QStringLiteral("X50 found (system %1, global channel %2)")
+                  .arg(m_probe.versionText).arg(r.value.channel);
+    m_probe.items.append(ok);
+
+    const auto req = modeAndStateRequest(m_channel);
+    m_probeStage = ProbeStage::ModeState;
+    m_timer.start(m_timing.requestMs);
+    sendRaw(req.value);
+}
+
+void X50Link::onModeStateReply(const QByteArray &msg)
+{
+    const auto r = parseModeAndState(msg, m_channel);
+    if (!r.ok) {
+        probeFailedStage(QStringLiteral("Mode and State reply refused: %1").arg(r.error),
+                         QStringLiteral("Working in manual mode; report the raw bytes"), r.raw);
+        raise(QStringLiteral("Mode and State reply refused: %1").arg(r.error), r.raw);
+        finishProbe(State::Manual);
+        return;
+    }
+    const ModeAndState &s = r.value;
+    m_probe.state = s;
+    m_probe.sysexReplies = true;
+
+    auto flag = [this](bool on, const QString &what, const QString &tick) {
+        CheckItem i;
+        i.status = on ? CheckItem::Status::Ok : CheckItem::Status::Failed;
+        i.text = on ? QStringLiteral("%1 enabled").arg(what) : QStringLiteral("%1 disabled").arg(what);
+        if (!on)
+            i.fix = QStringLiteral("GLOBAL 1: MIDI, tick \"%1\"").arg(tick);
+        m_probe.items.append(i);
+    };
+    flag(s.enableProgramChange, QStringLiteral("Program Change"), QStringLiteral("Program Change"));
+    flag(s.enableBankChange, QStringLiteral("Bank Change"), QStringLiteral("Bank"));
+    flag(s.enableCombinationChange, QStringLiteral("Combination Change"), QStringLiteral("Combi"));
+    CheckItem bm;
+    bm.text = QStringLiteral("Bank Map: %1").arg(s.bankMap == BankMap::Gm ? QStringLiteral("GM")
+                                                                          : QStringLiteral("KORG"));
+    m_probe.items.append(bm);
+    CheckItem sx;
+    sx.text = QStringLiteral("SysEx: replies received");
+    m_probe.items.append(sx);
+    if (s.programBank == 4) {
+        CheckItem sus;
+        sus.status = CheckItem::Status::Warning;
+        sus.text = QStringLiteral("Suspect: Mode and State reports program bank E, which only the microX has");
+        sus.fix = QStringLiteral("Report the raw bytes");
+        sus.raw = msg;
+        m_probe.items.append(sus);
+    }
+
+    m_bankMap = s.bankMap;
+    m_bankMapKnown = true;
+    m_mode = s.mode;
+    m_msb.reset();
+    m_lsb.reset();
+    m_current.reset();
+    if (s.mode == Mode::CombiPlay && s.combinationBank <= 2)
+        m_current = SoundAddress(SoundAddress::Kind::Combi, kBanks[s.combinationBank], s.combinationNumber);
+    else if (s.mode == Mode::ProgPlay && s.programBank <= 3)
+        m_current = SoundAddress(SoundAddress::Kind::Prog, kBanks[s.programBank], s.programNumber);
+    finishProbe(State::Connected);
+}
+
+// ------------------------------------------------------------- incoming
+
+void X50Link::onMessage(const QByteArray &msg)
+{
+    if (m_state == State::Disconnected)
+        return;
+    const Classification c = classify(msg);
+    switch (c.kind) {
+    case MessageKind::DeviceInquiryReply:
+        if (m_activity == Activity::Probing && m_probeStage == ProbeStage::Inquiry)
+            onInquiryReply(msg);
+        return;
+    default:
+        break;
+    }
+    // Everything else is a Korg message or channel message: ours only.
+    if (c.channel != 0 && c.channel != m_channel)
+        return;
+    switch (c.kind) {
+    case MessageKind::ModeAndState:
+        if (m_activity == Activity::Probing && m_probeStage == ProbeStage::ModeState)
+            onModeStateReply(msg);
+        break;
+    case MessageKind::Ack:
+    case MessageKind::Nak:
+        if (m_activity == Activity::ModeWait) {
+            const auto a = parseAckNak(msg, m_channel);
+            const std::optional<SoundAddress> pending = m_pendingSend;
+            m_timer.stop();
+            m_activity = Activity::Idle;
+            m_pendingSend.reset();
+            if (!a.ok) {
+                if (pending)
+                    failSend(*pending, QStringLiteral("Mode Change reply refused: %1").arg(a.error), a.raw);
+            } else if (!a.value.ack) {
+                if (pending)
+                    failSend(*pending,
+                             QStringLiteral("The X50 refused the mode change: %1")
+                                 .arg(nakCodeText(a.value.errorCode)),
+                             msg);
+            } else if (pending) {
+                transmit(*pending);
+            }
+        } else if (m_activity == Activity::Reading && c.kind == MessageKind::Nak) {
+            onReadNak(msg);
+        } else if (m_activity == Activity::Probing && m_probeStage == ProbeStage::ModeState &&
+                   c.kind == MessageKind::Nak) {
+            const auto a = parseAckNak(msg, m_channel);
+            probeFailedStage(QStringLiteral("Mode and State refused by the X50: %1")
+                                 .arg(a.ok ? nakCodeText(a.value.errorCode) : a.error),
+                             QStringLiteral("Working in manual mode"), msg);
+            finishProbe(State::Manual);
+        }
+        break;
+    case MessageKind::ModeChange:
+        onModeChange(msg);
+        break;
+    case MessageKind::ControlChange:
+    case MessageKind::ProgramChange:
+        onChannelMessage(msg);
+        break;
+    case MessageKind::ProgramDump:
+    case MessageKind::CombinationDump:
+    case MessageKind::GlobalDump:
+        if (m_activity == Activity::Reading)
+            onDump(msg);
+        break;
+    default:
+        break;  // 40/49 current-buffer dumps, other Korg SysEx, real-time bytes: ignored
+    }
+}
+
+void X50Link::onTimeout()
+{
+    switch (m_activity) {
+    case Activity::Probing:
+        if (m_probeStage == ProbeStage::Inquiry) {
+            probeFailedStage(
+                QStringLiteral("No reply. Is the X50 on, the USB cable in, and GLOBAL 1: MIDI \"Exclusive\" ticked?"),
+                QStringLiteral("GLOBAL 1: MIDI, tick \"Exclusive\""), QByteArray());
+        } else {
+            probeFailedStage(QStringLiteral("No reply to Mode and State: check Exclusive"),
+                             QStringLiteral("GLOBAL 1: MIDI, tick \"Exclusive\""), QByteArray());
+        }
+        finishProbe(State::Manual);
+        break;
+    case Activity::ModeWait: {
+        // No ACK within the wait: carry on (MIDI.md section 3 step 1).
+        const std::optional<SoundAddress> pending = m_pendingSend;
+        m_activity = Activity::Idle;
+        m_pendingSend.reset();
+        if (pending)
+            transmit(*pending);
+        break;
+    }
+    case Activity::Reading:
+        stepFailed(QStringLiteral("no reply within %1 s").arg(m_timing.bankMs / 1000.0, 0, 'g', 3),
+                   QByteArray());
+        break;
+    case Activity::Idle:
+        break;
+    }
+}
+
+// ----------------------------------------------------------------- send
+
+void X50Link::failSend(const SoundAddress &a, const QString &reason, const QByteArray &raw)
+{
+    raise(reason, raw);
+    emit sendFailed(a, reason);
+}
+
+void X50Link::send(const SoundAddress &address)
+{
+    if (!address.isValid()) {
+        failSend(address, QStringLiteral("Invalid sound address"));
+        return;
+    }
+    switch (m_state) {
+    case State::Disconnected:
+        failSend(address, QStringLiteral("Not connected to the X50"));
+        return;
+    case State::Refused:
+        failSend(address, kMicroXText);
+        return;
+    case State::Probing:
+        failSend(address, QStringLiteral("Still checking the X50; try again in a moment"));
+        return;
+    default:
+        break;
+    }
+    if (m_activity == Activity::Reading || m_activity == Activity::Probing) {
+        failSend(address, QStringLiteral("Busy reading names from the X50"));
+        return;
+    }
+    // A send during the mode wait supersedes the earlier one: the newest sound wins.
+    m_timer.stop();
+    m_activity = Activity::Idle;
+    m_pendingSend.reset();
+
+    const Mode target = modeForKind(address.kind());
+    if (m_mode && *m_mode == target) {
+        transmit(address);
+        return;
+    }
+    const auto mc = modeChange(m_channel, target);
+    m_activity = Activity::ModeWait;
+    m_pendingSend = address;
+    m_timer.start(m_timing.modeChangeWaitMs);
+    sendRaw(mc.value);
+}
+
+void X50Link::transmit(const SoundAddress &address)
+{
+    const auto msgs = programSelect(address, m_bankMap, m_channel);
+    if (!msgs.ok) {
+        failSend(address, msgs.error);
+        return;
+    }
+    for (const QByteArray &m : msgs.value) {
+        if (!sendRaw(m)) {
+            emit sendFailed(address, m_status);
+            return;
+        }
+    }
+    const auto bs = address.bankSelect(m_bankMap);
+    m_msb = bs->msb;
+    m_lsb = bs->lsb;
+    m_mode = modeForKind(address.kind());
+    m_current = address;
+    m_echoActive = true;
+    m_echoTimer.start(m_timing.echoMs);
+    emit sent(address);
+}
+
+// --------------------------------------------------------------- follow
+
+void X50Link::onModeChange(const QByteArray &msg)
+{
+    const auto r = parseModeChange(msg, m_channel);
+    if (!r.ok) {
+        raise(QStringLiteral("Mode change from the X50 refused: %1").arg(r.error), r.raw);
+        return;
+    }
+    const bool changed = !m_mode || *m_mode != r.value.mode;
+    m_mode = r.value.mode;
+    const auto k = kindOfMode(r.value.mode);
+    if (m_current && (!k || *k != m_current->kind()))
+        m_current.reset();  // the sound in the new mode is unknown until the panel sends one
+    if (changed)
+        emit followedMode(r.value.mode);
+}
+
+void X50Link::onChannelMessage(const QByteArray &msg)
+{
+    if (m_state != State::Connected && m_state != State::Manual)
+        return;
+    if (m_echoActive)
+        return;  // the echo of our own send (SPEC 4.4)
+    const auto r = parseChannelMessage(msg, m_channel);
+    if (!r.ok)
+        return;
+    const ChannelMessage &cm = r.value;
+    if (!cm.isProgramChange) {
+        if (cm.controller == 0x00)
+            m_msb = cm.value;
+        else if (cm.controller == 0x20)
+            m_lsb = cm.value;
+        return;
+    }
+    if (!m_mode || !m_msb || !m_lsb)
+        return;
+    const auto kind = kindOfMode(*m_mode);
+    if (!kind)
+        return;
+    const auto a = addressFromBankSelect(*m_msb, *m_lsb, cm.value, m_bankMap, *kind);
+    if (!a)
+        return;
+    m_current = *a;
+    emit followedSound(*a);
+}
+
+// ----------------------------------------------------------------- read
+
+void X50Link::readNames(bool continueOnError)
+{
+    if (m_state != State::Connected && m_state != State::Manual) {
+        raise(m_state == State::Refused ? kMicroXText : QStringLiteral("Not connected to the X50"));
+        return;
+    }
+    if (m_activity != Activity::Idle) {
+        raise(QStringLiteral("The X50 link is busy"));
+        return;
+    }
+    m_steps.clear();
+    static const char *const letters = "ABCD";
+    for (int b = 0; b < 4; ++b)
+        m_steps.append({ReadStep::Type::Program, b, QStringLiteral("Program %1").arg(QLatin1Char(letters[b]))});
+    for (int b = 0; b < 3; ++b)
+        m_steps.append({ReadStep::Type::Combination, b, QStringLiteral("Combination %1").arg(QLatin1Char(letters[b]))});
+    m_steps.append({ReadStep::Type::Global, 0, QStringLiteral("Global")});
+    m_stepRecords = QVector<QVector<SoundRecord>>(m_steps.size());
+    m_stepIndex = 0;
+    m_continueOnError = continueOnError;
+    m_rawDumps.clear();
+    m_readResult = ReadResult();
+    m_haveCategories = false;
+    m_firstFailBank.clear();
+    m_firstFailReason.clear();
+    m_firstFailRaw.clear();
+    m_activity = Activity::Reading;
+    emit readProgress(0, m_steps.size(), QString());
+    if (m_activity == Activity::Reading)
+        requestStep();
+}
+
+void X50Link::cancelRead()
+{
+    if (m_activity != Activity::Reading)
+        return;
+    m_timer.stop();
+    m_activity = Activity::Idle;
+    emit readCancelled();
+}
+
+void X50Link::requestStep()
+{
+    const ReadStep &s = m_steps.at(m_stepIndex);
+    X50Protocol::Result<QByteArray> req;
+    switch (s.type) {
+    case ReadStep::Type::Program: req = programBankDumpRequest(m_channel, s.bank); break;
+    case ReadStep::Type::Combination: req = combinationBankDumpRequest(m_channel, s.bank); break;
+    case ReadStep::Type::Global: req = globalDumpRequest(m_channel); break;
+    }
+    m_timer.start(m_timing.bankMs);
+    sendRaw(req.value);
+}
+
+void X50Link::stepFailed(const QString &reason, const QByteArray &raw)
+{
+    const QString label = m_steps.at(m_stepIndex).label;
+    m_readResult.errors << QStringLiteral("%1: %2").arg(label, reason);
+    if (m_firstFailBank.isEmpty()) {
+        m_firstFailBank = label;
+        m_firstFailReason = reason;
+        m_firstFailRaw = raw;
+    }
+    if (!m_continueOnError) {
+        finishRead(true);
+        return;
+    }
+    stepDone();
+}
+
+void X50Link::stepDone()
+{
+    m_timer.stop();
+    const int done = m_stepIndex + 1;
+    const QString label = m_steps.at(m_stepIndex).label;
+    ++m_stepIndex;
+    emit readProgress(done, m_steps.size(), label);
+    if (m_activity != Activity::Reading)
+        return;  // cancelled from the progress slot
+    if (m_stepIndex < m_steps.size())
+        requestStep();
+    else
+        finishRead(false);
+}
+
+void X50Link::onReadNak(const QByteArray &msg)
+{
+    const auto a = parseAckNak(msg, m_channel);
+    stepFailed(a.ok ? QStringLiteral("the X50 refused the request: %1").arg(nakCodeText(a.value.errorCode))
+                    : QStringLiteral("NAK reply refused: %1").arg(a.error),
+               msg);
+}
+
+void X50Link::onDump(const QByteArray &msg)
+{
+    const ReadStep &step = m_steps.at(m_stepIndex);
+    const MessageKind got = classify(msg).kind;
+    const MessageKind want = step.type == ReadStep::Type::Program       ? MessageKind::ProgramDump
+                             : step.type == ReadStep::Type::Combination ? MessageKind::CombinationDump
+                                                                        : MessageKind::GlobalDump;
+    if (got != want) {
+        // A dump of the wrong kind is not the answer to this request.
+        m_rawDumps.append({step.label, msg});
+        stepFailed(QStringLiteral("unexpected dump type instead of the %1 dump").arg(step.label), msg);
+        return;
+    }
+    m_rawDumps.append({step.label, msg});
+
+    if (step.type == ReadStep::Type::Global) {
+        const auto g = parseGlobalDump(msg, m_channel);
+        if (!g.ok) {
+            stepFailed(g.error, g.raw);
+            return;
+        }
+        const auto cats = parseGlobalCategories(g.value.data);
+        if (!cats.ok) {
+            stepFailed(cats.error, msg);
+            return;
+        }
+        m_categories = cats.value;
+        m_haveCategories = true;
+        m_stepRecords[m_stepIndex] = QVector<SoundRecord>();
+        stepDone();
+        return;
+    }
+
+    const bool combi = step.type == ReadStep::Type::Combination;
+    const auto d = combi ? parseCombinationDump(msg, m_channel) : parseProgramDump(msg, m_channel);
+    if (!d.ok) {
+        stepFailed(d.error, d.raw);
+        return;
+    }
+    if (d.value.kind != 1 || d.value.bank != step.bank) {
+        stepFailed(QStringLiteral("dump is for kind %1 bank %2, expected one bank, bank %3")
+                       .arg(d.value.kind).arg(d.value.bank).arg(step.bank),
+                   msg);
+        return;
+    }
+    const auto recs = combi ? sliceCombinationRecords(d.value.data) : sliceProgramRecords(d.value.data);
+    if (!recs.ok) {
+        stepFailed(recs.error, msg);
+        return;
+    }
+    if (recs.value.size() != kRecordsPerBank) {
+        stepFailed(QStringLiteral("bank holds %1 records, expected %2")
+                       .arg(recs.value.size()).arg(kRecordsPerBank),
+                   msg);
+        return;
+    }
+    m_stepRecords[m_stepIndex] = recs.value;
+    stepDone();
+}
+
+void X50Link::finishRead(bool failedStop)
+{
+    m_timer.stop();
+    m_activity = Activity::Idle;
+    if (failedStop) {
+        emit readFailed(m_firstFailBank, m_firstFailReason, m_firstFailRaw);
+        return;
+    }
+    ReadResult &res = m_readResult;
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    res.haveCategories = m_haveCategories;
+    if (m_haveCategories) {
+        for (const NameField &f : m_categories.programCategories)
+            res.programCategories << f.text;
+        for (const NameField &f : m_categories.combinationCategories)
+            res.combinationCategories << f.text;
+    }
+    for (int i = 0; i < m_steps.size(); ++i) {
+        const ReadStep &s = m_steps.at(i);
+        const QVector<SoundRecord> &recs = m_stepRecords.at(i);
+        if (s.type == ReadStep::Type::Global || recs.isEmpty())
+            continue;
+        const bool combi = s.type == ReadStep::Type::Combination;
+        for (int n = 0; n < recs.size(); ++n) {
+            const SoundRecord &r = recs.at(n);
+            Catalogue::UnitName u;
+            u.name = r.name.text;
+            if (m_haveCategories && r.categoryValid && r.category >= 0 && r.category < 16)
+                u.category = combi ? res.combinationCategories.at(r.category)
+                                   : res.programCategories.at(r.category);
+            u.readAt = now;
+            res.names.insert(SoundAddress(combi ? SoundAddress::Kind::Combi : SoundAddress::Kind::Prog,
+                                          kBanks[s.bank], n),
+                             u);
+        }
+    }
+    res.complete = res.errors.isEmpty();
+    emit readFinished(res);
+}

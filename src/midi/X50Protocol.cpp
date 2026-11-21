@@ -116,7 +116,9 @@ Result<BankDump> parseBankDump(const QByteArray &msg, bool combination,
     if ((kb & 0xC8) != 0 || kind > 2) {
         return fail<BankDump>(QStringLiteral("kind/bank byte %1 is malformed").arg(kb, 2, 16, QLatin1Char('0')), msg);
     }
-    const int maxBank = combination ? 2 : 4;  // A-C; A-D, 4 = E on microX (IMP *4)
+    // Combinations A-C; programs A-D. Bank E (4) is microX only, so an X50
+    // program dump (byte 5 == 00) with bank 4 is rejected.
+    const int maxBank = combination ? 2 : 3;
     if (bank > maxBank) {
         return fail<BankDump>(QStringLiteral("bank %1 is out of range").arg(bank), msg);
     }
@@ -124,6 +126,20 @@ Result<BankDump> parseBankDump(const QByteArray &msg, bool combination,
     const Result<QByteArray> decoded = decode78(encoded);
     if (!decoded.ok) {
         return fail<BankDump>(QStringLiteral("data: %1").arg(decoded.error), msg);
+    }
+    // The kind implies the record count (IMP *6, *9): one bank = 128 records,
+    // one record = 1. A record-aligned truncated bank must never look complete.
+    const int recordSize = combination ? kCombinationRecordSize : kProgramRecordSize;
+    const int dataSize = static_cast<int>(decoded.value.size());
+    if (kind == 1 && dataSize != recordSize * kRecordsPerBank) {
+        return fail<BankDump>(QStringLiteral("bank dump holds %1 bytes, expected %2 (128 records of %3)")
+                                  .arg(dataSize).arg(recordSize * kRecordsPerBank).arg(recordSize),
+                              msg);
+    }
+    if (kind == 2 && dataSize != recordSize) {
+        return fail<BankDump>(QStringLiteral("single-record dump holds %1 bytes, expected %2")
+                                  .arg(dataSize).arg(recordSize),
+                              msg);
     }
     BankDump d;
     d.channel = ch;
@@ -528,6 +544,199 @@ Result<GlobalCategories> parseGlobalCategories(const QByteArray &d) {
             decodeName(d.mid(kGlobalCombinationCategoryNames + i * kNameLength, kNameLength)));
     }
     return Result<GlobalCategories>::success(g);
+}
+
+// ---------------------------------------------------------- classification
+
+Classification classify(const QByteArray &m) {
+    Classification c;
+    if (m.isEmpty()) {
+        return c;
+    }
+    const int status = at(m, 0);
+    if (status >= 0xB0 && status <= 0xBF && m.size() == 3) {
+        c.kind = MessageKind::ControlChange;
+        c.channel = (status & 0x0F) + 1;
+        return c;
+    }
+    if (status >= 0xC0 && status <= 0xCF && m.size() == 2) {
+        c.kind = MessageKind::ProgramChange;
+        c.channel = (status & 0x0F) + 1;
+        return c;
+    }
+    if (m.at(0) != kSysexStart || m.size() < 6) {
+        return c;
+    }
+    if (at(m, 1) == 0x7E && (at(m, 2) & 0xF0) == 0x00 && at(m, 3) == 0x06 && at(m, 4) == 0x02) {
+        c.kind = MessageKind::DeviceInquiryReply;
+        c.channel = (at(m, 2) & 0x0F) + 1;
+        return c;
+    }
+    if (at(m, 1) == 0x42 && (at(m, 2) & 0xF0) == 0x30 && at(m, 3) == 0x7A) {
+        c.channel = (at(m, 2) & 0x0F) + 1;
+        switch (at(m, 4)) {
+        case 0x42: c.kind = MessageKind::ModeAndState; break;
+        case 0x23: c.kind = MessageKind::Ack; break;
+        case 0x24: c.kind = MessageKind::Nak; break;
+        case 0x4E: c.kind = MessageKind::ModeChange; break;
+        case 0x4C: c.kind = MessageKind::ProgramDump; break;
+        case 0x4D: c.kind = MessageKind::CombinationDump; break;
+        case 0x51: c.kind = MessageKind::GlobalDump; break;
+        default: c.kind = MessageKind::OtherKorgSysEx; break;
+        }
+    }
+    return c;
+}
+
+Result<ChannelMessage> parseChannelMessage(const QByteArray &m, std::optional<int> expectedChannel) {
+    const Classification c = classify(m);
+    if (c.kind != MessageKind::ControlChange && c.kind != MessageKind::ProgramChange) {
+        return fail<ChannelMessage>(QStringLiteral("not a control change or program change"), m);
+    }
+    for (int i = 1; i < m.size(); ++i) {
+        if (at(m, i) & 0x80) {
+            return fail<ChannelMessage>(QStringLiteral("data byte %1 has bit 7 set").arg(i), m);
+        }
+    }
+    if (expectedChannel && *expectedChannel != c.channel) {
+        return fail<ChannelMessage>(
+            QStringLiteral("message is on channel %1, expected %2").arg(c.channel).arg(*expectedChannel), m);
+    }
+    ChannelMessage cm;
+    cm.channel = c.channel;
+    if (c.kind == MessageKind::ProgramChange) {
+        cm.isProgramChange = true;
+        cm.value = at(m, 1);
+    } else {
+        cm.controller = at(m, 1);
+        cm.value = at(m, 2);
+    }
+    return Result<ChannelMessage>::success(cm);
+}
+
+std::optional<SoundAddress> addressFromBankSelect(int msb, int lsb, int program, BankMap map,
+                                                  SoundAddress::Kind kind) {
+    if (program < 0 || program > 127) {
+        return std::nullopt;
+    }
+    static const SoundAddress::Bank banks[] = {SoundAddress::Bank::A, SoundAddress::Bank::B,
+                                               SoundAddress::Bank::C, SoundAddress::Bank::D,
+                                               SoundAddress::Bank::G, SoundAddress::Bank::Gd};
+    for (const SoundAddress::Bank bank : banks) {
+        // Try both numbering bases: A-D are 0-127, G and g(d) are 1-128.
+        for (int number : {program, program + 1}) {
+            const SoundAddress a(kind, bank, number);
+            const auto bs = a.bankSelect(map);
+            if (bs && bs->msb == msb && bs->lsb == lsb && bs->program == program) {
+                return a;
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+// ------------------------------------------------- X50 side (FakeX50 only)
+
+QByteArray buildDeviceInquiryReply(const DeviceInquiryReply &r) {
+    return bytes({0xF0, 0x7E, (r.channel - 1) & 0x0F, 0x06, 0x02, 0x42, 0x7A, 0x00, r.memberCode,
+                  0x00, r.major, r.minor, r.release, r.build, 0xF7});
+}
+
+Result<QByteArray> buildModeAndState(const ModeAndState &s) {
+    if (!channelOk(s.channel)) {
+        return fail<QByteArray>(badChannel(s.channel), QByteArray());
+    }
+    const int s1 = (s.localControl ? 0x01 : 0) | ((s.midiClock & 0x03) << 1) |
+                   (s.bankMap == BankMap::Gm ? 0x10 : 0) | (s.powerOnMemorize ? 0x20 : 0) |
+                   (s.extRealtime ? 0x40 : 0);
+    const int s2 = (s.enableProgramChange ? 0x01 : 0) | (s.enableBankChange ? 0x02 : 0) |
+                   (s.enableCombinationChange ? 0x04 : 0) | (s.enableAftertouch ? 0x08 : 0) |
+                   (s.enableControlChange ? 0x10 : 0);
+    // MIDI.md section 5 layout; bytes 19-21 and 23-25 (multi, ext. controller) are zero.
+    return Result<QByteArray>::success(bytes(
+        {0xF0, 0x42, 0x30 | (s.channel - 1), 0x7A, 0x42, static_cast<int>(s.mode), 0x06, s1, s2,
+         s.memoryProtectBits & 0x7F, 0x02, s.programBank, s.programNumber, 0x00, 0x00,
+         s.combinationBank, s.combinationNumber, 0x00, 0x04, 0x00, 0x00, 0x00, 0x21, 0x00, 0x00,
+         0x00, 0xF7}));
+}
+
+Result<QByteArray> buildAck(int channel) {
+    if (!channelOk(channel)) {
+        return fail<QByteArray>(badChannel(channel), QByteArray());
+    }
+    QByteArray m = korgHeader(channel, 0x23);
+    m.append(kSysexEnd);
+    return Result<QByteArray>::success(m);
+}
+
+Result<QByteArray> buildNak(int channel, int errorCode) {
+    if (!channelOk(channel)) {
+        return fail<QByteArray>(badChannel(channel), QByteArray());
+    }
+    if (errorCode < 0 || errorCode > 0x7F) {
+        return fail<QByteArray>(QStringLiteral("NAK code out of range"), QByteArray());
+    }
+    QByteArray m = korgHeader(channel, 0x24);
+    m.append(static_cast<char>(errorCode));
+    m.append(kSysexEnd);
+    return Result<QByteArray>::success(m);
+}
+
+Result<QByteArray> buildModeChangeNotice(int channel, Mode mode) {
+    if (!channelOk(channel)) {
+        return fail<QByteArray>(badChannel(channel), QByteArray());
+    }
+    if (!knownMode(static_cast<int>(mode)) || mode == Mode::Demo) {
+        return fail<QByteArray>(QStringLiteral("mode is not in the section 4 table"), QByteArray());
+    }
+    QByteArray m = korgHeader(channel, 0x4E);
+    m.append(static_cast<char>(static_cast<int>(mode)));
+    m.append(kSysexEnd);
+    return Result<QByteArray>::success(m);
+}
+
+Result<QList<QByteArray>> buildPanelSelect(const SoundAddress &address, BankMap map, int channel) {
+    return programSelect(address, map, channel);  // the X50 transmits the same three messages
+}
+
+namespace {
+Result<QByteArray> buildDump(int channel, int function, int kindBank, const QByteArray &decoded) {
+    if (!channelOk(channel)) {
+        return fail<QByteArray>(badChannel(channel), QByteArray());
+    }
+    QByteArray m = korgHeader(channel, function);
+    m.append('\0');
+    m.append(static_cast<char>(kindBank));
+    m.append('\0');
+    m.append(encode78(decoded));
+    m.append(kSysexEnd);
+    return Result<QByteArray>::success(m);
+}
+}  // namespace
+
+Result<QByteArray> buildProgramDump(int channel, int bank, const QByteArray &decoded) {
+    if (bank < 0 || bank > 3) {
+        return fail<QByteArray>(QStringLiteral("program bank out of range 0-3"), QByteArray());
+    }
+    return buildDump(channel, 0x4C, 0x10 | bank, decoded);
+}
+
+Result<QByteArray> buildCombinationDump(int channel, int bank, const QByteArray &decoded) {
+    if (bank < 0 || bank > 2) {
+        return fail<QByteArray>(QStringLiteral("combination bank out of range 0-2"), QByteArray());
+    }
+    return buildDump(channel, 0x4D, 0x10 | bank, decoded);
+}
+
+Result<QByteArray> buildGlobalDump(int channel, const QByteArray &decoded) {
+    if (!channelOk(channel)) {
+        return fail<QByteArray>(badChannel(channel), QByteArray());
+    }
+    QByteArray m = korgHeader(channel, 0x51);
+    m.append('\0');
+    m.append(encode78(decoded));
+    m.append(kSysexEnd);
+    return Result<QByteArray>::success(m);
 }
 
 }  // namespace X50Protocol

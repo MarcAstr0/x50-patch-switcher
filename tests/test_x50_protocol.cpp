@@ -407,15 +407,16 @@ private slots:
         verifyRejected(parseModeChange(bad), bad, "mode 5 not in table");
     }
 
-    // MIDI.md section 7, Replies: 4C 0X kind/bank program-no data F7. Kind 1,
-    // bank B (byte 11), 3 internal bytes 80 01 FF encode to 05 00 01 7F
+    // MIDI.md section 7, Replies: 4C 0X kind/bank program-no data F7. Kind 0
+    // (all; the kind-1 and kind-2 record counts are checked in dumpKindImpliesRecordCount),
+    // bank B, 3 internal bytes 80 01 FF encode to 05 00 01 7F
     // (top bits: byte 1 -> bit 0, byte 3 -> bit 2).
     void programDumpParse() {
-        const QByteArray good = H({0xF0, 0x42, 0x30, 0x7A, 0x4C, 0x00, 0x11, 0x00, 0x05, 0x00, 0x01, 0x7F, 0xF7});
+        const QByteArray good = H({0xF0, 0x42, 0x30, 0x7A, 0x4C, 0x00, 0x01, 0x00, 0x05, 0x00, 0x01, 0x7F, 0xF7});
         const auto r = parseProgramDump(good, 1);
         QVERIFY2(r.ok, qPrintable(r.error));
         QCOMPARE(r.value.channel, 1);
-        QCOMPARE(r.value.kind, 1);
+        QCOMPARE(r.value.kind, 0);
         QCOMPARE(r.value.bank, 1);
         QCOMPARE(r.value.number, 0);
         QCOMPARE(r.value.data, H({0x80, 0x01, 0xFF}));
@@ -437,18 +438,18 @@ private slots:
         b = H({0xF0, 0x42, 0x30, 0x7A, 0x4C, 0x00, 0x11, 0x00, 0x00, 1, 2, 3, 4, 5, 6, 7, 0x03, 0xF7});
         verifyRejected(parseProgramDump(b), b, "malformed final group");
         // A combination dump is not a program dump.
-        const QByteArray combi = H({0xF0, 0x42, 0x30, 0x7A, 0x4D, 0x00, 0x11, 0x00, 0x05, 0x00, 0x01, 0x7F, 0xF7});
+        const QByteArray combi = H({0xF0, 0x42, 0x30, 0x7A, 0x4D, 0x00, 0x01, 0x00, 0x05, 0x00, 0x01, 0x7F, 0xF7});
         verifyRejected(parseProgramDump(combi), combi, "4D given to program parser");
         // Short: no data at all is still a well-formed (empty) dump; truncated header is not.
         const QByteArray tiny = H({0xF0, 0x42, 0x30, 0x7A, 0x4C, 0x00, 0x11, 0xF7});
         verifyRejected(parseProgramDump(tiny), tiny, "truncated header");
     }
-    // MIDI.md section 7: 4D 00 kind/bank combination-no data F7. Kind 2, bank C, no. 7.
+    // MIDI.md section 7: 4D 00 kind/bank combination-no data F7. Kind 0, bank C, no. 7.
     void combinationDumpParse() {
-        const QByteArray good = H({0xF0, 0x42, 0x3F, 0x7A, 0x4D, 0x00, 0x22, 0x07, 0x00, 0x41, 0xF7});
+        const QByteArray good = H({0xF0, 0x42, 0x3F, 0x7A, 0x4D, 0x00, 0x02, 0x07, 0x00, 0x41, 0xF7});
         const auto r = parseCombinationDump(good, 16);
         QVERIFY2(r.ok, qPrintable(r.error));
-        QCOMPARE(r.value.kind, 2);
+        QCOMPARE(r.value.kind, 0);
         QCOMPARE(r.value.bank, 2);
         QCOMPARE(r.value.number, 7);
         QCOMPARE(r.value.data, H({0x41}));
@@ -458,11 +459,40 @@ private slots:
         b[5] = 0x01;
         verifyRejected(parseCombinationDump(b), b, "reserved byte");
         b = good;
-        b[6] = 0x13;  // bank D does not exist for combinations
+        b[6] = 0x03;  // bank D does not exist for combinations
         verifyRejected(parseCombinationDump(b), b, "combination bank 3");
         // Truncating the data by one byte leaves a header-only group.
-        b = H({0xF0, 0x42, 0x3F, 0x7A, 0x4D, 0x00, 0x22, 0x07, 0x00, 0xF7});
+        b = H({0xF0, 0x42, 0x3F, 0x7A, 0x4D, 0x00, 0x02, 0x07, 0x00, 0xF7});
         verifyRejected(parseCombinationDump(b), b, "header-only group");
+    }
+    // MIDI.md section 7 (IMP *6, *9): kind 1 = one bank = exactly 128 records,
+    // kind 2 = exactly one record. Bank E (4) is microX only: rejected in an X50 program dump.
+    void dumpKindImpliesRecordCount() {
+        auto frame = [](int function, int kb, const QByteArray &data) {
+            QByteArray m = H({0xF0, 0x42, 0x30, 0x7A, function, 0x00, kb, 0x00});
+            m.append(encode78(data));
+            m.append(static_cast<char>(0xF7));
+            return m;
+        };
+        const QByteArray bank = syntheticProgramData();  // 128 x 444
+        QVERIFY(parseProgramDump(frame(0x4C, 0x10, bank), 1).ok);
+        const QByteArray shortBank = bank.left(444 * 127);  // record aligned, one short
+        const QByteArray m1 = frame(0x4C, 0x10, shortBank);
+        verifyRejected(parseProgramDump(m1), m1, "127 records in a bank dump");
+        QVERIFY(parseProgramDump(frame(0x4C, 0x20, bank.left(444)), 1).ok);
+        const QByteArray m2 = frame(0x4C, 0x20, bank.left(444 * 2));
+        verifyRejected(parseProgramDump(m2), m2, "2 records in a single-record dump");
+        const QByteArray cbank = syntheticCombiData();  // 128 x 544
+        QVERIFY(parseCombinationDump(frame(0x4D, 0x10, cbank), 1).ok);
+        const QByteArray m3 = frame(0x4D, 0x10, cbank.left(544 * 127));
+        verifyRejected(parseCombinationDump(m3), m3, "127 combinations in a bank dump");
+        QVERIFY(parseCombinationDump(frame(0x4D, 0x20, cbank.left(544)), 1).ok);
+        const QByteArray m4 = frame(0x4D, 0x20, cbank.left(543));
+        verifyRejected(parseCombinationDump(m4), m4, "partial single combination");
+        // Bank D accepted, bank E rejected, for programs.
+        QVERIFY(parseProgramDump(frame(0x4C, 0x13, bank), 1).ok);
+        const QByteArray e = frame(0x4C, 0x14, bank);
+        verifyRejected(parseProgramDump(e), e, "program bank E on an X50");
     }
     // MIDI.md section 7: 51 00 data F7; data >= 840 bytes (TABLE 4).
     void globalDumpParse() {
@@ -642,6 +672,114 @@ private slots:
         QVERIFY(recs.ok);
         QCOMPARE(recs.value.size(), 128);
         QCOMPARE(recs.value.at(42).name.text, QStringLiteral("Prog 042"));
+    }
+
+    // MIDI.md sections 4-8, header-only classification.
+    void classifyRoutes() {
+        QCOMPARE(classify(H({0xF0, 0x7E, 0x02, 0x06, 0x02, 0x42, 0x7A, 0x00, 0x01, 0x00, 1, 5, 0, 0, 0xF7})).kind,
+                 MessageKind::DeviceInquiryReply);
+        QCOMPARE(classify(H({0xF0, 0x7E, 0x02, 0x06, 0x02, 0x42, 0x7A, 0x00, 0x01, 0x00, 1, 5, 0, 0, 0xF7})).channel, 3);
+        QCOMPARE(classify(H({0xF0, 0x42, 0x30, 0x7A, 0x23, 0xF7})).kind, MessageKind::Ack);
+        QCOMPARE(classify(H({0xF0, 0x42, 0x30, 0x7A, 0x24, 0x02, 0xF7})).kind, MessageKind::Nak);
+        QCOMPARE(classify(H({0xF0, 0x42, 0x3F, 0x7A, 0x4E, 0x02, 0xF7})).kind, MessageKind::ModeChange);
+        QCOMPARE(classify(H({0xF0, 0x42, 0x3F, 0x7A, 0x4E, 0x02, 0xF7})).channel, 16);
+        QCOMPARE(classify(H({0xF0, 0x42, 0x30, 0x7A, 0x42, 0x02, 0xF7})).kind, MessageKind::ModeAndState);
+        QCOMPARE(classify(H({0xF0, 0x42, 0x30, 0x7A, 0x4C, 0x00, 0x10, 0x00, 0xF7})).kind, MessageKind::ProgramDump);
+        QCOMPARE(classify(H({0xF0, 0x42, 0x30, 0x7A, 0x4D, 0x00, 0x10, 0x00, 0xF7})).kind, MessageKind::CombinationDump);
+        QCOMPARE(classify(H({0xF0, 0x42, 0x30, 0x7A, 0x51, 0x00, 0xF7})).kind, MessageKind::GlobalDump);
+        QCOMPARE(classify(H({0xF0, 0x42, 0x30, 0x7A, 0x40, 0x00, 0xF7})).kind, MessageKind::OtherKorgSysEx);
+        QCOMPARE(classify(H({0xB0, 0x00, 0x3F})).kind, MessageKind::ControlChange);
+        QCOMPARE(classify(H({0xC4, 0x05})).channel, 5);
+        QCOMPARE(classify(H({0xF8})).kind, MessageKind::Other);
+        QCOMPARE(classify(QByteArray()).kind, MessageKind::Other);
+        QCOMPARE(classify(H({0xF0, 0x41, 0x10, 0x42, 0x12, 0xF7})).kind, MessageKind::Other);
+    }
+
+    // MIDI.md section 8 / 3: Bn 00 mm, Bn 20 bb, Cn pp.
+    void channelMessageParse() {
+        const auto cc = parseChannelMessage(H({0xB2, 0x20, 0x01}), 3);
+        QVERIFY(cc.ok);
+        QVERIFY(!cc.value.isProgramChange);
+        QCOMPARE(cc.value.channel, 3);
+        QCOMPARE(cc.value.controller, 0x20);
+        QCOMPARE(cc.value.value, 1);
+        const auto pc = parseChannelMessage(H({0xC0, 0x7F}));
+        QVERIFY(pc.ok);
+        QVERIFY(pc.value.isProgramChange);
+        QCOMPARE(pc.value.value, 127);
+        const QByteArray bad = H({0xB0, 0x00, 0x80});
+        verifyRejected(parseChannelMessage(bad), bad, "classify rejects (status in data)");
+        const QByteArray other = H({0xB1, 0x00, 0x3F});
+        verifyRejected(parseChannelMessage(other, 1), other, "wrong channel");
+        const QByteArray sx = H({0xF0, 0x42, 0x30, 0x7A, 0x23, 0xF7});
+        verifyRejected(parseChannelMessage(sx), sx, "SysEx is not a channel message");
+    }
+
+    // Reverse of the MIDI.md section 3 table.
+    void addressFromBankSelectTable() {
+        using K = SoundAddress::Kind;
+        using B = SoundAddress::Bank;
+        QCOMPARE(*addressFromBankSelect(0x00, 0x01, 5, BankMap::Korg, K::Prog), A(K::Prog, B::B, 5));
+        QCOMPARE(*addressFromBankSelect(0x3F, 0x02, 127, BankMap::Gm, K::Combi), A(K::Combi, B::C, 127));
+        QVERIFY(!addressFromBankSelect(0x3F, 0x02, 127, BankMap::Korg, K::Combi));  // wrong map
+        QCOMPARE(*addressFromBankSelect(0x79, 0x00, 0, BankMap::Gm, K::Prog), A(K::Prog, B::G, 1));
+        QCOMPARE(*addressFromBankSelect(0x78, 0x00, 127, BankMap::Korg, K::Prog), A(K::Prog, B::Gd, 128));
+        QVERIFY(!addressFromBankSelect(0x00, 0x03, 0, BankMap::Korg, K::Combi));  // no combination bank D
+        QVERIFY(!addressFromBankSelect(0x00, 0x00, 128, BankMap::Korg, K::Prog));
+    }
+
+    // MIDI.md section 6: F0 7E 0g 06 02 42 7A 00 mm 00 vv nn rr bb F7.
+    void buildInquiryReplyBytes() {
+        DeviceInquiryReply r;
+        r.channel = 2; r.memberCode = 0x01; r.major = 1; r.minor = 5; r.release = 0; r.build = 3;
+        const QByteArray b = buildDeviceInquiryReply(r);
+        QCOMPARE(b, H({0xF0, 0x7E, 0x01, 0x06, 0x02, 0x42, 0x7A, 0x00, 0x01, 0x00, 0x01, 0x05, 0x00, 0x03, 0xF7}));
+        QVERIFY(parseDeviceInquiryReply(b, 2).ok);
+    }
+
+    // MIDI.md section 5: 27 bytes. Mode PROG PLAY (02), GM (bit 4 of byte 7),
+    // byte 8 = 07 (three enables), program B005, combination C007.
+    void buildModeAndStateBytes() {
+        ModeAndState s;
+        s.channel = 1; s.mode = Mode::ProgPlay; s.bankMap = BankMap::Gm;
+        s.enableProgramChange = s.enableBankChange = s.enableCombinationChange = true;
+        s.programBank = 1; s.programNumber = 5; s.combinationBank = 2; s.combinationNumber = 7;
+        const auto b = buildModeAndState(s);
+        QVERIFY(b.ok);
+        QCOMPARE(b.value, H({0xF0, 0x42, 0x30, 0x7A, 0x42, 0x02, 0x06, 0x10, 0x07, 0x00, 0x02, 0x01, 0x05, 0x00,
+                             0x00, 0x02, 0x07, 0x00, 0x04, 0x00, 0x00, 0x00, 0x21, 0x00, 0x00, 0x00, 0xF7}));
+        const auto p = parseModeAndState(b.value, 1);
+        QVERIFY2(p.ok, qPrintable(p.error));
+        QCOMPARE(p.value.programNumber, 5);
+        QVERIFY(!buildModeAndState([&] { ModeAndState x = s; x.channel = 0; return x; }()).ok);
+    }
+
+    // MIDI.md sections 3-4: ACK F0 42 3g 7A 23 F7, NAK ... 24 cc F7, panel 4E 0m.
+    void buildAckNakNotice() {
+        QCOMPARE(buildAck(1).value, H({0xF0, 0x42, 0x30, 0x7A, 0x23, 0xF7}));
+        QCOMPARE(buildNak(16, 0x02).value, H({0xF0, 0x42, 0x3F, 0x7A, 0x24, 0x02, 0xF7}));
+        QVERIFY(!buildAck(0).ok);
+        QVERIFY(!buildNak(1, 0x80).ok);
+        QCOMPARE(buildModeChangeNotice(1, Mode::Multi).value, H({0xF0, 0x42, 0x30, 0x7A, 0x4E, 0x04, 0xF7}));
+        QCOMPARE(buildModeChangeNotice(1, Mode::Global).value, H({0xF0, 0x42, 0x30, 0x7A, 0x4E, 0x06, 0xF7}));
+        QVERIFY(!buildModeChangeNotice(1, Mode::Demo).ok);
+        const auto sel = buildPanelSelect(A(A::Kind::Combi, A::Bank::B, 9), BankMap::Gm, 2);
+        QCOMPARE(sel.value, (QList<QByteArray>{H({0xB1, 0x00, 0x3F}), H({0xB1, 0x20, 0x01}), H({0xC1, 0x09})}));
+    }
+
+    // MIDI.md section 7 dump replies: 4C 00 kind/bank 00 data F7; 51 00 data F7.
+    // 3 internal bytes 80 01 FF encode to 05 00 01 7F (see programDumpParse).
+    void buildDumpBytes() {
+        const QByteArray data = H({0x80, 0x01, 0xFF});
+        QCOMPARE(buildProgramDump(1, 3, data).value,
+                 H({0xF0, 0x42, 0x30, 0x7A, 0x4C, 0x00, 0x13, 0x00, 0x05, 0x00, 0x01, 0x7F, 0xF7}));
+        QCOMPARE(buildCombinationDump(2, 2, data).value,
+                 H({0xF0, 0x42, 0x31, 0x7A, 0x4D, 0x00, 0x12, 0x00, 0x05, 0x00, 0x01, 0x7F, 0xF7}));
+        QCOMPARE(buildGlobalDump(1, data).value,
+                 H({0xF0, 0x42, 0x30, 0x7A, 0x51, 0x00, 0x05, 0x00, 0x01, 0x7F, 0xF7}));
+        QVERIFY(!buildProgramDump(1, 4, data).ok);
+        QVERIFY(!buildCombinationDump(1, 3, data).ok);
+        QVERIFY(!buildGlobalDump(17, data).ok);
     }
 };
 

@@ -76,7 +76,7 @@ No GUI beyond the scaffold window. Everything testable headless.
   carrying the raw bytes; the 7/8 codec with round-trip tests over every tail length
   1-7 and random data; record slicing for 444- and 544-byte records with name and
   category extraction.
-- ☐ **T1.7 `X50Link`, backends and `FakeX50`.** Connect by name (substring), 2 s poll
+- ☑ **T1.7 `X50Link`, backends and `FakeX50`.** Connect by name (substring), 2 s poll
   while disconnected, probe (inquiry → mode and state) with 1 s timeouts, send with Mode
   Change + ACK-or-100 ms wait, follow mode with 300 ms echo suppression, read names with
   progress, cancel, 10 s per-bank timeout, NAK handling, "port busy" on open failure.
@@ -236,3 +236,8 @@ fixes go back to the builder as T5.x tasks.
   zero-based as on the unit. Open for M3: the factory TSV has category names but not
   their index; the index order must come from the unit's global dump or from VNL, never
   alphabetical. (owner; foreman)
+- 2026-11-21 · X50Link details (T1.7): version shown as "major.minor(2 digits)"; sends
+  during a probe or a names read are refused, not queued; with the mode unknown, panel
+  CC/PC are ignored until a 4E or a probe tells the mode; unplug is detected only on a
+  failed send or a backend error (no polling while connected). G1 must confirm that a
+  whole bank dump (~65-80 KB) arrives as one SysEx through WinMM. (foreman)

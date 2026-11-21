@@ -208,4 +208,65 @@ struct GlobalCategories {
 };
 Result<GlobalCategories> parseGlobalCategories(const QByteArray &decodedGlobal);
 
+// ---------------------------------------------------------- classification
+
+// Cheap header-only classification of an incoming message, so a caller can route
+// it before parsing. It checks the frame start and header bytes only; the
+// parsers above do the full validation. `channel` is 1-16 when the header has a
+// channel nibble (0 otherwise).
+enum class MessageKind {
+    Other,
+    DeviceInquiryReply,  // F0 7E 0g 06 02 ...
+    ModeAndState,        // F0 42 3g 7A 42 ...
+    Ack,                 // ... 23
+    Nak,                 // ... 24
+    ModeChange,          // ... 4E
+    ProgramDump,         // ... 4C
+    CombinationDump,     // ... 4D
+    GlobalDump,          // ... 51
+    OtherKorgSysEx,      // F0 42 3g 7A <other function>
+    ControlChange,       // Bn cc vv
+    ProgramChange        // Cn pp
+};
+struct Classification {
+    MessageKind kind = MessageKind::Other;
+    int channel = 0;
+};
+Classification classify(const QByteArray &msg);
+
+// MIDI.md section 3 / 8: an incoming CC or PC (X50 follow mode).
+struct ChannelMessage {
+    bool isProgramChange = false;
+    int channel = 0;     // 1-16
+    int controller = 0;  // CC number (0 = bank MSB, 32 = bank LSB); 0 for PC
+    int value = 0;       // CC value, or the program number for PC
+};
+Result<ChannelMessage> parseChannelMessage(const QByteArray &msg,
+                                           std::optional<int> expectedChannel = std::nullopt);
+
+// Reverse of SoundAddress::bankSelect() (MIDI.md section 3 table): the address
+// a CC0/CC32/PC triple selects, for the given Bank Map and kind. Nothing if no
+// address matches.
+std::optional<SoundAddress> addressFromBankSelect(int msb, int lsb, int program, BankMap map,
+                                                  SoundAddress::Kind kind);
+
+// ------------------------------------------------- X50 side (FakeX50 only)
+// What the X50 itself transmits (MIDI.md sections 4-8). The app never sends
+// these; FakeX50 uses them so that the bytes still live in this one file.
+
+QByteArray buildDeviceInquiryReply(const DeviceInquiryReply &r);
+Result<QByteArray> buildModeAndState(const ModeAndState &s);
+Result<QByteArray> buildAck(int channel);
+Result<QByteArray> buildNak(int channel, int errorCode);
+// Any mode of the section 4 table except Demo (the panel can enter any of them).
+Result<QByteArray> buildModeChangeNotice(int channel, Mode mode);
+// Panel side: Bn 00 mm, Bn 20 bb, Cn pp (MIDI.md section 8).
+Result<QList<QByteArray>> buildPanelSelect(const SoundAddress &address, BankMap map, int channel);
+// `decoded` is the internal (not 7/8 encoded) data; it is encoded here. The
+// number byte of a bank dump is 00 (assumption, as in the request; the parsers
+// accept any value).
+Result<QByteArray> buildProgramDump(int channel, int bank, const QByteArray &decoded);
+Result<QByteArray> buildCombinationDump(int channel, int bank, const QByteArray &decoded);
+Result<QByteArray> buildGlobalDump(int channel, const QByteArray &decoded);
+
 }  // namespace X50Protocol
