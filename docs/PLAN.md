@@ -403,3 +403,10 @@ fixes go back to the builder as T5.x tasks.
   single-shot timer serves Esc hold and the second-press window; every key is swallowed
   in live view and auto-repeat never acts. `[` and `]` need AltGr on some layouts:
   Ctrl+Left/Right remains the reliable set switch (both kept per SPEC). (foreman)
+- 2026-11-21 · R-T4.2 (reviewer: ship). Follow-up after T4.3: next/previous step from a
+  "target slot" set on emit and resolved by sent/sendFailed, so fast pedal presses during
+  a Mode Change wait advance (Next, Next = two slots); prefer the last-chosen slot when
+  a sound sits in two slots; clear the pressed look on focus-out. A double tap re-sends
+  (accepted: re-send is the recovery move). Note: clickSendsExactBytes compares to bytes
+  the foreman checked against MIDI.md §3 (B0 00 3F, B0 20 00, C0 02 for COMBI A002, GM).
+  (foreman)
