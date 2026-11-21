@@ -546,7 +546,7 @@ private slots:
         QVERIFY(view().setCategory(QString()));
         QCOMPARE(view().resultCount(), m_catalogue.size());
         // Clicking the list row filters too.
-        view().categoryList()->setCurrentRow(1);
+        view().categoryList()->setCurrentRow(4);  // rows: Favourites, Recent, separator, All, then categories
         QCOMPARE(view().category(), view().categoryNames().at(1));
         QVERIFY(view().resultCount() < m_catalogue.size());
         // Switching to combinations only changes the list; a category the new list lacks resets to All.

@@ -34,6 +34,9 @@
 
 namespace {
 
+// Category list rows: Favourites, Recent, separator, then All (DESIGN 7.6).
+constexpr int kFirstAllRow = 3;
+
 bool isGm(const SoundAddress &a)
 {
     return a.bank() == SoundAddress::Bank::G || a.bank() == SoundAddress::Bank::Gd;
@@ -98,7 +101,8 @@ BrowseView::BrowseView(Catalogue *catalogue, Library *library, X50Link *link, QW
         syncCurrent();
     }
     connect(m_library, &Library::changed, this, [this]() {
-        m_model->refreshMarks();
+        m_model->refreshMarks();  // rows stay put (DESIGN 7.7): only a rebuild drops or reorders them
+        updateEmptyText();
         updateControls();
     });
 
@@ -192,11 +196,7 @@ void BrowseView::buildUi()
     connect(m_categories, &QListWidget::currentRowChanged, this, [this](int row) {
         if (m_building || row < 0)
             return;
-        const QString name = row == 0 ? QString() : m_categories->item(row)->text();
-        if (name == m_category)
-            return;
-        m_category = name;
-        refilter();
+        onCategoryRow(row);
     });
     catLayout->addWidget(m_categories, 1);
 
@@ -342,13 +342,28 @@ void BrowseView::rebuildCategories()
     const QStringList names = m_catalogue->hasUnitCategories() ? m_catalogue->categories(m_listedKind)
                                                                : firstAppearanceCategories(*m_catalogue, m_listedKind);
     m_categories->clear();
-    m_categories->addItem(QStringLiteral("All"));
-    m_categories->addItems(names);
-    int row = 0;
-    if (!m_category.isEmpty()) {
+    auto add = [this](const QString &text, int kind) {
+        auto *item = new QListWidgetItem(text);
+        item->setData(CategoryDelegate::KindRole, kind);
+        if (kind == CategoryDelegate::Separator)
+            item->setFlags(Qt::NoItemFlags);  // neither selectable nor focusable: Up/Down skip it
+        m_categories->addItem(item);
+    };
+    add(QStringLiteral("Favourites"), CategoryDelegate::Favourites);
+    add(QStringLiteral("Recent"), CategoryDelegate::Recent);
+    add(QString(), CategoryDelegate::Separator);
+    add(QStringLiteral("All"), CategoryDelegate::All);
+    for (const QString &n : names)
+        add(n, CategoryDelegate::Category);
+    int row = kFirstAllRow;
+    if (m_source == Source::Favourites) {
+        row = 0;
+    } else if (m_source == Source::Recent) {
+        row = 1;
+    } else if (!m_category.isEmpty()) {
         const int found = names.indexOf(m_category);
         if (found >= 0)
-            row = found + 1;
+            row = found + kFirstAllRow + 1;
         else
             m_category.clear();
     }
@@ -358,13 +373,43 @@ void BrowseView::rebuildCategories()
     m_building = wasBuilding;
 }
 
+void BrowseView::onCategoryRow(int row)
+{
+    const int kind = m_categories->item(row)->data(CategoryDelegate::KindRole).toInt();
+    Source source = Source::Browse;
+    QString name;
+    if (kind == CategoryDelegate::Favourites)
+        source = Source::Favourites;
+    else if (kind == CategoryDelegate::Recent)
+        source = Source::Recent;
+    else if (kind == CategoryDelegate::Category)
+        name = m_categories->item(row)->text();
+    else if (kind != CategoryDelegate::All)
+        return;  // the separator (cannot be current)
+    // Re-selecting the same view does nothing: only a change rebuilds (DESIGN 7.7).
+    if (source == m_source && name == m_category)
+        return;
+    m_source = source;
+    m_category = name;
+    refilter();
+}
+
+void BrowseView::setSource(Source source)
+{
+    if (source == Source::Browse) {
+        setCategory(QString());
+        return;
+    }
+    m_categories->setCurrentRow(source == Source::Favourites ? 0 : 1);
+}
+
 bool BrowseView::setCategory(const QString &name)
 {
     if (name.isEmpty()) {
-        m_categories->setCurrentRow(0);
+        m_categories->setCurrentRow(kFirstAllRow);
         return true;
     }
-    for (int i = 1; i < m_categories->count(); ++i) {
+    for (int i = kFirstAllRow + 1; i < m_categories->count(); ++i) {
         if (m_categories->item(i)->text() == name) {
             m_categories->setCurrentRow(i);
             return true;
@@ -389,7 +434,7 @@ void BrowseView::refreshNames()
 QStringList BrowseView::categoryNames() const
 {
     QStringList l;
-    for (int i = 0; i < m_categories->count(); ++i)
+    for (int i = kFirstAllRow; i < m_categories->count(); ++i)
         l << m_categories->item(i)->text();
     return l;
 }
@@ -448,17 +493,31 @@ void BrowseView::refilter()
     const std::optional<SoundAddress> keep = highlighted();
     const SearchQuery query = SearchQuery::parse(m_search->text());
     const bool wantCombi = m_combis->isChecked(), wantProg = m_programs->isChecked(), wantGm = m_gm->isChecked();
-    QVector<SoundAddress> out;
-    out.reserve(m_catalogue->size());
-    for (const Catalogue::Entry &e : m_catalogue->entries()) {
+    auto accept = [&](const Catalogue::Entry &e) {
         const SoundAddress &a = e.address;
         if (a.kind() == SoundAddress::Kind::Combi ? !wantCombi : (isGm(a) ? !wantGm : !wantProg))
-            continue;
-        if (!m_category.isEmpty() && m_catalogue->effectiveCategory(a).compare(m_category, Qt::CaseInsensitive) != 0)
-            continue;
-        if (!query.matches(*m_catalogue, e))
-            continue;
-        out.append(a);
+            return false;
+        if (m_source == Source::Browse && !m_category.isEmpty() &&
+            m_catalogue->effectiveCategory(a).compare(m_category, Qt::CaseInsensitive) != 0)
+            return false;
+        return query.matches(*m_catalogue, e);
+    };
+    QVector<SoundAddress> out;
+    out.reserve(m_catalogue->size());
+    if (m_source == Source::Recent) {
+        // Most recent first, the library's order (DESIGN 7.7), not catalogue order.
+        for (const Library::Recent &r : m_library->recents()) {
+            const Catalogue::Entry *e = m_catalogue->find(r.address);
+            if (e && accept(*e))
+                out.append(r.address);
+        }
+    } else {
+        for (const Catalogue::Entry &e : m_catalogue->entries()) {
+            if (m_source == Source::Favourites && !m_library->isFavourite(e.address))
+                continue;
+            if (accept(e))
+                out.append(e.address);
+        }
     }
     m_model->setResults(out);
     int row = keep ? m_model->rowOf(*keep) : -1;
@@ -468,7 +527,21 @@ void BrowseView::refilter()
         row = 0;
     if (row >= 0)
         selectRow(row);
+    updateEmptyText();
     updateControls();
+}
+
+QString BrowseView::emptyText() const { return static_cast<ResultTable *>(m_table)->emptyText(); }
+
+void BrowseView::updateEmptyText()
+{
+    // "Nothing at all" texts apply when the view has no entries before search and kinds.
+    QString text = QStringLiteral("No sounds match.");
+    if (m_source == Source::Favourites && m_library->favourites().isEmpty())
+        text = QStringLiteral("No favourites yet. Star a sound with Ctrl+D or the star.");
+    else if (m_source == Source::Recent && m_library->recents().isEmpty())
+        text = QStringLiteral("Nothing played yet. Sounds you send appear here.");
+    static_cast<ResultTable *>(m_table)->setEmptyText(text);
 }
 
 void BrowseView::updateControls()

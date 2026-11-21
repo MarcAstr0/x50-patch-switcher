@@ -13,7 +13,7 @@
 // into the box `r` with the given colour and restores the painter's state.
 namespace Glyphs {
 
-enum class Kind { StarOutline, StarFilled, ChevronLeft, ChevronRight, Magnifier, Cross };
+enum class Kind { StarOutline, StarFilled, ChevronLeft, ChevronRight, Magnifier, Cross, Clock };
 
 // Five-point star in the unit square (0..1), computed once; scale and translate to use.
 const QPolygonF &starPolygon();
@@ -24,6 +24,9 @@ void checkMark(QPainter &p, const QRectF &r, const QColor &color, qreal stroke =
 void chevron(QPainter &p, const QRectF &r, bool left, const QColor &color, qreal stroke = 2.0);
 void magnifier(QPainter &p, const QRectF &r, const QColor &color, qreal stroke = 2.0);
 void cross(QPainter &p, const QRectF &r, const QColor &color, qreal stroke = 1.5);
+// Clock (DESIGN 7.6): circle filling `r` (outer diameter = the smaller side), `stroke` px, no fill,
+// two hands from the centre (up 4 px, right 3 px at the 14 px design size, scaled with `r`), round caps.
+void clock(QPainter &p, const QRectF &r, const QColor &color, qreal stroke = 1.5);
 // Solid right-pointing triangle filling `r`.
 void triangleRight(QPainter &p, const QRectF &r, const QColor &color);
 

@@ -123,7 +123,7 @@ on the live mockups, that is the moment to send them to her.
   `settings-errors`, `live-8`, `live-6`, `live-disconnected`.
 - ☑ **T3.2 BrowseView.** Search, kind toggles, categories, result list and delegate,
   send on Enter / double-click / Play, prev/next, every shortcut in SPEC §4.1.
-- ☐ **T3.3 Favourites, recents, edited markers.**
+- ☑ **T3.3 Favourites, recents, edited markers.**
 - ☑ **T3.4 Settings and probe checklist.** Ports, Test, Check X50, the checklist with
   per-line fix hints, manual channel and Bank Map when the probe fails.
 - ☐ **T3.5 Read names** UI with progress and cancel (after G1 / T1.10).
@@ -364,3 +364,6 @@ fixes go back to the builder as T5.x tasks.
   selected slot after a shrink; drag tests through a factored makeDragMime() and the
   table's drag setup. Kept as designed: a label stays when a different sound is dropped
   on its slot (the label names the song part). (foreman)
+- 2026-11-21 · T3.3b done: Favourites and Recent in the category list. Recent does not
+  re-order while it is shown (Prev/Next must follow the order on screen); the new order
+  appears on the next rebuild. (foreman)

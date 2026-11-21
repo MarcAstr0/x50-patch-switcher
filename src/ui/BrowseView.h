@@ -58,12 +58,19 @@ public:
     void setKinds(bool combis, bool programs, bool gm);
     // Select a category by name; an empty name selects "All". False if the list lacks it.
     bool setCategory(const QString &name);
-    QString category() const { return m_category; }
+    QString category() const { return m_category; }  // empty for All, Favourites and Recent
+    // The view chosen in the category list (DESIGN 7.6): Favourites and Recent sit above All.
+    enum class Source { Browse, Favourites, Recent };
+    Source source() const { return m_source; }
+    void setSource(Source source);  // Browse selects "All"
+    // The text the result list shows when it is empty (DESIGN 7.7 table).
+    QString emptyText() const;
     // Rebuild the category list (after the unit's category names were read).
     void refreshCategories();
     // Re-read names from the catalogue (after unit names were applied).
     void refreshNames();
-    QStringList categoryNames() const;  // as listed, "All" first
+    // "All" first, then the categories: the Favourites / Recent / separator rows are not names.
+    QStringList categoryNames() const;
     QString categoryTitle() const;
     // Width of the category column (the splitter position), remembered between runs.
     int categoryWidth() const;
@@ -119,6 +126,8 @@ private:
     void buildUi();
     void rebuildCategories();
     void refilter();
+    void updateEmptyText();
+    void onCategoryRow(int row);
     void updateControls();
     void syncCurrent();
     bool handleKey(QObject *source, QKeyEvent *event);
@@ -149,7 +158,8 @@ private:
     SetEditor *m_editor = nullptr;
 
     QIcon m_starOn, m_starOff;
-    QString m_category;  // empty = All
+    QString m_category;  // empty = All (or Favourites / Recent, see m_source)
+    Source m_source = Source::Browse;
     SoundAddress::Kind m_listedKind = SoundAddress::Kind::Prog;
     bool m_building = true;
 };

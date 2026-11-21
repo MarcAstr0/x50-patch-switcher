@@ -76,7 +76,7 @@ constexpr int browseToolbarHeight = 40, browseStatusHeight = 24;
 constexpr int browseCategoryWidth = 200, browseSplitterHandle = 6;
 constexpr int browseTransportHeight = 56, browseSetEditorHeight = 200;
 constexpr int browseCategoryMinWidth = 160, browseCategoryMaxWidth = 260;
-constexpr int browseCategoryTitleHeight = 24, browseCategoryRowHeight = 32;
+constexpr int browseCategoryTitleHeight = 24, browseCategoryRowHeight = 32, browseCategorySeparatorHeight = 9;
 
 // ---- DESIGN 7.3-7.8 toolbar, kind toggles, transport, result list (logical px) ----
 constexpr int kindToggleWidth = 100, readNamesWidth = 120, settingsWidth = 100, liveWidth = 100;

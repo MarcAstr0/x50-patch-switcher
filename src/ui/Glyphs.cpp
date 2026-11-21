@@ -106,6 +106,21 @@ void cross(QPainter &p, const QRectF &r, const QColor &color, qreal stroke)
     p.drawLine(q.topRight(), q.bottomLeft());
 }
 
+void clock(QPainter &p, const QRectF &r, const QColor &color, qreal stroke)
+{
+    Scope scope(p);
+    QPen pen(color, stroke);
+    pen.setCapStyle(Qt::RoundCap);
+    p.setPen(pen);
+    p.setBrush(Qt::NoBrush);
+    const qreal d = qMin(r.width(), r.height());
+    const QPointF c = r.center();
+    p.drawEllipse(QRectF(c.x() - d / 2 + stroke / 2, c.y() - d / 2 + stroke / 2, d - stroke, d - stroke));
+    const qreal k = d / 14.0;
+    p.drawLine(c, QPointF(c.x(), c.y() - 4 * k));
+    p.drawLine(c, QPointF(c.x() + 3 * k, c.y()));
+}
+
 void triangleRight(QPainter &p, const QRectF &r, const QColor &color)
 {
     Scope scope(p);
@@ -132,6 +147,7 @@ QIcon icon(Kind kind, const QSize &size, const QColor &color)
         case Kind::ChevronRight: chevron(p, box, false, color); break;
         case Kind::Magnifier: magnifier(p, box, color); break;
         case Kind::Cross: cross(p, box, color); break;
+        case Kind::Clock: clock(p, box, color); break;
         }
         p.end();
         ic.addPixmap(pm);
