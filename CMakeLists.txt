@@ -1,0 +1,61 @@
+cmake_minimum_required(VERSION 3.22)
+project(x50-patch-switcher VERSION 0.1.0 LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_AUTOMOC ON)
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
+option(X50_BUILD_TESTS "Build the Qt Test suite" ON)
+
+find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Widgets Test)
+
+include(FetchContent)
+set(RTMIDI_BUILD_TESTING OFF CACHE BOOL "" FORCE)
+set(RTMIDI_BUILD_STATIC_LIBS ON CACHE BOOL "" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(rtmidi
+  GIT_REPOSITORY https://github.com/thestk/rtmidi.git
+  GIT_TAG 6.0.0)
+FetchContent_MakeAvailable(rtmidi)
+
+function(x50_target_options target)
+  target_compile_definitions(${target} PRIVATE QT_NO_CAST_FROM_ASCII)
+  if(MSVC)
+    target_compile_options(${target} PRIVATE /W4)
+  else()
+    target_compile_options(${target} PRIVATE -Wall -Wextra)
+  endif()
+endfunction()
+
+# core: no GUI, no MIDI. Placeholder-free content arrives with T1.1.
+add_library(x50core STATIC src/core/Version.cpp src/core/Version.h)
+target_include_directories(x50core PUBLIC src)
+target_link_libraries(x50core PUBLIC Qt6::Core)
+x50_target_options(x50core)
+
+add_library(x50midi STATIC src/midi/RtMidiBackend.cpp src/midi/RtMidiBackend.h)
+target_include_directories(x50midi PUBLIC src)
+target_link_libraries(x50midi PUBLIC x50core Qt6::Core rtmidi)
+x50_target_options(x50midi)
+
+add_library(x50ui STATIC src/ui/MainWindow.cpp src/ui/MainWindow.h)
+target_include_directories(x50ui PUBLIC src)
+target_link_libraries(x50ui PUBLIC x50core x50midi Qt6::Widgets)
+x50_target_options(x50ui)
+
+add_executable(x50-patch-switcher
+  src/app/main.cpp src/app/CommandLine.cpp src/app/CommandLine.h)
+target_link_libraries(x50-patch-switcher PRIVATE x50ui x50midi x50core Qt6::Widgets)
+x50_target_options(x50-patch-switcher)
+if(WIN32)
+  set_target_properties(x50-patch-switcher PROPERTIES WIN32_EXECUTABLE OFF)
+endif()
+
+if(X50_BUILD_TESTS)
+  enable_testing()
+  add_subdirectory(tests)
+endif()

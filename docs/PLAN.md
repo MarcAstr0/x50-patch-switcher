@@ -44,7 +44,7 @@ without waiting; only T1.9 (CI) needs the remote.
 
 No GUI beyond the scaffold window. Everything testable headless.
 
-- ☐ **T1.0 Build scaffold.** `CMakeLists.txt` with RtMidi 6.0.0 via FetchContent;
+- ☑ **T1.0 Build scaffold.** `CMakeLists.txt` with RtMidi 6.0.0 via FetchContent;
   static libs `x50core`, `x50midi`, `x50ui`; the executable; `tests/` with an
   `x50_add_test()` helper; an empty main window; `--list-ports`. Build and `ctest` green
   on the Linux box.
@@ -177,3 +177,9 @@ fixes go back to the builder as T5.x tasks.
   project) to Sonnet; the brief compensates by being explicit about every deliverable.
 - 2026-11-21 · Windows is the primary target and has no local test machine; every
   hardware fact goes through `--diagnose` and the keyboard player.
+- 2026-11-21 · G0: GitHub repository `MarcAstr0/x50-patch-switcher` created **public**
+  (MIT) and added as `origin`. (owner)
+- 2026-11-21 · G0: keyboard player's answers not in yet; proceeding on defaults: both
+  programs and combinations, English UI, Spanish one-page guide, no pedal or touch
+  screen assumed (arrow and page keys still work). Revisit when the answers arrive.
+  (owner)
