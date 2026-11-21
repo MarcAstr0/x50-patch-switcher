@@ -36,7 +36,8 @@ public:
     int size() const { return m_slots.size(); }
     const QVector<Slot> &allSlots() const { return m_slots; }
     // idx is 0-based here and in every operation (the UI shows idx + 1).
-    const Slot &slot(int idx) const { return m_slots.at(idx); }
+    // Out of range (including negative) returns an empty Slot; never reads past the end.
+    const Slot &slot(int idx) const;
 
     Result rename(const QString &name);
     // Resize 6 <-> 8. To 6 keeps slots 1-6 and refuses if 7 or 8 are filled.

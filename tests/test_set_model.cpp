@@ -114,6 +114,33 @@ private slots:
         QVERIFY2(r.error.contains(QStringLiteral("slot 8 is")), qPrintable(r.error));
         QCOMPARE(s.size(), 8);
     }
+    void outOfRangeAccessAndMutators() {
+        SetModel s(QStringLiteral("i"), QStringLiteral("A"), 6);
+        s.setSlot(0, combi(1));
+        s.setLabel(0, QStringLiteral("L"));
+        const QVector<SetModel::Slot> before = s.allSlots();
+        for (int bad : {-1, 6, 7}) {
+            QVERIFY(s.slot(bad).isEmpty());
+            QVERIFY(s.slot(bad).label.isEmpty());
+            auto r = s.setSlot(bad, combi(2));
+            QVERIFY(!r.ok() && !r.error.isEmpty());
+            r = s.clearSlot(bad);
+            QVERIFY(!r.ok() && !r.error.isEmpty());
+            r = s.setLabel(bad, QStringLiteral("x"));
+            QVERIFY(!r.ok() && !r.error.isEmpty());
+            r = s.moveSlot(bad, 0);
+            QVERIFY(!r.ok() && !r.error.isEmpty());
+            r = s.moveSlot(0, bad);
+            QVERIFY(!r.ok() && !r.error.isEmpty());
+        }
+        QCOMPARE(s.size(), 6);
+        QCOMPARE(s.allSlots().size(), before.size());
+        for (int i = 0; i < 6; ++i) {
+            QCOMPARE(s.slot(i).address.has_value(), before.at(i).address.has_value());
+            QCOMPARE(s.slot(i).label, before.at(i).label);
+        }
+        QCOMPARE(*s.slot(0).address, combi(1));
+    }
     void resizeBadSizeAndSame() {
         SetModel s(QStringLiteral("i"), QStringLiteral("A"), 6);
         QVERIFY(!s.resize(7).ok());

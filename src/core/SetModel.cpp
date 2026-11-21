@@ -26,6 +26,12 @@ bool SetModel::assignSlots(const QVector<Slot> &newSlots)
     return true;
 }
 
+const SetModel::Slot &SetModel::slot(int idx) const
+{
+    static const Slot none;
+    return inRange(idx) ? m_slots.at(idx) : none;
+}
+
 SetModel::Result SetModel::rename(const QString &name)
 {
     const QString trimmed = name.trimmed();

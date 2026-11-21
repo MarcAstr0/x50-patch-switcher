@@ -121,6 +121,17 @@ private slots:
         QTest::qWait(100);
         QCOMPARE(link->state(), X50Link::State::Disconnected);
         QVERIFY(link->statusText().contains(QStringLiteral("No X50 port found")));
+        QVERIFY(link->statusIsFailure());
+    }
+
+    // statusIsFailure() is set for a failed port search and cleared once connected.
+    void statusIsFailureClearsOnConnect() {
+        fake->unplug();
+        link->start();
+        QVERIFY(link->statusIsFailure());
+        fake->plug();
+        QTRY_COMPARE_WITH_TIMEOUT(link->state(), X50Link::State::Connected, 3000);
+        QVERIFY(!link->statusIsFailure());
     }
 
     // SPEC 4.5: while disconnected a poll re-scans; once connected the poll stops.

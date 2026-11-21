@@ -141,8 +141,9 @@ void X50Link::setActivity(Activity a)
         emit busyChanged();
 }
 
-void X50Link::setStatus(const QString &text)
+void X50Link::setStatus(const QString &text, bool failure)
 {
+    m_statusFailure = failure;  // before the signal, so slots see the flag that goes with the text
     if (m_status == text)
         return;
     m_status = text;
@@ -311,7 +312,7 @@ void X50Link::attemptConnect()
             ? QStringLiteral("MIDI is unavailable: %1").arg(ports.error)
             : (m_outSub.isEmpty() ? QStringLiteral("No MIDI port chosen")
                                   : QStringLiteral("No X50 port found (looking for \"%1\")").arg(m_outSub));
-        setStatus(why);
+        setStatus(why, true);
         return;
     }
     MidiBackend::Status st = m_backend->openOutput(out);

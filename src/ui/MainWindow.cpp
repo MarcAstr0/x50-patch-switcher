@@ -74,7 +74,7 @@ MainWindow::MainWindow(Catalogue *catalogue, Library *library, X50Link *link, QW
         });
         connect(m_link, &X50Link::statusChanged, this, [this](const QString &text) {
             // Connect failures are only status text (no errorOccurred): tell them once, here.
-            if (m_link->state() == X50Link::State::Disconnected && isConnectFailure(text)) {
+            if (m_link->state() == X50Link::State::Disconnected && m_link->statusIsFailure()) {
                 showStatus(text, true);
                 syncFromLink();
             }
@@ -152,12 +152,6 @@ void MainWindow::showStatus(const QString &text, bool isError)
     m_status->setStyleSheet(isError ? QStringLiteral("color: %1;").arg(QColor(Theme::red).name()) : QString());
 }
 
-bool MainWindow::isConnectFailure(const QString &text)
-{
-    return text.startsWith(QStringLiteral("MIDI is unavailable")) || text.startsWith(QStringLiteral("No X50 port found"))
-        || text.startsWith(QStringLiteral("No MIDI port chosen"));
-}
-
 void MainWindow::syncFromLink()
 {
     if (!m_link)
@@ -180,7 +174,7 @@ void MainWindow::syncFromLink()
         m_strip->setConnection(false, m_linkError.isEmpty() ? m_link->statusText() : m_linkError);
         break;
     case X50Link::State::Disconnected:
-        m_strip->setConnection(false, isConnectFailure(m_link->statusText()) ? m_link->statusText() : m_linkError);
+        m_strip->setConnection(false, m_link->statusIsFailure() ? m_link->statusText() : m_linkError);
         break;
     }
 }

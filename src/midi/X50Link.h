@@ -132,6 +132,8 @@ public:
 
     State state() const { return m_state; }
     QString statusText() const { return m_status; }
+    // True while statusText() is a failure to find or open the MIDI ports (set by attemptConnect).
+    bool statusIsFailure() const { return m_statusFailure; }
     // True while a probe, a Mode Change wait or a names read is running.
     bool isBusy() const { return m_activity != Activity::Idle; }
     bool isReading() const { return m_activity == Activity::Reading; }
@@ -181,7 +183,7 @@ private:
     int findPort(const QStringList &names, const QString &substring) const;
     void setState(State s);
     void setActivity(Activity a);
-    void setStatus(const QString &text);
+    void setStatus(const QString &text, bool failure = false);
     void raise(const QString &message, const QByteArray &raw = QByteArray());
     void disconnectWith(const QString &reason, const QByteArray &raw = QByteArray());
     bool sendRaw(const QByteArray &bytes);
@@ -229,6 +231,7 @@ private:
     ProbeStage m_probeStage = ProbeStage::Inquiry;
     bool m_started = false;
     QString m_outSub, m_inSub, m_portName, m_inPortName, m_status, m_lastRaised;
+    bool m_statusFailure = false;
 
     // Effective values: learned from the X50, or the manual ones when nothing is learned.
     int m_channel = 1;
