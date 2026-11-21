@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.22)
+cmake_minimum_required(VERSION 3.24)
 project(x50-patch-switcher VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -17,6 +17,8 @@ include(FetchContent)
 set(RTMIDI_BUILD_TESTING OFF CACHE BOOL "" FORCE)
 set(RTMIDI_BUILD_STATIC_LIBS ON CACHE BOOL "" FORCE)
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+# Do not depend on whether libjack happens to be installed.
+set(RTMIDI_API_JACK OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(rtmidi
   GIT_REPOSITORY https://github.com/thestk/rtmidi.git
   GIT_TAG 6.0.0)

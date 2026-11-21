@@ -75,10 +75,45 @@ private slots:
         QCOMPARE(r->name, QStringLiteral("Acoustic Piano"));
     }
 
+    // Per-bank counts; spot rows confirmed against the TSV and the VNL
+    // (docs/MIDI.md "Sources"): PROG A084 Filter Drums osc D, PROG A004
+    // Mashed Kit no osc, PROG A001 StereoPiano mf/f osc d, PROG G001 osc s,
+    // COMBI A114 StreetCatScratch, PROG D025 {(Meditate}), PROG g(d)001 STANDARD Kit.
+    void perBankCountsAndOsc() {
+        const QString combi = QStringLiteral("COMBI"), prog = QStringLiteral("PROG");
+        for (const char *b : {"A", "B", "C"})
+            QCOMPARE(count(combi, {QString::fromLatin1(b)}), 128);
+        for (const char *b : {"A", "B", "C", "D", "G"})
+            QCOMPARE(count(prog, {QString::fromLatin1(b)}), 128);
+
+        const Row *r = find(prog, QStringLiteral("A"), QStringLiteral("084"));
+        QVERIFY(r);
+        QCOMPARE(r->osc, QStringLiteral("D"));
+        r = find(prog, QStringLiteral("A"), QStringLiteral("004"));
+        QVERIFY(r);
+        QCOMPARE(r->osc, QString());
+        r = find(prog, QStringLiteral("A"), QStringLiteral("001"));
+        QVERIFY(r);
+        QCOMPARE(r->osc, QStringLiteral("d"));
+        r = find(prog, QStringLiteral("G"), QStringLiteral("001"));
+        QVERIFY(r);
+        QCOMPARE(r->osc, QStringLiteral("s"));
+        r = find(combi, QStringLiteral("A"), QStringLiteral("114"));
+        QVERIFY(r);
+        QCOMPARE(r->name, QStringLiteral("StreetCatScratch"));
+        r = find(prog, QStringLiteral("D"), QStringLiteral("025"));
+        QVERIFY(r);
+        QCOMPARE(r->name, QStringLiteral("{(Meditate})"));
+        r = find(prog, QStringLiteral("g(d)"), QStringLiteral("001"));
+        QVERIFY(r);
+        QCOMPARE(r->name, QStringLiteral("STANDARD Kit"));
+    }
+
     void namesAndAddresses() {
         QSet<QString> seen;
         for (const Row &r : rows) {
             QVERIFY2(!r.name.isEmpty(), qPrintable(r.bank + r.number));
+            QVERIFY2(r.name == r.name.trimmed(), qPrintable(r.name));
             QVERIFY2(r.name.length() <= 16, qPrintable(r.name));
             QVERIFY2(!r.category.isEmpty(), qPrintable(r.bank + r.number));
             const QString key = r.kind + QLatin1Char(' ') + r.bank + r.number;

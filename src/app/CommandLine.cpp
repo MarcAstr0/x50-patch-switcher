@@ -20,11 +20,12 @@ void printList(QTextStream &out, const QString &title, const QStringList &names)
 }
 } // namespace
 
-bool CommandLine::process(const QStringList &arguments)
+CommandLine::Result CommandLine::process(const QStringList &arguments)
 {
     QCommandLineParser parser;
     parser.setApplicationDescription(Version::appName());
-    parser.addHelpOption();
+    // addHelpOption also registers --help-all (Qt's own option name).
+    const QCommandLineOption helpOption = parser.addHelpOption();
     const QCommandLineOption listPorts(QStringLiteral("list-ports"),
                                        QStringLiteral("Print output and input port names and exit."));
     parser.addOption(listPorts);
@@ -32,12 +33,12 @@ bool CommandLine::process(const QStringList &arguments)
     if (!parser.parse(arguments)) {
         QTextStream(stderr) << parser.errorText() << QStringLiteral("\n");
         m_exitCode = 2;
-        return false;
+        return Result::Exit;
     }
-    if (parser.isSet(QStringLiteral("help"))) {
+    if (parser.isSet(helpOption) || parser.isSet(QStringLiteral("help-all"))) {
         QTextStream(stdout) << parser.helpText();
         m_exitCode = 0;
-        return false;
+        return Result::Exit;
     }
     if (parser.isSet(listPorts)) {
         const RtMidiBackend::Ports ports = RtMidiBackend::listPorts();
@@ -46,8 +47,8 @@ bool CommandLine::process(const QStringList &arguments)
         printList(out, QStringLiteral("Inputs:"), ports.inputs);
         if (!ports.error.isEmpty())
             QTextStream(stderr) << QStringLiteral("MIDI error: ") << ports.error << QStringLiteral("\n");
-        m_exitCode = 0;
-        return false;
+        m_exitCode = ports.error.isEmpty() ? 0 : 1;
+        return Result::Exit;
     }
-    return true;
+    return Result::Gui;
 }

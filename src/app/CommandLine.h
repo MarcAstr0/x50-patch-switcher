@@ -5,9 +5,11 @@
 class CommandLine
 {
 public:
-    // Parses argv-style arguments. Returns true if the GUI should start;
-    // false if a flag was handled and the process should exit with exitCode().
-    bool process(const QStringList &arguments);
+    enum class Result { Gui, Exit };
+    // Parses argv-style arguments (first element is the program name). Needs
+    // no application object. Gui: start the GUI; Exit: a flag was handled and
+    // the process should exit with exitCode().
+    Result process(const QStringList &arguments);
     int exitCode() const { return m_exitCode; }
 
 private:

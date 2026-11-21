@@ -63,6 +63,11 @@ private slots:
         QTest::newRow("c12 bare bank C") << "c12" << 2 << "COMBI C012" << "PROG C012";
         QTest::newRow("padded") << "  prog   g(d) 009 " << 1 << "PROG g(d)009" << "";
         QTest::newRow("G128") << "G128" << 1 << "PROG G128" << "";
+        QTest::newRow("bare c100") << "c100" << 2 << "COMBI C100" << "PROG C100";
+        QTest::newRow("bare C100") << "C100" << 2 << "COMBI C100" << "PROG C100";
+        QTest::newRow("g1") << "g1" << 1 << "PROG G001" << "";
+        QTest::newRow("GD1") << "GD1" << 1 << "PROG g(d)001" << "";
+        QTest::newRow("G(D)1") << "G(D)1" << 1 << "PROG g(d)001" << "";
         QTest::newRow("A127") << "a127" << 2 << "COMBI A127" << "PROG A127";
     }
     void grammarForms() {
@@ -148,8 +153,44 @@ private slots:
         QFETCH(int, pc);
         const A a = one(addr);
         QVERIFY(a.isValid());
-        QVERIFY(a.bankSelect(BankMap::Korg) == (A::BankSelect{korgMsb, korgLsb, pc}));
-        QVERIFY(a.bankSelect(BankMap::Gm) == (A::BankSelect{gmMsb, gmLsb, pc}));
+        QVERIFY(a.bankSelect(BankMap::Korg).has_value());
+        QVERIFY(a.bankSelect(BankMap::Gm).has_value());
+        QVERIFY(*a.bankSelect(BankMap::Korg) == (A::BankSelect{korgMsb, korgLsb, pc}));
+        QVERIFY(*a.bankSelect(BankMap::Gm) == (A::BankSelect{gmMsb, gmLsb, pc}));
+    }
+
+    // Invalid addresses give no bytes in either map.
+    void bankSelectInvalid() {
+        const A bad[] = {A(), A(A::Kind::Prog, A::Bank::G, 0), A(A::Kind::Combi, A::Bank::G, 1),
+                         A(A::Kind::Combi, A::Bank::D, 0), A(A::Kind::Prog, A::Bank::A, 128),
+                         A(A::Kind::Prog, A::Bank::Gd, 129)};
+        for (const A &a : bad) {
+            QVERIFY(!a.bankSelect(BankMap::Korg).has_value());
+            QVERIFY(!a.bankSelect(BankMap::Gm).has_value());
+        }
+    }
+
+    // Every catalogue address yields data bytes (0-127) in both maps.
+    void bankSelectCatalogueInRange() {
+        QFile f(QStringLiteral(X50_FACTORY_TSV));
+        QVERIFY(f.open(QIODevice::ReadOnly | QIODevice::Text));
+        int n = 0;
+        while (!f.atEnd()) {
+            const QStringList c = QString::fromUtf8(f.readLine()).split(QLatin1Char('\t'));
+            if (c.size() < 3)
+                continue;
+            const A a = one(c[0] + QLatin1Char(' ') + c[1] + c[2]);
+            QVERIFY(a.isValid());
+            for (BankMap m : {BankMap::Korg, BankMap::Gm}) {
+                const std::optional<A::BankSelect> b = a.bankSelect(m);
+                QVERIFY(b.has_value());
+                QVERIFY(b->msb >= 0 && b->msb <= 127);
+                QVERIFY(b->lsb >= 0 && b->lsb <= 127);
+                QVERIFY(b->program >= 0 && b->program <= 127);
+            }
+            ++n;
+        }
+        QCOMPARE(n, 1033);
     }
 };
 

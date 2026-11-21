@@ -3,7 +3,13 @@
 #include <QRegularExpression>
 
 namespace {
+// Indexed by static_cast<int>(Bank); the order is asserted below.
 const char16_t *const kBankNames[] = {u"A", u"B", u"C", u"D", u"G", u"g(d)"};
+static_assert(static_cast<int>(SoundAddress::Bank::A) == 0 && static_cast<int>(SoundAddress::Bank::B) == 1 &&
+                  static_cast<int>(SoundAddress::Bank::C) == 2 && static_cast<int>(SoundAddress::Bank::D) == 3 &&
+                  static_cast<int>(SoundAddress::Bank::G) == 4 && static_cast<int>(SoundAddress::Bank::Gd) == 5,
+              "kBankNames is indexed by the Bank enum");
+static_assert(sizeof(kBankNames) / sizeof(kBankNames[0]) == 6, "one name per Bank");
 
 bool isGmBank(SoundAddress::Bank b) {
     return b == SoundAddress::Bank::G || b == SoundAddress::Bank::Gd;
@@ -27,7 +33,9 @@ QString SoundAddress::format() const {
              QStringLiteral("%1").arg(m_number, 3, 10, QLatin1Char('0')));
 }
 
-SoundAddress::BankSelect SoundAddress::bankSelect(BankMap map) const {
+std::optional<SoundAddress::BankSelect> SoundAddress::bankSelect(BankMap map) const {
+    if (!isValid())
+        return std::nullopt;
     // docs/MIDI.md section 3, "Bank select values" table.
     BankSelect s;
     switch (m_bank) {
@@ -38,7 +46,12 @@ SoundAddress::BankSelect SoundAddress::bankSelect(BankMap map) const {
         // Rows "Program bank A-D" and "Combination bank A-C": MSB 00 (KORG) or
         // 3F (GM); LSB 00..03 for A..D; program change 0-127.
         s.msb = (map == BankMap::Korg) ? 0x00 : 0x3F;
-        s.lsb = static_cast<int>(m_bank);
+        switch (m_bank) {
+        case Bank::A: s.lsb = 0; break;
+        case Bank::B: s.lsb = 1; break;
+        case Bank::C: s.lsb = 2; break;
+        default:      s.lsb = 3; break;  // Bank::D
+        }
         s.program = m_number;
         break;
     case Bank::G:

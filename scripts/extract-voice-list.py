@@ -21,6 +21,21 @@ PROG_PAGES = range(15, 19)   # banks A, B, C, D
 GM_PAGE = 19                 # bank G and g(d)
 EXPECTED = {"COMBI": 384, "PROG-ABCD": 512, "PROG-G": 128, "PROG-g(d)": 9}
 NAME_LEN = 16
+KNOWN_CATEGORIES = frozenset([
+    "Bass", "BassSplits", "Bell/Mallet", "Bell/Mallet/Perc", "Brass", "BrassReed",
+    "Complex & SE", "Drums", "Ds/Hits", "FastSynth", "Guitar/Plucked", "Hit/Arpg",
+    "Keyboard", "LeadSplits", "LeadSynth", "MotionSynth", "Orchestral", "Organ",
+    "Pads", "SE", "SlowSynth", "Strings", "Synth", "User", "Vocal/Airy",
+    "Woodwind/Reed", "World",
+])
+# (kind, bank) -> exact set of numbers the bank must contain.
+EXPECTED_NUMBERS = {}
+for _b in "ABC":
+    EXPECTED_NUMBERS[("COMBI", _b)] = set(range(0, 128))
+for _b in "ABCD":
+    EXPECTED_NUMBERS[("PROG", _b)] = set(range(0, 128))
+EXPECTED_NUMBERS[("PROG", "G")] = set(range(1, 129))
+EXPECTED_NUMBERS[("PROG", "g(d)")] = {1, 9, 17, 25, 26, 33, 41, 49, 57}
 
 
 def fail(msg):
@@ -129,6 +144,18 @@ def main():
         seen.add(key)
         if not r[3] or not r[4] or len(r[3]) > NAME_LEN or re.match(r"[sdD] ", r[3]):
             fail("bad name/category in row %r" % (r,))
+
+    numbers = {}
+    for r in rows:
+        numbers.setdefault((r[0], r[1]), set()).add(r[2])
+        if r[4] not in KNOWN_CATEGORIES:
+            fail("unknown category %r in row %r" % (r[4], r))
+    if numbers != EXPECTED_NUMBERS:
+        for key in sorted(set(numbers) | set(EXPECTED_NUMBERS)):
+            got, want = numbers.get(key, set()), EXPECTED_NUMBERS.get(key, set())
+            if got != want:
+                fail("bank %r: missing %r, unexpected %r; nothing written"
+                     % (key, sorted(want - got), sorted(got - want)))
 
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     with open(out, "w", encoding="utf-8", newline="\n") as f:

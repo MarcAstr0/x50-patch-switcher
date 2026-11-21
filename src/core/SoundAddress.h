@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include <QString>
 #include <QVector>
 
@@ -45,8 +47,9 @@ public:
     bool isValid() const;
     // Canonical form: "COMBI A000", "PROG G001", "PROG g(d)001". Empty if invalid.
     QString format() const;
-    // MIDI.md section 3 table. Only meaningful if isValid().
-    BankSelect bankSelect(BankMap map) const;
+    // MIDI.md section 3 table. Returns nothing for an invalid address, so a
+    // caller can never send out-of-range bytes.
+    std::optional<BankSelect> bankSelect(BankMap map) const;
 
     bool operator==(const SoundAddress &o) const {
         return m_kind == o.m_kind && m_bank == o.m_bank && m_number == o.m_number;
