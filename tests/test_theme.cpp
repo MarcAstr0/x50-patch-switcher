@@ -73,6 +73,7 @@ private slots:
             QCOMPARE(int(f.hintingPreference()), int(QFont::PreferNoHinting));
             QVERIFY(!f.kerning());
             QVERIFY(f.styleStrategy() & QFont::NoSubpixelAntialias);
+            QVERIFY(f.styleStrategy() & QFont::NoAntialias);  // CoreText smooths otherwise
             QCOMPARE(f.letterSpacing(), 0.0);
         }
         // Advances are whole font pixels times k: digit 7 regular / 8 bold, space 4 (DESIGN 2.2).

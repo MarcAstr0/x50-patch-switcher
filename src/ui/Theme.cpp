@@ -116,7 +116,9 @@ QFont pixelFont(int k, bool bold)
     f.setWeight(have ? weight(face) : weight(Face::BarlowSemiBold));
     f.setPixelSize(16 * qMax(1, k));
     f.setHintingPreference(QFont::PreferNoHinting);
-    f.setStyleStrategy(QFont::StyleStrategy(QFont::PreferAntialias | QFont::NoSubpixelAntialias));
+    // NoAntialias, not PreferAntialias: the face is drawn on a pixel grid and must produce only the
+    // ink colour. CoreText (macOS, Qt 6.8) smooths and dilates outlines unless this is requested.
+    f.setStyleStrategy(QFont::StyleStrategy(QFont::NoAntialias | QFont::NoSubpixelAntialias));
     f.setKerning(false);
     f.setLetterSpacing(QFont::AbsoluteSpacing, 0);
     return f;

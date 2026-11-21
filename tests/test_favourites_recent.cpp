@@ -410,7 +410,13 @@ private slots:
 
         QTest::keyClick(table(), Qt::Key_8, Qt::ControlModifier);  // the set has 6 slots
         QVERIFY(errors.last());
-        QVERIFY(!m_library->setById(id)->slot(7).address.has_value());
+        // slot(7) would read past the end of a 6-slot set (undefined behaviour): check the size and
+        // that only the two filled slots changed.
+        QCOMPARE(m_library->setById(id)->size(), 6);
+        int filled = 0;
+        for (const auto &sl : m_library->setById(id)->allSlots())
+            filled += sl.address.has_value() ? 1 : 0;
+        QCOMPARE(filled, 2);
         // The shortcut also works with the category list focused (the highlight is in the Recent view).
         cats()->setFocus();
         QTest::keyClick(cats(), Qt::Key_2, Qt::ControlModifier);

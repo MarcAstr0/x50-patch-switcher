@@ -863,10 +863,16 @@ private slots:
         QCOMPARE(view().liveButton()->height(), Theme::browseToolbarHeight);
         QCOMPARE(view().settingsButton()->height(), Theme::browseToolbarHeight);
         QCOMPARE(view().readNamesButton()->height(), Theme::browseToolbarHeight);
+        // DESIGN 7.3 / 7.9: width = max(listed, advance + 32), the advance measured from the button's
+        // own font. (On Qt 6.8 / Linux the bold face is wider than on Qt 6.4, so a hard-coded pixel
+        // width only holds where the advance is small enough for the listed width to win.)
+        const auto expectW = [](const QPushButton *b, int listed) {
+            return qMax(listed, b->fontMetrics().horizontalAdvance(b->text()) + 32);
+        };
         // DESIGN 7.3 / 7.8 (D3): Read names 126, Settings and Live 100, Prev and Next 90, all 40 high.
-        QCOMPARE(view().readNamesButton()->width(), 126);
-        QCOMPARE(view().settingsButton()->width(), 100);
-        QCOMPARE(view().liveButton()->width(), 100);
+        QCOMPARE(view().readNamesButton()->width(), expectW(view().readNamesButton(), 126));
+        QCOMPARE(view().settingsButton()->width(), expectW(view().settingsButton(), 100));
+        QCOMPARE(view().liveButton()->width(), expectW(view().liveButton(), 100));
         QCOMPARE(view().prevButton()->width(), 90);
         QCOMPARE(view().nextButton()->width(), 90);
         QCOMPARE(view().prevButton()->height(), Theme::browseToolbarHeight);

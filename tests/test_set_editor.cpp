@@ -147,10 +147,15 @@ private slots:
         QPushButton *nb = button(QStringLiteral("New")), *rb = button(QStringLiteral("Rename")),
                     *db = button(QStringLiteral("Duplicate")), *xb = button(QStringLiteral("Delete"));
         QVERIFY(nb && rb && db && xb);
-        QCOMPARE(nb->width(), 84);
-        QCOMPARE(rb->width(), 96);
-        QCOMPARE(db->width(), 106);
-        QCOMPARE(xb->width(), 84);
+        // DESIGN 7.9: width = max(listed, advance + 32), advance from the button's own font (it is
+        // wider on Qt 6.8 / Linux than on 6.4, so fixed pixel widths do not hold everywhere).
+        const auto expectW = [](const QPushButton *b, int listed) {
+            return qMax(listed, b->fontMetrics().horizontalAdvance(b->text()) + 32);
+        };
+        QCOMPARE(nb->width(), expectW(nb, 84));
+        QCOMPARE(rb->width(), expectW(rb, 96));
+        QCOMPARE(db->width(), expectW(db, 106));
+        QCOMPARE(xb->width(), expectW(xb, 84));
         for (QWidget *w : {static_cast<QWidget *>(nb), static_cast<QWidget *>(rb), static_cast<QWidget *>(db),
                            static_cast<QWidget *>(xb), static_cast<QWidget *>(ed().picker())})
             QCOMPARE(w->height(), 36);
