@@ -88,7 +88,7 @@ No GUI beyond the scaffold window. Everything testable headless.
   bank read. `packaging/windows/Diagnose X50.bat` runs it into
   `X50-diagnose-<date-time>` on the real Desktop (`GetFolderPath`, fallback `%USERPROFILE%\Desktop`) and opens that folder.
   `scripts/midi-smoke.sh` checks `--send` bytes against `Midi Through` + `aseqdump`.
-- ☐ **T1.9 CI.** GitHub Actions on `windows-latest`, `ubuntu-24.04`, `macos-14`: build,
+- ☑ **T1.9 CI.** GitHub Actions on `windows-latest`, `ubuntu-24.04`, `macos-14`: build,
   test, and on Windows `windeployqt` into a portable zip containing the exe, the Qt
   DLLs, the `.bat` and a short `LEEME.txt`/`README.txt`. Artifact downloadable from the
   run. Proof the exe starts: `--list-ports` and `--probe --fake-midi` on the runner.
@@ -279,3 +279,8 @@ fixes go back to the builder as T5.x tasks.
   `--probe` and `--diagnose` too; check report.txt write/flush and exit 4 on a short
   write; diagnose folder name collision-safe (seconds plus a -N suffix if it exists).
   (foreman)
+- 2026-11-21 · T1.9: CI green on windows-latest, ubuntu-24.04 and macos-15 (macos-14 is
+  retired on GitHub) in run 44932729199; Windows zip artifact built and its staged exe
+  smoke-tested without Qt on PATH. Runners have no ALSA sequencer, so real-MIDI tests
+  skip or accept the documented exit-1 path there. MSVC shows 11 Qt 6.8 deprecation /
+  truncation warnings (qAsConst, QDateTime ctor, a cast in a test): fix in R1. (foreman)
