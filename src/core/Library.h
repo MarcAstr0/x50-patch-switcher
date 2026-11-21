@@ -22,7 +22,7 @@
 //
 // Persistence: QSaveFile (atomic); every change restarts a 500 ms single-shot
 // timer and the save happens when it fires; flush() saves at once (exit).
-// A file that fails to parse or validate is renamed library.json.broken-<UTC
+// A file that fails to parse or has a wrong or missing required field is renamed library.json.broken-<UTC
 // timestamp>, an empty library starts, loadError() says so, and nothing is
 // written to the path until the next load, so a broken file is never lost.
 //
@@ -31,6 +31,10 @@
 //    spec has none).
 //  - A stored address that does not parse does not sideline the file: the slot
 //    (or favourite, recent, unit name) is dropped and loadWarnings() names it.
+//    The original is then copied once to library.json.bak-<UTC timestamp> before
+//    the first save overwrites it.
+//  - A read failure (not corruption) blocks writes and sets loadError(); the file
+//    is left alone. An empty config directory blocks writes (no relative path).
 //  - Types: timestamps are ISO 8601 UTC strings; unit.memberCode int,
 //    unit.version string, unit.globalChannel 1-16, unit.bankMap "korg"|"gm".
 class Library : public QObject {
@@ -54,6 +58,8 @@ public:
     using Result = SetModel::Result;
 
     explicit Library(QObject *parent = nullptr);
+    // Saves a pending change (silently, no signals) so nothing is lost on teardown.
+    ~Library() override;
 
     // Reads <configDir>/library.json. A missing file or directory is not an
     // error (empty library; the directory is created on first save). Returns
@@ -69,6 +75,9 @@ public:
     // Saves now if a change is pending; stops the timer. Call on exit.
     void flush();
     bool hasPendingSave() const { return m_dirty; }
+    // Debounce interval; default kSaveDebounceMs. The setter exists for tests.
+    int saveDebounceMs() const { return m_timer.interval(); }
+    void setSaveDebounceMs(int ms) { m_timer.setInterval(ms); }
     QString lastSaveError() const { return m_saveError; }
     int writeCount() const { return m_writeCount; }
 
@@ -121,6 +130,8 @@ private:
     bool fromJson(const QByteArray &data, QString *error);
     void clearContent();
     bool sideline();
+    QString writeNow(bool notify);
+    QString backupOriginal();
 
     QString m_path;
     QString m_loadError;
@@ -128,7 +139,8 @@ private:
     QString m_brokenPath;
     QString m_saveError;
     bool m_dirty = false;
-    bool m_writeBlocked = false;  // a broken file could not be moved aside
+    bool m_writeBlocked = false;  // file unreadable, or broken and not movable
+    bool m_needBackup = false;    // load dropped entries: copy the file before first save
     int m_writeCount = 0;
     QTimer m_timer;
 

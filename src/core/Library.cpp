@@ -1,6 +1,8 @@
 #include "core/Library.h"
 
 #include <algorithm>
+#include <cmath>
+#include <limits>
 #include <utility>
 
 #include <QDir>
@@ -42,9 +44,32 @@ std::optional<SoundAddress> parseStored(const QString &text)
     return r.matches.first();
 }
 
+// An integral JSON number within [lo, hi]; checked on the double so no cast is UB.
+bool isIntIn(const QJsonValue &v, double lo, double hi)
+{
+    if (!v.isDouble())
+        return false;
+    const double d = v.toDouble();
+    return std::isfinite(d) && std::fabs(d) <= 9007199254740992.0 && d == std::floor(d) && d >= lo && d <= hi;
+}
+
 bool isInt(const QJsonValue &v)
 {
-    return v.isDouble() && v.toDouble() == static_cast<double>(static_cast<qint64>(v.toDouble()));
+    return isIntIn(v, -9007199254740992.0, 9007199254740992.0);
+}
+
+bool isIntRange(const QJsonValue &v, int lo, int hi)
+{
+    return isIntIn(v, lo, hi);
+}
+
+// A required timestamp string that parses.
+bool validTime(const QJsonValue &v, QDateTime *out)
+{
+    if (!v.isString())
+        return false;
+    *out = parseTime(v.toString());
+    return out->isValid();
 }
 
 QString makeId()
@@ -58,6 +83,13 @@ Library::Library(QObject *parent) : QObject(parent)
     m_timer.setSingleShot(true);
     m_timer.setInterval(kSaveDebounceMs);
     connect(&m_timer, &QTimer::timeout, this, [this]() { save(); });
+}
+
+Library::~Library()
+{
+    m_timer.stop();
+    if (m_dirty)
+        writeNow(false);
 }
 
 void Library::clearContent()
@@ -80,8 +112,16 @@ bool Library::load(const QString &configDir)
     m_brokenPath.clear();
     m_saveError.clear();
     m_writeBlocked = false;
+    m_needBackup = false;
     clearContent();
 
+    if (configDir.isEmpty()) {
+        // Never fall back to a relative library.json in the working directory.
+        m_path.clear();
+        m_writeBlocked = true;
+        m_saveError = QStringLiteral("No config directory is available; changes will not be saved.");
+        return true;
+    }
     QFile f(m_path);
     if (!f.exists())
         return true;
@@ -91,12 +131,22 @@ bool Library::load(const QString &configDir)
         m_writeBlocked = true;
         return false;
     }
+    const qint64 expected = f.size();
     const QByteArray data = f.readAll();
+    if (f.error() != QFileDevice::NoError || (expected >= 0 && data.size() != expected)) {
+        const QString why = f.error() != QFileDevice::NoError ? f.errorString()
+                                                               : QStringLiteral("short read");
+        m_loadError = QStringLiteral("Cannot read %1: %2").arg(m_path, why);
+        m_writeBlocked = true;
+        return false;
+    }
     f.close();
 
     QString err;
-    if (fromJson(data, &err))
+    if (fromJson(data, &err)) {
+        m_needBackup = !m_loadWarnings.isEmpty();
         return true;
+    }
 
     clearContent();
     m_loadWarnings.clear();
@@ -187,12 +237,12 @@ bool Library::fromJson(const QByteArray &data, QString *error)
                 return false;
             }
             ids.insert(id);
-            if (!so.value(QStringLiteral("name")).isString()) {
+            if (!so.value(QStringLiteral("name")).isString() || name.trimmed().isEmpty()) {
                 *error = QStringLiteral("set %1 has no name").arg(n);
                 return false;
             }
             const QJsonValue sizeV = so.value(QStringLiteral("size"));
-            if (!isInt(sizeV) || !SetModel::isValidSize(sizeV.toInt())) {
+            if (!isIntRange(sizeV, 6, 8) || !SetModel::isValidSize(sizeV.toInt())) {
                 *error = QStringLiteral("set \"%1\": size must be 6 or 8").arg(name);
                 return false;
             }
@@ -272,16 +322,19 @@ bool Library::fromJson(const QByteArray &data, QString *error)
             if (!e.isObject())
                 return badType("recents", "an array of objects");
             const QJsonObject o = e.toObject();
-            const QString text = o.value(QStringLiteral("address")).toString();
-            const auto a = parseStored(text);
-            const QDateTime when = parseTime(o.value(QStringLiteral("lastUsed")).toString());
+            const QJsonValue av = o.value(QStringLiteral("address"));
             const QJsonValue cv = o.value(QStringLiteral("count"));
+            QDateTime when;
+            if (!av.isString())
+                return badType("recents address", "a string");
+            if (!isIntRange(cv, 1, std::numeric_limits<int>::max()))
+                return badType("recents count", "a positive integer");
+            if (!validTime(o.value(QStringLiteral("lastUsed")), &when))
+                return badType("recents lastUsed", "an ISO 8601 time string");
+            const QString text = av.toString();
+            const auto a = parseStored(text);
             if (!a) {
                 m_loadWarnings << QStringLiteral("Recent \"%1\" is not a sound address; dropped.").arg(text);
-                continue;
-            }
-            if (!isInt(cv) || cv.toInt() < 1 || !when.isValid()) {
-                m_loadWarnings << QStringLiteral("Recent \"%1\" has a bad count or time; dropped.").arg(text);
                 continue;
             }
             bool dup = false;
@@ -304,19 +357,24 @@ bool Library::fromJson(const QByteArray &data, QString *error)
             return badType("unitNames", "an object");
         const QJsonObject o = v.toObject();
         for (auto it = o.begin(); it != o.end(); ++it) {
+            if (!it.value().isObject())
+                return badType("unitNames entries", "objects");
+            const QJsonObject eo = it.value().toObject();
+            if (!eo.value(QStringLiteral("name")).isString())
+                return badType("unitNames name", "a string");
+            if (eo.contains(QStringLiteral("category")) && !eo.value(QStringLiteral("category")).isString())
+                return badType("unitNames category", "a string");
+            Catalogue::UnitName un;
+            if (!validTime(eo.value(QStringLiteral("readAt")), &un.readAt))
+                return badType("unitNames readAt", "an ISO 8601 time string");
+            un.name = eo.value(QStringLiteral("name")).toString();
+            un.category = eo.value(QStringLiteral("category")).toString();
             const auto a = parseStored(it.key());
             if (!a) {
                 m_loadWarnings << QStringLiteral("Unit name for \"%1\": not a sound address; dropped.")
                                       .arg(it.key());
                 continue;
             }
-            if (!it.value().isObject() || !it.value().toObject().value(QStringLiteral("name")).isString())
-                return badType("unitNames entries", "objects with a string name");
-            const QJsonObject eo = it.value().toObject();
-            Catalogue::UnitName un;
-            un.name = eo.value(QStringLiteral("name")).toString();
-            un.category = eo.value(QStringLiteral("category")).toString();
-            un.readAt = parseTime(eo.value(QStringLiteral("readAt")).toString());
             m_unitNames.insert(*a, un);
         }
     }
@@ -328,12 +386,15 @@ bool Library::fromJson(const QByteArray &data, QString *error)
             return badType("unit", "an object");
         const QJsonObject o = v.toObject();
         UnitInfo u;
-        if (!isInt(o.value(QStringLiteral("memberCode"))) || !isInt(o.value(QStringLiteral("globalChannel"))))
+        if (!isIntRange(o.value(QStringLiteral("memberCode")), 0, std::numeric_limits<int>::max()) ||
+            !isInt(o.value(QStringLiteral("globalChannel"))))
             return badType("unit.memberCode and unit.globalChannel", "integers");
         u.memberCode = o.value(QStringLiteral("memberCode")).toInt();
         u.globalChannel = o.value(QStringLiteral("globalChannel")).toInt();
-        if (u.globalChannel < 1 || u.globalChannel > 16)
+        if (!isIntRange(o.value(QStringLiteral("globalChannel")), 1, 16))
             return badType("unit.globalChannel", "1-16");
+        if (!o.value(QStringLiteral("version")).isString())
+            return badType("unit.version", "a string");
         u.version = o.value(QStringLiteral("version")).toString();
         const QString bm = o.value(QStringLiteral("bankMap")).toString();
         if (bm == QStringLiteral("korg"))
@@ -342,7 +403,8 @@ bool Library::fromJson(const QByteArray &data, QString *error)
             u.bankMap = BankMap::Gm;
         else
             return badType("unit.bankMap", "\"korg\" or \"gm\"");
-        u.lastSeen = parseTime(o.value(QStringLiteral("lastSeen")).toString());
+        if (!validTime(o.value(QStringLiteral("lastSeen")), &u.lastSeen))
+            return badType("unit.lastSeen", "an ISO 8601 time string");
         m_unit = u;
     }
     return true;
@@ -415,7 +477,26 @@ QByteArray Library::toJson() const
     return QJsonDocument(root).toJson(QJsonDocument::Indented);
 }
 
+QString Library::backupOriginal()
+{
+    // Load dropped entries; keep the original once before overwriting it.
+    if (!QFileInfo::exists(m_path))
+        return {};
+    const QString stamp = QDateTime::currentDateTimeUtc().toString(QStringLiteral("yyyyMMdd'T'HHmmss"));
+    QString target = m_path + QStringLiteral(".bak-") + stamp;
+    for (int n = 2; QFileInfo::exists(target); ++n)
+        target = m_path + QStringLiteral(".bak-") + stamp + QStringLiteral("-") + QString::number(n);
+    if (!QFile::copy(m_path, target))
+        return QStringLiteral("Cannot back up %1 before saving.").arg(QDir::toNativeSeparators(m_path));
+    return {};
+}
+
 QString Library::save()
+{
+    return writeNow(true);
+}
+
+QString Library::writeNow(bool notify)
 {
     m_timer.stop();
     QString err;
@@ -427,23 +508,31 @@ QString Library::save()
         err = QStringLiteral("Cannot create the folder %1.")
                   .arg(QDir::toNativeSeparators(QFileInfo(m_path).absolutePath()));
     } else {
-        QSaveFile f(m_path);
-        if (!f.open(QIODevice::WriteOnly)) {
-            err = QStringLiteral("Cannot write %1: %2")
-                      .arg(QDir::toNativeSeparators(m_path), f.errorString());
-        } else {
-            f.write(toJson());
-            if (!f.commit())
+        if (m_needBackup) {
+            err = backupOriginal();
+            if (err.isEmpty())
+                m_needBackup = false;
+        }
+        if (err.isEmpty()) {
+            QSaveFile f(m_path);
+            if (!f.open(QIODevice::WriteOnly)) {
                 err = QStringLiteral("Cannot write %1: %2")
                           .arg(QDir::toNativeSeparators(m_path), f.errorString());
+            } else {
+                f.write(toJson());
+                if (!f.commit())
+                    err = QStringLiteral("Cannot write %1: %2")
+                              .arg(QDir::toNativeSeparators(m_path), f.errorString());
+            }
         }
     }
     m_saveError = err;
     if (err.isEmpty()) {
         m_dirty = false;
         ++m_writeCount;
-        emit saved();
-    } else {
+        if (notify)
+            emit saved();
+    } else if (notify) {
         // Stay dirty so flush() retries; do not retry on a timer.
         emit saveFailed(err);
     }
@@ -528,12 +617,17 @@ void Library::recordUse(const SoundAddress &a, const QDateTime &when)
 void Library::setUnitNames(const QMap<SoundAddress, Catalogue::UnitName> &names)
 {
     m_unitNames = names;
+    for (auto it = m_unitNames.begin(); it != m_unitNames.end(); ++it)
+        if (!it.value().readAt.isValid())
+            it.value().readAt = QDateTime::currentDateTimeUtc();  // the file requires a time
     touch();
 }
 
 void Library::setUnit(const UnitInfo &info)
 {
     m_unit = info;
+    if (!m_unit->lastSeen.isValid())
+        m_unit->lastSeen = QDateTime::currentDateTimeUtc();  // the file requires a time
     touch();
 }
 

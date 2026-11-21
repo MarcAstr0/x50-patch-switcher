@@ -37,6 +37,7 @@ int main(int argc, char *argv[])
     library.load(ConfigLocation::resolveForApp(cli.configDir()));
     if (!library.loadError().isEmpty())
         qWarning("%s", qPrintable(library.loadError()));
+    QObject::connect(&app, &QCoreApplication::aboutToQuit, &library, [&library]() { library.flush(); });
     MainWindow window;
     window.show();
     const int rc = QApplication::exec();

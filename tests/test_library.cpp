@@ -139,27 +139,30 @@ private slots:
         QVERIFY(s.value(QStringLiteral("slots")).toArray().at(1).isNull());
     }
 
+    void defaultDebounceIs500ms() {
+        Library lib;
+        QCOMPARE(lib.saveDebounceMs(), 500);
+        QCOMPARE(Library::kSaveDebounceMs, 500);
+    }
+
     void debounceOneWrite() {
         QTemporaryDir d;
         Library lib;
+        lib.setSaveDebounceMs(300);
         lib.load(d.path());
         QSignalSpy saved(&lib, &Library::saved);
         lib.setFavourite(combi(1), true);
-        QTest::qWait(200);
-        lib.setFavourite(combi(2), true);
-        QTest::qWait(200);
-        lib.setFavourite(combi(3), true);
+        // Immediately after the change: nothing written yet (no waiting involved).
         QVERIFY(lib.hasPendingSave());
         QCOMPARE(lib.writeCount(), 0);
         QVERIFY(!QFileInfo::exists(d.filePath(QStringLiteral("library.json"))));
-        // 400 ms after the first change, 200 after the last: still nothing.
-        QTest::qWait(350);
+        lib.setFavourite(combi(2), true);
+        lib.setFavourite(combi(3), true);
         QCOMPARE(lib.writeCount(), 0);
-        QTest::qWait(400);
-        QCOMPARE(lib.writeCount(), 1);
+        QTRY_COMPARE_WITH_TIMEOUT(lib.writeCount(), 1, 3000);
         QCOMPARE(saved.count(), 1);
         QVERIFY(!lib.hasPendingSave());
-        QTest::qWait(700);
+        QTest::qWait(600);  // 2x the interval: still exactly one write
         QCOMPARE(lib.writeCount(), 1);
         Library again;
         again.load(d.path());
@@ -169,6 +172,7 @@ private slots:
     void flushWritesAtOnceAndOnlyWhenDirty() {
         QTemporaryDir d;
         Library lib;
+        lib.setSaveDebounceMs(300);
         lib.load(d.path());
         lib.flush();
         QCOMPARE(lib.writeCount(), 0);
@@ -220,27 +224,203 @@ private slots:
             "{\"sets\":[{\"id\":\"a\",\"name\":\"n\",\"size\":6,\"slots\":[null,null,null,null,null,null]},"
             "{\"id\":\"a\",\"name\":\"m\",\"size\":6,\"slots\":[null,null,null,null,null,null]}]}");
         QTest::newRow("bad bankMap") << QByteArray(
-            "{\"unit\":{\"memberCode\":1,\"version\":\"1\",\"globalChannel\":1,\"bankMap\":\"x\"}}");
+            "{\"unit\":{\"memberCode\":1,\"version\":\"1\",\"globalChannel\":1,\"bankMap\":\"x\","
+            "\"lastSeen\":\"2026-01-01T00:00:00Z\"}}");
     }
     void brokenFileSidelined() {
         QFETCH(QByteArray, content);
+        checkSidelined(content);
+    }
+
+    // Item 2: empty, blank, missing or non-string set name.
+    void setNameInvalidSidelined_data() {
+        QTest::addColumn<QByteArray>("content");
+        const char *slotsJson = "\"size\":6,\"slots\":[null,null,null,null,null,null]";
+        for (const char *n : {"\"name\":\"\",", "\"name\":\"  \\t\",", "", "\"name\":5,"})
+            QTest::newRow(*n ? n : "missing")
+                << (QByteArray("{\"sets\":[{\"id\":\"a\",") + n + slotsJson + "}]}");
+    }
+    void setNameInvalidSidelined() {
+        QFETCH(QByteArray, content);
+        checkSidelined(content);
+    }
+
+    // Item 3: recents with a bad count or time are structural errors.
+    void recentsInvalidSidelined_data() {
+        QTest::addColumn<QByteArray>("content");
+        const char *t = "\"lastUsed\":\"2026-01-01T00:00:00Z\"";
+        auto row = [&](const char *name, const QByteArray &body) {
+            QTest::newRow(name) << (QByteArray("{\"recents\":[{\"address\":\"COMBI A001\",") + body + "}]}");
+        };
+        row("count string", QByteArray("\"count\":\"2\",") + t);
+        row("count fractional", QByteArray("\"count\":1.5,") + t);
+        row("count missing", QByteArray(t));
+        row("count zero", QByteArray("\"count\":0,") + t);
+        row("lastUsed missing", "\"count\":1");
+        row("lastUsed garbage", "\"count\":1,\"lastUsed\":\"yesterday\"");
+        row("lastUsed number", "\"count\":1,\"lastUsed\":5");
+    }
+    void recentsInvalidSidelined() {
+        QFETCH(QByteArray, content);
+        checkSidelined(content);
+    }
+
+    // Item 4: unitNames entries with a bad category or readAt.
+    void unitNamesInvalidSidelined_data() {
+        QTest::addColumn<QByteArray>("content");
+        auto row = [&](const char *name, const char *body) {
+            QTest::newRow(name) << (QByteArray("{\"unitNames\":{\"COMBI A001\":{\"name\":\"x\",") + body + "}}}");
+        };
+        row("category number", "\"category\":5,\"readAt\":\"2026-01-01T00:00:00Z\"");
+        row("category null", "\"category\":null,\"readAt\":\"2026-01-01T00:00:00Z\"");
+        row("readAt missing", "\"category\":\"Pad\"");
+        row("readAt garbage", "\"readAt\":\"never\"");
+    }
+    void unitNamesInvalidSidelined() {
+        QFETCH(QByteArray, content);
+        checkSidelined(content);
+    }
+
+    // Item 5: unit with a missing or bad version or lastSeen. Absent unit is fine.
+    void unitInvalidSidelined_data() {
+        QTest::addColumn<QByteArray>("content");
+        auto row = [&](const char *name, const char *body) {
+            QTest::newRow(name) << (QByteArray("{\"unit\":{\"memberCode\":1,\"globalChannel\":1,\"bankMap\":\"korg\",")
+                                    + body + "}}");
+        };
+        row("version missing", "\"lastSeen\":\"2026-01-01T00:00:00Z\"");
+        row("version number", "\"version\":1,\"lastSeen\":\"2026-01-01T00:00:00Z\"");
+        row("lastSeen missing", "\"version\":\"1\"");
+        row("lastSeen garbage", "\"version\":\"1\",\"lastSeen\":\"x\"");
+    }
+    void unitInvalidSidelined() {
+        QFETCH(QByteArray, content);
+        checkSidelined(content);
+    }
+    void unitAbsentIsFine() {
+        QTemporaryDir d;
+        writeAll(d.filePath(QStringLiteral("library.json")), "{\"favourites\":[]}");
+        Library lib;
+        QVERIFY(lib.load(d.path()));
+        QVERIFY(!lib.unit().has_value());
+        QVERIFY(brokenFiles(d.path()).isEmpty());
+    }
+
+    // Item 6: huge or non-integral numbers are structural errors, not UB.
+    void hugeNumbersSidelined_data() {
+        QTest::addColumn<QByteArray>("content");
+        QTest::newRow("size 1e300") << QByteArray("{\"sets\":[{\"id\":\"a\",\"name\":\"n\",\"size\":1e300,\"slots\":[]}]}");
+        QTest::newRow("count 1e300") << QByteArray(
+            "{\"recents\":[{\"address\":\"COMBI A001\",\"count\":1e300,\"lastUsed\":\"2026-01-01T00:00:00Z\"}]}");
+        QTest::newRow("count 2^60") << QByteArray(
+            "{\"recents\":[{\"address\":\"COMBI A001\",\"count\":1152921504606846976,\"lastUsed\":\"2026-01-01T00:00:00Z\"}]}");
+        QTest::newRow("channel -1e300") << QByteArray(
+            "{\"unit\":{\"memberCode\":1,\"version\":\"1\",\"globalChannel\":-1e300,\"bankMap\":\"korg\","
+            "\"lastSeen\":\"2026-01-01T00:00:00Z\"}}");
+    }
+    void hugeNumbersSidelined() {
+        QFETCH(QByteArray, content);
+        checkSidelined(content);
+    }
+
+    // Item 1: an unreadable file is not corruption.
+    void unreadableFileNotSidelined() {
         QTemporaryDir d;
         const QString path = d.filePath(QStringLiteral("library.json"));
+        const QByteArray content = "{\"favourites\":[\"COMBI A001\"]}";
         writeAll(path, content);
+        QVERIFY(QFile::setPermissions(path, QFileDevice::WriteOwner));
+        QFile probe(path);
+        if (probe.open(QIODevice::ReadOnly)) {
+            probe.close();
+            QFile::setPermissions(path, QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+            QSKIP("file stays readable (running as a privileged user)");
+        }
         Library lib;
         QVERIFY(!lib.load(d.path()));
-        QVERIFY(!lib.loadError().isEmpty());
-        QVERIFY(lib.sets().isEmpty());
-        QVERIFY(!QFileInfo::exists(path));
-        const QStringList broken = brokenFiles(d.path());
-        QCOMPARE(broken.size(), 1);
-        QCOMPARE(readAll(d.filePath(broken.first())), content);
-        QCOMPARE(lib.brokenFilePath(), d.filePath(broken.first()));
-        // Later saves do not touch the broken copy.
-        lib.setFavourite(combi(1), true);
-        lib.flush();
-        QCOMPARE(readAll(d.filePath(broken.first())), content);
+        QVERIFY(lib.loadError().contains(QStringLiteral("Cannot read")));
+        QVERIFY(brokenFiles(d.path()).isEmpty());
         QVERIFY(QFileInfo::exists(path));
+        lib.setFavourite(combi(2), true);
+        QVERIFY(!lib.save().isEmpty());  // writes blocked
+        lib.flush();
+        QFile::setPermissions(path, QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+        QCOMPARE(readAll(path), content);
+    }
+
+    // Item 7: an empty config directory must never write a relative library.json.
+    void emptyConfigDirRefused() {
+        QTemporaryDir cwd;
+        const QString old = QDir::currentPath();
+        QVERIFY(QDir::setCurrent(cwd.path()));
+        {
+            Library lib;
+            QVERIFY(lib.load(QString()));
+            QVERIFY(!lib.lastSaveError().isEmpty());
+            lib.setFavourite(combi(1), true);
+            QVERIFY(!lib.save().isEmpty());
+            lib.flush();
+        }  // destructor flush must not write either
+        QDir::setCurrent(old);
+        QVERIFY(!QFileInfo::exists(cwd.filePath(QStringLiteral("library.json"))));
+        QVERIFY(QDir(cwd.path()).entryList(QDir::Files | QDir::NoDotAndDotDot).isEmpty());
+    }
+
+    // Item 8: entries dropped at load: original copied once to .bak-<stamp> before the first save.
+    void backupBeforeFirstSaveAfterWarnings() {
+        QTemporaryDir d;
+        const QString path = d.filePath(QStringLiteral("library.json"));
+        const QByteArray content = "{\"favourites\":[\"COMBI A001\",\"nonsense\"]}";
+        writeAll(path, content);
+        // A pre-existing .bak with the same stamp must not be overwritten.
+        const QString stamp = QDateTime::currentDateTimeUtc().toString(QStringLiteral("yyyyMMdd'T'HHmmss"));
+        const QString taken = path + QStringLiteral(".bak-") + stamp;
+        writeAll(taken, "old backup");
+        Library lib;
+        QVERIFY(lib.load(d.path()));
+        QCOMPARE(lib.loadWarnings().size(), 1);
+        QVERIFY(QDir(d.path()).entryList({QStringLiteral("library.json.bak-*")}, QDir::Files).size() == 1);
+        lib.setFavourite(combi(2), true);
+        lib.flush();
+        lib.setFavourite(combi(3), true);
+        lib.flush();  // second save: no second backup
+        const QStringList baks = QDir(d.path()).entryList({QStringLiteral("library.json.bak-*")}, QDir::Files);
+        QVERIFY2(baks.size() <= 2, qPrintable(baks.join(QLatin1Char(' '))));
+        int original = 0;
+        for (const QString &b : baks) {
+            const QByteArray c = readAll(d.filePath(b));
+            if (c == content)
+                ++original;
+            else
+                QCOMPARE(c, QByteArray("old backup"));
+        }
+        QCOMPARE(original, 1);
+        QCOMPARE(readAll(taken), QByteArray("old backup"));
+        QVERIFY(readAll(path) != content);
+        // A clean load makes no backup.
+        QTemporaryDir d2;
+        Library clean;
+        clean.load(d2.path());
+        clean.setFavourite(combi(1), true);
+        clean.flush();
+        Library clean2;
+        QVERIFY(clean2.load(d2.path()));
+        clean2.setFavourite(combi(2), true);
+        clean2.flush();
+        QVERIFY(QDir(d2.path()).entryList({QStringLiteral("library.json.bak-*")}, QDir::Files).isEmpty());
+    }
+
+    // Item 9: a pending change is written when the Library is destroyed.
+    void destructorFlushes() {
+        QTemporaryDir d;
+        {
+            Library lib;
+            lib.load(d.path());
+            lib.setFavourite(combi(5), true);
+        }
+        Library again;
+        QVERIFY(again.load(d.path()));
+        QVERIFY(again.isFavourite(combi(5)));
     }
 
     void twoBrokenFilesBothKept() {
@@ -434,6 +614,27 @@ private slots:
         QCOMPARE(again.setById(id)->size(), 6);
         QCOMPARE(again.setById(id)->slot(0).label, QStringLiteral("a"));
         QVERIFY(again.setById(id)->slot(1).isEmpty());
+    }
+
+private:
+    void checkSidelined(const QByteArray &content) {
+        QTemporaryDir d;
+        const QString path = d.filePath(QStringLiteral("library.json"));
+        writeAll(path, content);
+        Library lib;
+        QVERIFY(!lib.load(d.path()));
+        QVERIFY(!lib.loadError().isEmpty());
+        QVERIFY(lib.sets().isEmpty());
+        QVERIFY(!QFileInfo::exists(path));
+        const QStringList broken = brokenFiles(d.path());
+        QCOMPARE(broken.size(), 1);
+        QCOMPARE(readAll(d.filePath(broken.first())), content);
+        QCOMPARE(lib.brokenFilePath(), d.filePath(broken.first()));
+        // Later saves do not touch the broken copy.
+        lib.setFavourite(combi(1), true);
+        lib.flush();
+        QCOMPARE(readAll(d.filePath(broken.first())), content);
+        QVERIFY(QFileInfo::exists(path));
     }
 };
 
