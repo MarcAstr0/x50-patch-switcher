@@ -93,6 +93,10 @@ jobs:
           "$exe" --diagnose "$diag" --fake-midi
           test -s "$diag/report.txt"
 
+      - name: Footprint (Linux)
+        if: runner.os == 'Linux'
+        run: scripts/measure-footprint.sh
+
       - name: MSVC developer environment (so windeployqt finds the VC runtime)
         if: runner.os == 'Windows'
         # Sets VCINSTALLDIR; without it windeployqt warns "Cannot find Visual Studio
@@ -175,6 +179,24 @@ jobs:
           set "PATH=%SystemRoot%\system32;%SystemRoot%"
           cd X50-Patch-Switcher
           x50-patch-switcher.exe --probe --fake-midi
+
+      - name: Footprint (staged package)
+        if: runner.os == 'Windows'
+        # SPEC 5: resident memory under 60 MB after start. Working set is the closest match.
+        shell: pwsh
+        run: |
+          $env:QT_QPA_PLATFORM = 'offscreen'
+          $cfg = Join-Path $env:RUNNER_TEMP 'footprint-cfg'
+          $exe = (Resolve-Path 'X50-Patch-Switcher\x50-patch-switcher.exe').Path
+          $p = Start-Process -FilePath $exe -ArgumentList '--fake-midi', '--config-dir', $cfg -PassThru
+          Start-Sleep -Seconds 6
+          if ($p.HasExited) { Write-Host "app exited early with $($p.ExitCode)"; exit 1 }
+          $p.Refresh()
+          $ws = [math]::Round($p.WorkingSet64 / 1MB, 1)
+          $priv = [math]::Round($p.PrivateMemorySize64 / 1MB, 1)
+          Write-Host "WorkingSet64: $ws MB  PrivateMemorySize64: $priv MB  CPU: $($p.CPU) s  Threads: $($p.Threads.Count)"
+          Stop-Process -Id $p.Id -Force
+          if ($ws -ge 60) { Write-Host "working set $ws MB is over the SPEC 5 limit of 60 MB"; exit 1 }
 
       - name: Zip Windows package
         if: runner.os == 'Windows'

@@ -104,6 +104,8 @@ public:
     // Manual mode values (SPEC 4.5): channel 1-16, Bank Map. Used until a probe confirms the unit.
     void setManualChannel(int channel);
     void setManualBankMap(BankMap map);
+    int manualChannel() const { return m_manualChannel; }
+    BankMap manualBankMap() const { return m_manualBankMap; }
 
     // Start trying to connect now and every pollMs while disconnected.
     void start();

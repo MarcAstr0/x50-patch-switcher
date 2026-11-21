@@ -546,7 +546,7 @@ private slots:
         link->setManualChannel(5);
         connectLink(X50Link::State::Manual);
         SettingsDialog d(link, fake, dir->path());
-        QCOMPARE(d.channelSpin()->value(), 1);  // saved settings.ini value
+        QCOMPARE(d.channelSpin()->value(), 5);  // the link's effective manual value, not the saved 1
         fake->clearReceived();
         QSignalSpy sent(link, &X50Link::sent);
         link->send(combi(0));
@@ -558,6 +558,22 @@ private slots:
         QCOMPARE(cv.first().at(0) & 0x0F, d.channelSpin()->value() - 1);
     }
 
+    // Item 1: opening and closing Settings untouched leaves a --channel 5 equivalent at 5.
+    void openAndCloseKeepsCommandLineChannel()
+    {
+        fake->setDropReplies(true);
+        link->setManualChannel(5);
+        link->setManualBankMap(BankMap::Korg);
+        connectLink(X50Link::State::Manual);
+        {
+            SettingsDialog d(link, fake, dir->path());
+            QCOMPARE(d.channelSpin()->value(), 5);
+            d.reject();
+        }
+        QCOMPARE(link->manualChannel(), 5);
+        QCOMPARE(link->manualBankMap(), BankMap::Korg);
+        QCOMPARE(link->channel(), 5);
+    }
 };
 
 QTEST_MAIN(TestSettingsDialog)

@@ -142,7 +142,7 @@ on the live mockups, that is the moment to send them to her.
   no dialogs in live view. Tests drive it with `QTest::keyClick`.
 - ☑ **T4.3 Display-sleep inhibit** on Windows while live (SPEC §4.2), no-op elsewhere;
   CI-built, behaviour confirmed at G3.
-- ☐ **T4.4 Footprint.** `scripts/measure-footprint.sh` (Linux) and the CI Windows job
+- ☑ **T4.4 Footprint.** `scripts/measure-footprint.sh` (Linux) and the CI Windows job
   printing working-set size after start; within SPEC §5.
 - ☐ **D4 Design review** of live view at 1×, 1.25×, 1.5×, 2×.
 - ☐ **R4 Review** (reviewer + Codex), emphasis on input handling and repaint discipline.
@@ -421,3 +421,8 @@ fixes go back to the builder as T5.x tasks.
   Settings dialog re-applies the saved manual channel on open, which overrides a
   --channel from the command line; add X50Link::manualChannel()/manualBankMap() getters
   and display the link's effective values instead of re-applying. (foreman)
+- 2026-11-21 · T4.4: Linux offscreen footprint 44.6 MB browse / 43.1 MB live (SPEC §5:
+  < 60 MB), idle CPU 0.1 % / 0 % over 10 s, startup ~205 ms. Idle-CPU check allows 1 % of
+  one core (exact 0 would be flaky on CI). Windows working set enforced in CI.
+  X50_START_LIVE=1 env hook starts in live view (measurement only). Settings dialog now
+  displays the link's effective manual channel/Bank Map (no re-apply on open). (foreman)

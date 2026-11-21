@@ -101,6 +101,11 @@ private:
     ProbeChecklist *m_list = nullptr;
     int m_heightLimit = 0;
     bool m_building = false;
+    // The manual values shown: the link's effective ones (a --channel wins over the saved value).
+    // Only a user change is applied to the link and written to the settings.
+    int m_shownChannel = 1;
+    BankMap m_shownBankMap = BankMap::Gm;
+    bool m_manualTouched = false;
     bool m_hasPorts = false;
     bool m_checkedThisSession = false;
     bool m_saveFailed = false;

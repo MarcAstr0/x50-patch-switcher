@@ -285,9 +285,11 @@ SettingsDialog::SettingsDialog(X50Link *link, MidiBackend *backend, const QStrin
     outer->addLayout(bottom);
 
     // ---- values
+    m_shownChannel = m_link ? m_link->manualChannel() : m_settings.channel;
+    m_shownBankMap = m_link ? m_link->manualBankMap() : m_settings.bankMap;
     m_building = true;
-    m_channel->setValue(m_settings.channel);
-    m_bankMap->setCurrentIndex(m_settings.bankMap == BankMap::Korg ? 1 : 0);
+    m_channel->setValue(m_shownChannel);
+    m_bankMap->setCurrentIndex(m_shownBankMap == BankMap::Korg ? 1 : 0);
     m_building = false;
     refreshPorts();
 
@@ -323,12 +325,6 @@ SettingsDialog::SettingsDialog(X50Link *link, MidiBackend *backend, const QStrin
             if (m_link->state() == X50Link::State::Disconnected)
                 setNote(message);
         });
-    }
-    // The link may hold another manual channel than the saved one (--channel): what this dialog
-    // shows is what goes on the wire, so apply the displayed values to the link.
-    if (m_link) {
-        m_link->setManualChannel(m_settings.channel);
-        m_link->setManualBankMap(m_settings.bankMap);
     }
     onLinkChanged();
     fitToContent();
@@ -382,9 +378,10 @@ bool SettingsDialog::saveSettings()
 {
     m_settings.outputPort = m_output->count() ? m_output->currentText() : m_settings.outputPort;
     m_settings.inputPort = m_input->count() ? m_input->currentText() : m_settings.inputPort;
-    if (m_channel->isEnabled())  // a disabled spin box shows the learned channel, not a manual one
-        m_settings.channel = m_channel->value();
-    m_settings.bankMap = m_bankMap->currentIndex() == 1 ? BankMap::Korg : BankMap::Gm;
+    if (m_manualTouched) {  // untouched: keep the saved values (the shown ones may come from --channel)
+        m_settings.channel = m_shownChannel;
+        m_settings.bankMap = m_shownBankMap;
+    }
     const bool ok = m_settings.save(m_configDir);
     m_saveFailed = !ok;
     if (!ok)
@@ -408,13 +405,14 @@ void SettingsDialog::onManualChanged()
 {
     if (m_building)
         return;
-    if (m_channel->isEnabled())
-        m_settings.channel = m_channel->value();
-    m_settings.bankMap = m_bankMap->currentIndex() == 1 ? BankMap::Korg : BankMap::Gm;
+    m_manualTouched = true;
+    if (m_channel->isEnabled())  // a disabled spin box shows the learned channel, not a manual one
+        m_shownChannel = m_channel->value();
+    m_shownBankMap = m_bankMap->currentIndex() == 1 ? BankMap::Korg : BankMap::Gm;
     if (!m_link)
         return;
-    m_link->setManualChannel(m_settings.channel);  // the link ignores it when the X50 reported one
-    m_link->setManualBankMap(m_settings.bankMap);
+    m_link->setManualChannel(m_shownChannel);  // the link ignores it when the X50 reported one
+    m_link->setManualBankMap(m_shownBankMap);
 }
 
 void SettingsDialog::startTest()
@@ -521,7 +519,7 @@ void SettingsDialog::updateEnabled()
         channelLearned = manual && r.x50Confirmed && !busy;
     }
     m_building = true;
-    m_channel->setValue(channelLearned ? m_link->channel() : m_settings.channel);
+    m_channel->setValue(channelLearned ? m_link->channel() : m_shownChannel);
     m_building = false;
     m_channel->setEnabled(manual && !channelLearned);
     m_bankMap->setEnabled(manual);
