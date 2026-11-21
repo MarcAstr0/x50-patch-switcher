@@ -48,7 +48,7 @@ No GUI beyond the scaffold window. Everything testable headless.
   static libs `x50core`, `x50midi`, `x50ui`; the executable; `tests/` with an
   `x50_add_test()` helper; an empty main window; `--list-ports`. Build and `ctest` green
   on the Linux box.
-- ☐ **T1.1 Factory catalogue.** `scripts/extract-voice-list.py` (reads VNL by path with
+- ☑ **T1.1 Factory catalogue.** `scripts/extract-voice-list.py` (reads VNL by path with
   `pdftotext -layout`, writes `data/x50-factory.tsv` per SPEC §3.2). Mind the two-column
   program pages, the three-column GM page, two-line combination rows, and names with
   internal spaces. Test `tests/test_factory_table.cpp`: counts 384 / 512 / 128 / 9;
