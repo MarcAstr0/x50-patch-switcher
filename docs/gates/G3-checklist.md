@@ -1,6 +1,7 @@
 # G3: beta checklist for the keyboard player
 
-For the owner to forward with the `v0.9.0` beta zip. Nothing here is sent by Claude.
+For the owner to forward with the `v0.9.0` beta zip: `X50-Patch-Switcher-windows-0.9.0-08b5d3a.zip`
+from CI run 44958148618 (artifacts expire after 30 days). Nothing here is sent by Claude.
 The checklist is in Spanish; each step says what the app and the X50's own screen should
 show. She ticks each step (sí / no) and adds a note or photo where something differs.
 Results go to `docs/gates/G3-results/`.

@@ -303,12 +303,12 @@ fixes go back to the builder as T5.x tasks.
   MSVC runtime copied from the toolset's own redist (14.52, asserted against
   VCToolsVersion), no vc_redist/dxcompiler/dxil in the zip, exact-first port selection,
   clearer refused-inquiry result. CI green, run 44935392424, artifact
-  X50-Patch-Switcher-windows-966817a.zip (13 MB). Ready for G1. (foreman)
+  X50-Patch-Switcher-windows-0.9.0-08b5d3a.zip (supersedes the G1 zip) (13 MB). Ready for G1. (foreman)
 - 2026-11-21 · For T5.1: windeployqt bundles Qt6Network.dll with the tls and
   networkinformation plugins although the app links no network module (CLAUDE.md: no
   network code). Find what pulls it in (likely Qt6Svg or the icon engine) and exclude it,
   checking the staged smoke still passes. Not a G1 blocker. (foreman)
-- 2026-11-21 · **G1 on hold** (owner): zip X50-Patch-Switcher-windows-966817a.zip and
+- 2026-11-21 · **G1 on hold** (owner): zip X50-Patch-Switcher-windows-0.9.0-08b5d3a.zip (supersedes the G1 zip) and
   the message are ready in docs/gates/; not sent yet. M3 starts meanwhile. (owner)
 - 2026-11-21 · Category numbers: neither VNL nor the Operation Guide lists the factory
   category order (only two data points from the LCD figures: COMBI 00 = Keyboard,
@@ -445,3 +445,7 @@ fixes go back to the builder as T5.x tasks.
   --fake-midi; Settings saves only the manual field the user changed; a re-send from a
   duplicate slot lights that slot; Esc timing tests de-flaked. G3 checklist drafted in
   docs/gates/G3-checklist.md (Spanish, 19 steps, includes the G1 diagnose). (foreman)
+- 2026-11-21 · CI broke at ac578a3: the foreman's `git add -A src tests docs` swept in a
+  concurrently running builder's half-done version change. Fixed by 08b5d3a. Process:
+  never commit with -A while another builder is working in the main tree; stage the
+  files of the reporting task by name. (foreman)
