@@ -1,0 +1,134 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows
+            os: windows-latest
+            qt_arch: win64_msvc2022_64
+            exe: build/Release/x50-patch-switcher.exe
+          - name: linux
+            os: ubuntu-24.04
+            qt_arch: ""
+            exe: build/x50-patch-switcher
+          - name: macos
+            os: macos-14
+            qt_arch: ""
+            exe: build/x50-patch-switcher
+    defaults:
+      run:
+        shell: bash
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt 6.8
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.8.*"
+          arch: ${{ matrix.qt_arch }}
+          cache: true
+
+      - name: Linux packages
+        if: runner.os == 'Linux'
+        # libasound2-dev: RtMidi ALSA backend. The rest: libraries Qt's Gui and
+        # its offscreen platform plugin load at runtime.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libgl1-mesa-dev libegl1 \
+            libxkbcommon0 libfontconfig1 libdbus-1-3 libglib2.0-0
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release -j
+
+      - name: Test
+        run: |
+          # The Windows tests load Qt DLLs from the Qt bin dir.
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            export PATH="$(cygpath -u "$QT_ROOT_DIR")/bin:$PATH"
+          fi
+          ctest --test-dir build --output-on-failure -C Release
+
+      - name: Smoke (build tree)
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            export PATH="$(cygpath -u "$QT_ROOT_DIR")/bin:$PATH"
+          fi
+          exe="${{ matrix.exe }}"
+
+          # --list-ports exits 0 (an empty list is fine) or 1 if enumeration
+          # itself failed. Hosted Linux runners have no ALSA sequencer, so 1 is
+          # expected there. Anywhere else it is a failure.
+          set +e
+          "$exe" --list-ports
+          rc=$?
+          set -e
+          if [ "$rc" -eq 0 ]; then
+            echo "--list-ports: ok"
+          elif [ "$rc" -eq 1 ] && [ "$RUNNER_OS" = "Linux" ]; then
+            echo "--list-ports exited 1: ALSA sequencer unavailable on this runner (expected)."
+          else
+            echo "--list-ports failed with exit code $rc"
+            exit 1
+          fi
+
+          "$exe" --probe --fake-midi
+
+          diag="$RUNNER_TEMP/diag"
+          "$exe" --diagnose "$diag" --fake-midi
+          test -s "$diag/report.txt"
+
+      - name: Stage Windows package
+        if: runner.os == 'Windows'
+        run: |
+          stage=X50-Patch-Switcher
+          mkdir "$stage"
+          cp build/Release/x50-patch-switcher.exe "$stage/"
+          cp "packaging/windows/Diagnose X50.bat" packaging/windows/LEEME.txt \
+             packaging/windows/README.txt "$stage/"
+          # Copies the Qt DLLs and platform plugins next to the exe.
+          windeployqt --release --no-translations --no-system-d3d-compiler \
+            --no-opengl-sw "$stage/x50-patch-switcher.exe"
+          ls -R "$stage"
+
+      - name: Smoke (staged package)
+        if: runner.os == 'Windows'
+        # Qt is deliberately off PATH: a DLL windeployqt missed fails here.
+        # Run through cmd with a minimal PATH so the Git bash tools are not needed.
+        shell: cmd
+        run: |
+          set "PATH=%SystemRoot%\system32;%SystemRoot%"
+          cd X50-Patch-Switcher
+          x50-patch-switcher.exe --probe --fake-midi
+
+      - name: Zip Windows package
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $sha = $env:GITHUB_SHA.Substring(0, 7)
+          Compress-Archive -Path X50-Patch-Switcher -DestinationPath "X50-Patch-Switcher-windows-$sha.zip"
+          "ZIP_NAME=X50-Patch-Switcher-windows-$sha.zip" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Upload Windows package
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ZIP_NAME }}
+          path: ${{ env.ZIP_NAME }}
+          retention-days: 30
+          if-no-files-found: error

@@ -1,0 +1,14 @@
+X50 Patch Switcher (prueba de diagnostico)
+
+1. Descomprime TODA la carpeta donde quieras (clic derecho sobre el zip,
+   "Extraer todo"). No ejecutes nada desde dentro del zip.
+2. Conecta el KORG X50 al computador por USB y enciendelo.
+3. Haz doble clic en "Diagnose X50.bat".
+4. Espera a que termine. Se abrira una carpeta en el Escritorio.
+5. Envia de vuelta esa carpeta completa (comprimida o con los archivos tal cual).
+
+Windows SmartScreen puede mostrar una advertencia la primera vez.
+Pulsa "Mas informacion" y luego "Ejecutar de todas formas".
+
+No se instala nada en el computador y no se escribe nada en el X50.
+El programa solo le pregunta al X50 que es y que sonido tiene seleccionado.
