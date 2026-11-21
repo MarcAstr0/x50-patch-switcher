@@ -31,3 +31,6 @@ x50_add_test(test_fake_x50 test_fake_x50.cpp)
 x50_add_test(test_sysex_assembler test_sysex_assembler.cpp)
 x50_add_test(test_x50_link test_x50_link.cpp)
 x50_add_test(test_logging_backend test_logging_backend.cpp ../src/app/LoggingBackend.cpp ../src/app/LoggingBackend.h)
+x50_add_test(test_diagnose_ports test_diagnose_ports.cpp
+  ../src/app/DiagnoseRunner.cpp ../src/app/DiagnoseRunner.h ../src/app/CliRunner.cpp ../src/app/CliRunner.h
+  ../src/app/LoggingBackend.cpp ../src/app/LoggingBackend.h)

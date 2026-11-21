@@ -93,7 +93,7 @@ private slots:
         // About the size of the largest dump (~80 KB) in 1024-byte pieces.
         QByteArray msg = H({0xF0, 0x42, 0x30, 0x7A, 0x4D});
         msg.append(QByteArray(80000, '\x11'));
-        msg.append(char(0xF7));
+        msg.append('\xF7');
         SysExAssembler a;
         QList<QByteArray> out;
         for (int pos = 0; pos < msg.size(); pos += 1024)

@@ -3,6 +3,7 @@
 #include <optional>
 
 #include <QByteArray>
+#include <QDeadlineTimer>
 #include <QDateTime>
 #include <QMap>
 #include <QObject>
@@ -71,6 +72,8 @@ public:
         bool x50Confirmed = false;
         bool microX = false;
         bool sysexReplies = false;
+        bool inquiryRefused = false;  // a SysEx reply arrived but the parser refused it
+        QByteArray inquiryRaw;        // ... and these are its bytes
         QString versionText;  // "1.05"
         std::optional<X50Protocol::DeviceInquiryReply> inquiry;
         std::optional<X50Protocol::ModeAndState> state;
@@ -108,6 +111,15 @@ public:
     void stop();
     // Re-run the probe on the open ports ("Check X50").
     void probe();
+    // Mode and State only (read-only), for --diagnose after a Device Inquiry reply that
+    // was refused: the channel is the manual one. Ends in State::Manual with probeFinished().
+    void probeModeAndStateOnly();
+    // Port names as RtMidi reports them end in " <index>" on Windows (WinMM). Both helpers
+    // ignore that suffix so a name from the output list matches the same device in the input list.
+    static QString stripPortIndex(const QString &name);
+    // Case-insensitive: `name` contains `sub`, comparing without the trailing " <digits>" on either
+    // side, or `name` contains `sub` as given.
+    static bool portNameMatches(const QString &name, const QString &sub);
     // SPEC 4.3. Result arrives as sent() or errorOccurred()/sendFailed().
     void send(const SoundAddress &address);
     // SPEC 4.6. With continueOnError a failed bank is recorded and the next is tried
@@ -178,9 +190,11 @@ private:
     void transmit(const SoundAddress &address);
     void startModeChange(Mode target, const SoundAddress &address);
     // Ends the wait for a Mode Change reply. `failure` non-empty: the change was refused.
-    void finishModeWait(const QString &failure, const QByteArray &raw = QByteArray());
+    // `nak`: the failure is the X50's NAK. A NAK of a Mode Change that a newer send already
+    // superseded (the newest sound needs another mode) does not fail that newest send.
+    void finishModeWait(const QString &failure, const QByteArray &raw = QByteArray(), bool nak = false);
     void clearLearned();
-    // True when the configured ports are no longer listed by the backend.
+    // True when the ports that were opened are no longer listed by the backend.
     bool portsGone();
 
     // follow
@@ -191,6 +205,7 @@ private:
     void requestStep();
     void onDump(const QByteArray &msg);
     void onReadNak(const QByteArray &msg);
+    void onUnexpectedDump(const QByteArray &msg, X50Protocol::MessageKind got);
     void stepFailed(const QString &reason, const QByteArray &raw);
     void stepDone();
     void finishRead(bool failedStop);
@@ -205,7 +220,7 @@ private:
     Activity m_activity = Activity::Idle;
     ProbeStage m_probeStage = ProbeStage::Inquiry;
     bool m_started = false;
-    QString m_outSub, m_inSub, m_portName, m_status, m_lastRaised;
+    QString m_outSub, m_inSub, m_portName, m_inPortName, m_status, m_lastRaised;
 
     // Effective values: learned from the X50, or the manual ones when nothing is learned.
     int m_channel = 1;
@@ -217,8 +232,15 @@ private:
     std::optional<SoundAddress> m_current;
     std::optional<int> m_msb, m_lsb;
     bool m_echoActive = false;
-    QList<QByteArray> m_echoExpected;  // the CC0, CC32, PC we just sent, in order
-    int m_echoIndex = 0;
+    // Every send whose echo may still arrive (overlapping sends): the CC0, CC32, PC of each
+    // in order, how many came back, and when it stops counting.
+    struct EchoTuple {
+        QList<QByteArray> expected;
+        int index = 0;
+        QDeadlineTimer deadline;
+    };
+    QList<EchoTuple> m_echo;
+    bool m_modeStateOnly = false;
     std::optional<SoundAddress> m_pendingSend;  // the newest sound waiting for the mode wait
     std::optional<Mode> m_inflightMode;         // target of the Mode Change on the wire
 

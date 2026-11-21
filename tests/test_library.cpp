@@ -1,5 +1,6 @@
 // T1.5: Library persistence, debounce, sidelining, sets. No MIDI bytes.
 #include <QDir>
+#include <QTimeZone>
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonArray>
@@ -47,8 +48,8 @@ private slots:
 
     void roundTripEveryField() {
         QTemporaryDir d;
-        const QDateTime t1 = QDateTime(QDate(2026, 5, 1), QTime(12, 0, 5), Qt::UTC);
-        const QDateTime t2 = QDateTime(QDate(2026, 5, 2), QTime(8, 30, 0), Qt::UTC);
+        const QDateTime t1 = QDateTime(QDate(2026, 5, 1), QTime(12, 0, 5), QTimeZone::utc());
+        const QDateTime t2 = QDateTime(QDate(2026, 5, 2), QTime(8, 30, 0), QTimeZone::utc());
         QString setA, setB;
         {
             Library lib;
@@ -515,7 +516,7 @@ private slots:
         QTemporaryDir d;
         Library lib;
         lib.load(d.path());
-        const QDateTime base(QDate(2026, 1, 1), QTime(0, 0), Qt::UTC);
+        const QDateTime base(QDate(2026, 1, 1), QTime(0, 0), QTimeZone::utc());
         for (int i = 0; i < 60; ++i)
             lib.recordUse(combi(i), base.addSecs(i));
         QCOMPARE(lib.recents().size(), Library::kRecentsCap);

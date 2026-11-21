@@ -326,6 +326,10 @@ void FakeX50::handle(const QByteArray &msg)
     if (!m_present)
         return;
     if (msg == deviceInquiryRequest()) {
+        if (!m_inquiryOverride.isEmpty()) {
+            reply(Reply::DeviceInquiry, m_inquiryOverride);
+            return;
+        }
         DeviceInquiryReply r;
         r.channel = m_channel;
         r.memberCode = m_memberOverride ? m_memberCode : (m_microX ? 0x09 : 0x01);

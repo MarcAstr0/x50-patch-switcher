@@ -63,6 +63,8 @@ public:
     void plug() { m_present = true; }
     void setGlobalChannel(int channel) { m_channel = channel; }  // 1-16
     void setMicroX(bool microX) { m_microX = microX; }
+    // Reply to the Device Inquiry with exactly these bytes (a malformed or odd reply); empty = normal.
+    void setInquiryReplyOverride(const QByteArray &bytes) { m_inquiryOverride = bytes; }
     void setMemberCode(int code) { m_memberCode = code; m_memberOverride = true; }
     void setVersion(int major, int minor, int release, int build);
     void setBankMap(BankMap map) { m_bankMap = map; }
@@ -122,6 +124,7 @@ private:
     int m_channel = 1;
     bool m_microX = false, m_memberOverride = false;
     int m_memberCode = 0x01;
+    QByteArray m_inquiryOverride;
     int m_major = 1, m_minor = 5, m_release = 0, m_build = 0;
     BankMap m_bankMap = BankMap::Gm;
     bool m_enablePc = true, m_enableBank = true, m_enableCombi = true;

@@ -30,7 +30,7 @@ goto pick
 :picked
 echo.
 echo Diagnostico del X50.
-echo Enciende el X50 y conecta el cable USB. Esto tarda menos de un minuto.
+echo Enciende el X50 y conecta el cable USB. Esto tarda uno o dos minutos.
 echo No cierres esta ventana.
 echo.
 "%~dp0x50-patch-switcher.exe" --diagnose "%OUT%"

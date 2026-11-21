@@ -1010,6 +1010,177 @@ private slots:
         QTest::qWait(100);
         QCOMPARE(sound.count(), 0);
     }
+
+    // ---------------------------------------------------------------- R1 fixes
+
+    // RtMidi 6.0.0 WinMM appends " <portIndex>" to every port name: output and input names of
+    // one device differ only by that number and must still match.
+    void portNameIndexSuffixIsIgnored() {
+        QCOMPARE(X50Link::stripPortIndex(QStringLiteral("USB MIDI Device 1")), QStringLiteral("USB MIDI Device"));
+        QCOMPARE(X50Link::stripPortIndex(QStringLiteral("X50 12")), QStringLiteral("X50"));
+        QCOMPARE(X50Link::stripPortIndex(QStringLiteral("X50")), QStringLiteral("X50"));
+        QCOMPARE(X50Link::stripPortIndex(QStringLiteral("USB MIDI Device")), QStringLiteral("USB MIDI Device"));
+        QCOMPARE(X50Link::stripPortIndex(QStringLiteral("MIDI2")), QStringLiteral("MIDI2"));
+        QCOMPARE(X50Link::stripPortIndex(QStringLiteral(" 7")), QStringLiteral(" 7"));
+        QVERIFY(X50Link::portNameMatches(QStringLiteral("USB MIDI Device 1"), QStringLiteral("usb midi device 0")));
+        QVERIFY(X50Link::portNameMatches(QStringLiteral("USB MIDI Device 1"), QStringLiteral("Device 1")));
+        QVERIFY(X50Link::portNameMatches(QStringLiteral("KORG X50 3"), QStringLiteral("X50")));
+        QVERIFY(!X50Link::portNameMatches(QStringLiteral("KORG X50 3"), QStringLiteral("microX")));
+        QVERIFY(!X50Link::portNameMatches(QStringLiteral("KORG X50 3"), QString()));
+    }
+
+    void connectsWhenTheSubstringCarriesAnotherIndex() {
+        fake->setPortName(QStringLiteral("USB MIDI Device 1"));
+        link->setPortNames(QStringLiteral("usb midi device 0"));  // the input list's spelling
+        connectLink();
+        QCOMPARE(link->connectedPortName(), QStringLiteral("USB MIDI Device 1"));
+    }
+
+    // A refused Device Inquiry reply is flagged on the probe result with its bytes.
+    void refusedInquiryIsFlagged() {
+        fake->setGlobalChannel(3);
+        // MIDI.md section 6 with the family byte 7A altered to 7B: refused, channel nibble 2.
+        const QByteArray bad = H({0xF0, 0x7E, 0x02, 0x06, 0x02, 0x42, 0x7B, 0x00, 0x01, 0x00, 0x01, 0x05, 0x00, 0x00, 0xF7});
+        fake->setInquiryReplyOverride(bad);
+        link->start();
+        QTRY_COMPARE_WITH_TIMEOUT(link->state(), X50Link::State::Manual, 3000);
+        QVERIFY(link->lastProbe().inquiryRefused);
+        QCOMPARE(link->lastProbe().inquiryRaw, bad);
+        QVERIFY(!link->lastProbe().inquiry.has_value());
+    }
+
+    // A reply shaped like an inquiry reply but with byte 2 not of the 0g form is refused (with its
+    // bytes), not ignored as silence.
+    void inquiryReplyWithoutNibbleFormIsRefusedNotIgnored() {
+        const QByteArray bad = H({0xF0, 0x7E, 0x7F, 0x06, 0x02, 0x42, 0x7A, 0x00, 0x01, 0x00, 0x01, 0x05, 0x00, 0x00, 0xF7});
+        fake->setInquiryReplyOverride(bad);
+        link->start();
+        QTRY_COMPARE_WITH_TIMEOUT(link->state(), X50Link::State::Manual, 3000);
+        QVERIFY(link->lastProbe().inquiryRefused);
+        QCOMPARE(link->lastProbe().inquiryRaw, bad);
+    }
+
+    // The read-only follow-up after a refused reply: Mode and State on the given channel,
+    // then the banks, all while the link stays in manual mode.
+    void modeAndStateOnlyThenReadInManualState() {
+        fake->setGlobalChannel(3);
+        fake->setInquiryReplyOverride(H({0xF0, 0x7E, 0x02, 0x06, 0x02, 0x42, 0x7B, 0x00, 0x01, 0x00, 0x01, 0x05, 0x00, 0x00, 0xF7}));
+        link->start();
+        QTRY_COMPARE_WITH_TIMEOUT(link->state(), X50Link::State::Manual, 3000);
+        link->setManualChannel(3);
+        QSignalSpy probed(link, &X50Link::probeFinished);
+        fake->clearReceived();
+        link->probeModeAndStateOnly();
+        QTRY_COMPARE_WITH_TIMEOUT(probed.count(), 1, 3000);
+        QCOMPARE(fake->received(), (QList<QByteArray>{H({0xF0, 0x42, 0x32, 0x7A, 0x12, 0xF7})}));  // MIDI.md section 5, channel 3
+        QCOMPARE(link->state(), X50Link::State::Manual);  // an X50 is still not confirmed
+        QVERIFY(link->lastProbe().state.has_value());
+        QVERIFY(!link->lastProbe().x50Confirmed);
+        QSignalSpy finished(link, &X50Link::readFinished);
+        link->readNames(true);
+        QTRY_COMPARE_WITH_TIMEOUT(finished.count(), 1, 10000);
+        QVERIFY(finished.at(0).at(0).value<X50Link::ReadResult>().complete);
+    }
+
+    // Codex R1: a NAK of a Mode Change that a newer send superseded does not fail the newest
+    // send; it is re-evaluated against the unchanged mode (here PROG PLAY: no Mode Change).
+    void nakOfSupersededModeChangeReevaluatesTheNewestSend() {
+        connectLink();  // PROG PLAY
+        fake->setNakModeChange(0x02);
+        QSignalSpy sent(link, &X50Link::sent);
+        QSignalSpy failed(link, &X50Link::sendFailed);
+        link->send(A(K::Combi, B::A, 11));  // Mode Change to COMBI, which the X50 refuses
+        link->send(A(K::Prog, B::B, 22));   // supersedes it; PROG PLAY is where we already are
+        QTRY_COMPARE_WITH_TIMEOUT(sent.count(), 1, 3000);
+        QCOMPARE(failed.count(), 0);
+        QCOMPARE(sent.at(0).at(0).value<SoundAddress>(), A(K::Prog, B::B, 22));
+        QCOMPARE(*link->believedMode(), Mode::ProgPlay);
+        QCOMPARE(afterProbe(), (QList<QByteArray>{kToCombi, H({0xB0, 0x00, 0x3F}), H({0xB0, 0x20, 0x01}), H({0xC0, 0x16})}));
+    }
+
+    // ... and when the superseding send needs yet another mode change, that one is made.
+    void nakOfSupersededModeChangeStartsTheNeededOne() {
+        connectLink();
+        fake->setMode(Mode::CombiPlay);
+        link->probe();
+        QTRY_COMPARE_WITH_TIMEOUT(link->state(), X50Link::State::Connected, 3000);
+        QCOMPARE(*link->believedMode(), Mode::CombiPlay);
+        fake->setNakModeChange(0x02);
+        fake->clearReceived();
+        QSignalSpy failed(link, &X50Link::sendFailed);
+        QSignalSpy sent(link, &X50Link::sent);
+        link->send(A(K::Prog, B::A, 1));    // Mode Change to PROG: refused
+        link->send(A(K::Combi, B::A, 2));   // already in COMBI PLAY
+        QTRY_COMPARE_WITH_TIMEOUT(sent.count(), 1, 3000);
+        QCOMPARE(failed.count(), 0);
+        QCOMPARE(*link->currentSound(), A(K::Combi, B::A, 2));
+    }
+
+    // Codex R1: two sends close together: every echo tuple that has not expired is kept, so
+    // neither one's echo is taken for the player.
+    void overlappingSendsKeepAllEchoTuples() {
+        connectLink();
+        QSignalSpy sent(link, &X50Link::sent);
+        QSignalSpy sound(link, &X50Link::followedSound);
+        link->send(A(K::Prog, B::A, 1));  // MIDI.md section 3 (GM): B0 00 3F, B0 20 00, C0 01
+        link->send(A(K::Prog, B::A, 2));  // ... C0 02
+        QCOMPARE(sent.count(), 2);
+        for (const QByteArray &m : {H({0xB0, 0x00, 0x3F}), H({0xB0, 0x20, 0x00}), H({0xC0, 0x01}),
+                                    H({0xB0, 0x00, 0x3F}), H({0xB0, 0x20, 0x00}), H({0xC0, 0x02})})
+            emit fake->messageReceived(m);
+        QCOMPARE(sound.count(), 0);
+        // After both echoes the same bytes are the player again.
+        emit fake->messageReceived(H({0xB0, 0x00, 0x3F}));
+        emit fake->messageReceived(H({0xB0, 0x20, 0x00}));
+        emit fake->messageReceived(H({0xC0, 0x05}));
+        QCOMPARE(sound.count(), 1);
+    }
+
+    // Codex R1: a dump of an unexpected kind is parsed. Malformed: the step fails with its bytes.
+    void malformedDumpOfAnotherKindFailsTheStep() {
+        connectLink();
+        fake->setDrop(FakeX50::Reply::Dump, true);
+        QSignalSpy failed(link, &X50Link::readFailed);
+        link->readNames();  // waiting for Program A
+        QByteArray bad = buildCombinationDump(1, 0, QByteArray(kCombinationRecordSize * kRecordsPerBank, '\0')).value;
+        QVERIFY(bad.size() > 30);
+        bad[20] = static_cast<char>(0x90);  // a status byte inside the data
+        emit fake->messageReceived(bad);
+        QCOMPARE(failed.count(), 1);
+        QCOMPARE(failed.at(0).at(0).toString(), QStringLiteral("Program A"));
+        QCOMPARE(failed.at(0).at(2).toByteArray(), bad);
+    }
+
+    // ... and a well formed late dump of another kind is ignored: the step times out as before.
+    void wellFormedDumpOfAnotherKindIsIgnored() {
+        X50Link::Timing t = fastTiming();
+        t.bankMs = 150;
+        link->setTiming(t);
+        connectLink();
+        fake->setDrop(FakeX50::Reply::Dump, true);
+        QSignalSpy failed(link, &X50Link::readFailed);
+        link->readNames();
+        const QByteArray good = buildCombinationDump(1, 0, QByteArray(kCombinationRecordSize * kRecordsPerBank, '\0')).value;
+        emit fake->messageReceived(good);
+        QCOMPARE(failed.count(), 0);
+        QTRY_COMPARE(failed.count(), 1);
+        QVERIFY(failed.at(0).at(1).toString().contains(QStringLiteral("no reply")));
+    }
+
+    // Codex R1: the timeout check looks for the exact ports that were opened. Another port
+    // that also contains the substring must not hide that the X50 is gone.
+    void timeoutChecksTheExactOpenedPortNames() {
+        X50Link::Timing t = fastTiming();
+        t.bankMs = 150;
+        link->setTiming(t);
+        connectLink();  // opened "X50 Fake MIDI 1", found by "fake"
+        fake->setDrop(FakeX50::Reply::Dump, true);
+        QSignalSpy failed(link, &X50Link::readFailed);
+        link->readNames();
+        fake->setPortName(QStringLiteral("Other Fake Thing"));  // still matches "fake", is not the opened port
+        QTRY_COMPARE(failed.count(), 1);
+        QVERIFY(failed.at(0).at(1).toString().contains(QStringLiteral("gone")));
+    }
 };
 
 QTEST_MAIN(TestX50Link)

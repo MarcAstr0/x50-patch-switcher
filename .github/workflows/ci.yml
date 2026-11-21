@@ -93,6 +93,14 @@ jobs:
           "$exe" --diagnose "$diag" --fake-midi
           test -s "$diag/report.txt"
 
+      - name: MSVC developer environment (so windeployqt finds the VC runtime)
+        if: runner.os == 'Windows'
+        # Sets VCINSTALLDIR; without it windeployqt warns "Cannot find Visual Studio
+        # installation directory" and leaves vcruntime140*.dll out of the package.
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
       - name: Stage Windows package
         if: runner.os == 'Windows'
         run: |
@@ -104,7 +112,37 @@ jobs:
           # Copies the Qt DLLs and platform plugins next to the exe.
           windeployqt --release --no-translations --no-system-d3d-compiler \
             --no-opengl-sw "$stage/x50-patch-switcher.exe"
+
+          # Belt and braces: if windeployqt still did not bundle the VC runtime, copy it
+          # from the Visual Studio redistributable. The assertion below is what decides.
+          if [ ! -f "$stage/vcruntime140_1.dll" ] || [ ! -f "$stage/msvcp140.dll" ] || [ ! -f "$stage/vcruntime140.dll" ]; then
+            echo "windeployqt did not bundle the VC runtime; VCINSTALLDIR=${VCINSTALLDIR:-<unset>}"
+            if [ -n "${VCINSTALLDIR:-}" ]; then
+              for crt in "$(cygpath -u "$VCINSTALLDIR")"Redist/MSVC/*/x64/Microsoft.VC*.CRT; do
+                if [ -d "$crt" ]; then
+                  echo "copying the runtime from $crt"
+                  cp "$crt"/*.dll "$stage/"
+                  break
+                fi
+              done
+            fi
+          fi
           ls -R "$stage"
+
+      - name: Assert the VC runtime is in the package
+        if: runner.os == 'Windows'
+        # The player's laptop may lack the Visual C++ runtime: the exe must carry it.
+        run: |
+          missing=0
+          for f in vcruntime140.dll vcruntime140_1.dll msvcp140.dll; do
+            if [ -f "X50-Patch-Switcher/$f" ]; then
+              echo "present: $f"
+            else
+              echo "MISSING from X50-Patch-Switcher: $f"
+              missing=1
+            fi
+          done
+          exit $missing
 
       - name: Smoke (staged package)
         if: runner.os == 'Windows'
@@ -123,6 +161,56 @@ jobs:
           $sha = $env:GITHUB_SHA.Substring(0, 7)
           Compress-Archive -Path X50-Patch-Switcher -DestinationPath "X50-Patch-Switcher-windows-$sha.zip"
           "ZIP_NAME=X50-Patch-Switcher-windows-$sha.zip" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Extract the zip into a fresh folder
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $work = Join-Path $env:RUNNER_TEMP 'zipcheck'
+          if (Test-Path $work) { Remove-Item -Recurse -Force $work }
+          Expand-Archive -Path $env:ZIP_NAME -DestinationPath $work
+          $dir = Join-Path $work 'X50-Patch-Switcher'
+          $bad = $false
+          foreach ($f in 'x50-patch-switcher.exe', 'Diagnose X50.bat', 'LEEME.txt', 'README.txt',
+                         'vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll', 'Qt6Core.dll') {
+            if (-not (Test-Path (Join-Path $dir $f))) { Write-Host "MISSING in the zip: $f"; $bad = $true }
+          }
+          if ($bad) { exit 1 }
+          Get-ChildItem $dir | Format-Table Name, Length
+
+      - name: Smoke (extracted zip, as the player runs it)
+        if: runner.os == 'Windows'
+        # Reduced PATH: Windows system folders and Windows PowerShell (the .bat calls powershell),
+        # no Qt, no Visual Studio. Diagnose X50.bat is run with NUL as stdin so "pause" returns.
+        shell: cmd
+        run: |
+          set "PATH=%SystemRoot%\system32;%SystemRoot%;%SystemRoot%\System32\WindowsPowerShell\v1.0"
+          cd /d "%RUNNER_TEMP%\zipcheck\X50-Patch-Switcher" || exit /b 1
+          if exist "%RUNNER_TEMP%\zipdiag" rmdir /s /q "%RUNNER_TEMP%\zipdiag"
+          x50-patch-switcher.exe --diagnose "%RUNNER_TEMP%\zipdiag" --fake-midi
+          if errorlevel 1 (echo --diagnose --fake-midi exited with %ERRORLEVEL% & exit /b 1)
+          if not exist "%RUNNER_TEMP%\zipdiag\report.txt" (echo report.txt missing & exit /b 1)
+          echo --- the .bat, against the runner's real WinMM ports (no X50 here) ---
+          call "Diagnose X50.bat" < NUL
+          echo the .bat finished
+          exit /b 0
+
+      - name: Check what Diagnose X50.bat left on the Desktop
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $desk = [Environment]::GetFolderPath('Desktop')
+          if ([string]::IsNullOrEmpty($desk)) { $desk = Join-Path $env:USERPROFILE 'Desktop' }
+          Write-Host "Desktop: $desk"
+          $folders = @(Get-ChildItem -Path $desk -Directory -Filter 'X50-diagnose-*' -ErrorAction SilentlyContinue |
+                       Sort-Object LastWriteTime -Descending)
+          if ($folders.Count -eq 0) { Write-Host "No X50-diagnose-* folder on the Desktop"; exit 1 }
+          $report = Join-Path $folders[0].FullName 'report.txt'
+          if (-not (Test-Path $report)) { Write-Host "No report.txt in $($folders[0].FullName)"; exit 1 }
+          Write-Host "=== $report ==="
+          Get-Content $report | Write-Host
+          Write-Host "=== files ==="
+          Get-ChildItem $folders[0].FullName | Format-Table Name, Length
 
       - name: Upload Windows package
         if: runner.os == 'Windows'

@@ -50,6 +50,25 @@ void X50Link::ReadResult::applyTo(Catalogue &catalogue) const
         catalogue.setUnitCategories(programCategories, combinationCategories);
 }
 
+QString X50Link::stripPortIndex(const QString &name)
+{
+    // RtMidi's WinMM backend appends " <portIndex>" to every name (RtMidi.cpp, getPortName).
+    int i = static_cast<int>(name.size());
+    while (i > 0 && name.at(i - 1) >= QLatin1Char('0') && name.at(i - 1) <= QLatin1Char('9'))
+        --i;
+    if (i == name.size() || i < 2 || name.at(i - 1) != QLatin1Char(' '))
+        return name;
+    return name.left(i - 1);
+}
+
+bool X50Link::portNameMatches(const QString &name, const QString &sub)
+{
+    if (sub.isEmpty())
+        return false;
+    return name.contains(sub, Qt::CaseInsensitive) ||
+           stripPortIndex(name).contains(stripPortIndex(sub), Qt::CaseInsensitive);
+}
+
 X50Link::X50Link(MidiBackend *backend, QObject *parent) : QObject(parent), m_backend(backend)
 {
     m_timer.setSingleShot(true);
@@ -57,7 +76,7 @@ X50Link::X50Link(MidiBackend *backend, QObject *parent) : QObject(parent), m_bac
     m_poll.setSingleShot(false);
     m_poll.setInterval(m_timing.pollMs);
     connect(&m_timer, &QTimer::timeout, this, &X50Link::onTimeout);
-    connect(&m_echoTimer, &QTimer::timeout, this, [this]() { m_echoActive = false; });
+    connect(&m_echoTimer, &QTimer::timeout, this, [this]() { m_echoActive = false; m_echo.clear(); });
     connect(&m_poll, &QTimer::timeout, this, &X50Link::onPoll);
     connect(m_backend, &MidiBackend::messageReceived, this, &X50Link::onMessage);
     connect(m_backend, &MidiBackend::portError, this, &X50Link::onBackendError);
@@ -140,8 +159,8 @@ void X50Link::clearLearned()
     m_lsb.reset();
     m_current.reset();
     m_echoActive = false;
-    m_echoExpected.clear();
-    m_echoIndex = 0;
+    m_echo.clear();
+    m_modeStateOnly = false;
     m_echoTimer.stop();
 }
 
@@ -150,7 +169,18 @@ bool X50Link::portsGone()
     const MidiBackend::Ports p = m_backend->ports();
     if (!p.error.isEmpty())
         return false;  // cannot tell
-    return findPort(p.outputs, m_outSub) < 0 || findPort(p.inputs, m_inSub) < 0;
+    // The exact names that were opened, not the substring: another port with a matching name
+    // must not hide an unplugged X50. A shifted WinMM index (" 1" -> " 2") still counts as present.
+    auto listed = [](const QStringList &names, const QString &opened) {
+        if (opened.isEmpty() || names.contains(opened))
+            return true;
+        const QString stripped = stripPortIndex(opened);
+        for (const QString &n : names)
+            if (stripPortIndex(n).compare(stripped, Qt::CaseInsensitive) == 0)
+                return true;
+        return false;
+    };
+    return !listed(p.outputs, m_portName) || !listed(p.inputs, m_inPortName);
 }
 
 void X50Link::disconnectWith(const QString &reason, const QByteArray &raw)
@@ -225,8 +255,11 @@ int X50Link::findPort(const QStringList &names, const QString &sub) const
 {
     if (sub.isEmpty())
         return -1;
+    for (int i = 0; i < names.size(); ++i)  // an exact name (diagnose pairs) wins over a substring
+        if (names.at(i) == sub)
+            return i;
     for (int i = 0; i < names.size(); ++i)
-        if (names.at(i).contains(sub, Qt::CaseInsensitive))
+        if (portNameMatches(names.at(i), sub))
             return i;
     return -1;
 }
@@ -259,6 +292,7 @@ void X50Link::attemptConnect()
     }
     m_lastRaised.clear();
     m_portName = ports.outputs.at(out);
+    m_inPortName = ports.inputs.at(in);
     setStatus(QStringLiteral("Connected to %1; checking the X50").arg(m_portName));
     beginProbe();
 }
@@ -293,6 +327,27 @@ void X50Link::beginProbe()
         return;
 }
 
+void X50Link::probeModeAndStateOnly()
+{
+    if (m_state == State::Disconnected || m_state == State::Refused) {
+        raise(m_state == State::Refused ? kMicroXText : QStringLiteral("Not connected: no X50 port is open"));
+        return;
+    }
+    if (m_activity != Activity::Idle) {
+        raise(QStringLiteral("The X50 link is busy"));
+        return;
+    }
+    m_timer.stop();
+    clearLearned();  // the channel is the manual one again
+    m_modeStateOnly = true;
+    m_probe = ProbeResult();
+    m_activity = Activity::Probing;
+    m_probeStage = ProbeStage::ModeState;
+    setState(State::Probing);
+    m_timer.start(m_timing.requestMs);
+    sendRaw(modeAndStateRequest(m_channel).value);
+}
+
 void X50Link::probeFailedStage(const QString &text, const QString &fix, const QByteArray &raw)
 {
     CheckItem item;
@@ -307,6 +362,7 @@ void X50Link::finishProbe(State finalState)
 {
     m_timer.stop();
     m_activity = Activity::Idle;
+    m_modeStateOnly = false;
     m_lastProbe = m_probe;
     setState(finalState);
     switch (finalState) {
@@ -329,6 +385,8 @@ void X50Link::onInquiryReply(const QByteArray &msg)
 {
     const auto r = parseDeviceInquiryReply(msg);
     if (!r.ok) {
+        m_probe.inquiryRefused = true;
+        m_probe.inquiryRaw = r.raw;
         probeFailedStage(QStringLiteral("Device Inquiry reply refused: %1").arg(r.error),
                          QStringLiteral("Report the raw bytes"), r.raw);
         raise(QStringLiteral("Device Inquiry reply refused: %1").arg(r.error), r.raw);
@@ -416,7 +474,7 @@ void X50Link::onModeStateReply(const QByteArray &msg)
         m_current = SoundAddress(SoundAddress::Kind::Combi, kBanks[s.combinationBank], s.combinationNumber);
     else if (s.mode == Mode::ProgPlay && s.programBank <= 3)
         m_current = SoundAddress(SoundAddress::Kind::Prog, kBanks[s.programBank], s.programNumber);
-    finishProbe(State::Connected);
+    finishProbe(m_modeStateOnly ? State::Manual : State::Connected);
 }
 
 // ------------------------------------------------------------- incoming
@@ -425,6 +483,15 @@ void X50Link::onMessage(const QByteArray &msg)
 {
     if (m_state == State::Disconnected)
         return;
+    // While the Device Inquiry is pending, anything shaped like an inquiry reply (F0 7E .. 06 02)
+    // counts as the answer, even with a byte 2 that is not the 0g form: the parser then refuses
+    // it and the raw bytes are reported, instead of the reply being ignored as "no reply".
+    if (m_activity == Activity::Probing && m_probeStage == ProbeStage::Inquiry && msg.size() >= 5 &&
+        static_cast<unsigned char>(msg.at(0)) == 0xF0 && static_cast<unsigned char>(msg.at(1)) == 0x7E &&
+        msg.at(3) == 0x06 && msg.at(4) == 0x02) {
+        onInquiryReply(msg);
+        return;
+    }
     const Classification c = classify(msg);
     switch (c.kind) {
     case MessageKind::DeviceInquiryReply:
@@ -451,7 +518,7 @@ void X50Link::onMessage(const QByteArray &msg)
             else if (!a.value.ack)
                 finishModeWait(QStringLiteral("The X50 refused the mode change: %1")
                                    .arg(nakCodeText(a.value.errorCode)),
-                               msg);
+                               msg, true);
             else
                 finishModeWait(QString());
         } else if (m_activity == Activity::Reading && c.kind == MessageKind::Nak) {
@@ -573,7 +640,7 @@ void X50Link::startModeChange(Mode target, const SoundAddress &address)
     sendRaw(mc.value);  // on failure disconnectWith() reports sendFailed for the pending sound
 }
 
-void X50Link::finishModeWait(const QString &failure, const QByteArray &raw)
+void X50Link::finishModeWait(const QString &failure, const QByteArray &raw, bool nak)
 {
     m_timer.stop();
     const std::optional<SoundAddress> pending = m_pendingSend;
@@ -582,6 +649,17 @@ void X50Link::finishModeWait(const QString &failure, const QByteArray &raw)
     m_pendingSend.reset();
     m_inflightMode.reset();
     if (!failure.isEmpty()) {
+        if (nak && pending && inflight && modeForKind(pending->kind()) != *inflight) {
+            // The refused change was for an older send; the newest needs another mode and the
+            // X50 is still in the one it was in. Start over from there.
+            raise(failure, raw);
+            const Mode target = modeForKind(pending->kind());
+            if (m_mode && *m_mode == target)
+                transmit(*pending);
+            else
+                startModeChange(target, *pending);
+            return;
+        }
         if (pending)
             failSend(*pending, failure, raw);
         return;
@@ -615,10 +693,10 @@ void X50Link::transmit(const SoundAddress &address)
             return;
         }
     }
-    m_echoExpected.clear();
-    for (const QByteArray &m : msgs.value)
-        m_echoExpected.append(m);
-    m_echoIndex = 0;
+    EchoTuple tuple;
+    tuple.expected = msgs.value;
+    tuple.deadline = QDeadlineTimer(m_timing.echoMs);
+    m_echo.append(tuple);
     const auto bs = address.bankSelect(m_bankMap);
     m_msb = bs->msb;
     m_lsb = bs->lsb;
@@ -652,13 +730,25 @@ void X50Link::onChannelMessage(const QByteArray &msg)
     if (m_state != State::Connected && m_state != State::Manual)
         return;
     if (m_echoActive) {
-        // Only the echo we expect is swallowed (SPEC 4.4): the next byte triple member of
-        // our own send. Anything else is the player on the panel and ends suppression.
-        if (m_echoIndex < m_echoExpected.size() && msg == m_echoExpected.at(m_echoIndex)) {
-            if (++m_echoIndex >= m_echoExpected.size())
-                m_echoActive = false;
-            return;
+        // Only the echo we expect is swallowed (SPEC 4.4): the next member of the CC0, CC32, PC
+        // triple of one of our own sends that has not expired (sends may overlap, oldest first).
+        // Anything else is the player on the panel and ends suppression.
+        for (int i = m_echo.size() - 1; i >= 0; --i)
+            if (m_echo.at(i).deadline.hasExpired())
+                m_echo.removeAt(i);
+        for (int i = 0; i < m_echo.size(); ++i) {
+            EchoTuple &t = m_echo[i];
+            if (t.index < t.expected.size() && msg == t.expected.at(t.index)) {
+                if (++t.index >= t.expected.size())
+                    m_echo.removeAt(i);
+                if (m_echo.isEmpty()) {
+                    m_echoActive = false;
+                    m_echoTimer.stop();
+                }
+                return;
+            }
         }
+        m_echo.clear();
         m_echoActive = false;
         m_echoTimer.stop();
     }
@@ -780,6 +870,30 @@ void X50Link::onReadNak(const QByteArray &msg)
                msg);
 }
 
+void X50Link::onUnexpectedDump(const QByteArray &msg, MessageKind got)
+{
+    // Not the answer to this request. A well formed late dump of an earlier request is ignored
+    // (the step's own timeout decides); a malformed one fails the step, with its bytes.
+    const ReadStep &step = m_steps.at(m_stepIndex);
+    QString error;
+    QByteArray raw = msg;
+    if (got == MessageKind::ProgramDump) {
+        const auto d = parseProgramDump(msg, m_channel);
+        if (!d.ok) { error = d.error; raw = d.raw; }
+    } else if (got == MessageKind::CombinationDump) {
+        const auto d = parseCombinationDump(msg, m_channel);
+        if (!d.ok) { error = d.error; raw = d.raw; }
+    } else {
+        const auto d = parseGlobalDump(msg, m_channel);
+        if (!d.ok) { error = d.error; raw = d.raw; }
+    }
+    if (!error.isEmpty()) {
+        stepFailed(QStringLiteral("unexpected reply is malformed: %1").arg(error), raw);
+        return;
+    }
+    qDebug().noquote() << "X50Link: ignored a dump of another kind while reading" << step.label;
+}
+
 void X50Link::onDump(const QByteArray &msg)
 {
     const ReadStep &step = m_steps.at(m_stepIndex);
@@ -788,9 +902,7 @@ void X50Link::onDump(const QByteArray &msg)
                              : step.type == ReadStep::Type::Combination ? MessageKind::CombinationDump
                                                                         : MessageKind::GlobalDump;
     if (got != want) {
-        // Not the answer to this request (a late dump of an earlier one): the step's own
-        // timeout decides.
-        qDebug().noquote() << "X50Link: ignored a dump of another kind while reading" << step.label;
+        onUnexpectedDump(msg, got);
         return;
     }
     m_rawDumps.append({step.label, msg});

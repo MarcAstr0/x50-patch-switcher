@@ -7,6 +7,7 @@
 #include <RtMidi.h>
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <QCoreApplication>
@@ -125,11 +126,45 @@ void DiagnoseRunner::begin()
     nextAttempt();
 }
 
+QVector<DiagnoseRunner::PortPair> DiagnoseRunner::planPortPairs(const QStringList &outputs, const QStringList &inputs,
+                                                                bool *singleX50Pair)
+{
+    // RtMidi's WinMM backend appends " <index>" to every name, so output and input names of one
+    // device never match as written: compare without that suffix.
+    const QString x50 = CliCommon::defaultPortSubstring();
+    const QString gs = QStringLiteral("Microsoft GS Wavetable Synth");
+    QVector<PortPair> tier1, tier2, tier3;
+    for (const QString &out : outputs) {
+        const QString so = X50Link::stripPortIndex(out);
+        if (so.compare(gs, Qt::CaseInsensitive) == 0)
+            continue;  // the Windows software synth is never an X50
+        for (const QString &in : inputs) {
+            const QString si = X50Link::stripPortIndex(in);
+            if (so.contains(x50, Qt::CaseInsensitive) && si.contains(x50, Qt::CaseInsensitive))
+                tier1.append({out, in, QStringLiteral("both names contain X50")});
+            else if (so.compare(si, Qt::CaseInsensitive) == 0)
+                tier2.append({out, in, QStringLiteral("output and input have the same name")});
+            else
+                tier3.append({out, in, QStringLiteral("any other pair")});
+        }
+    }
+    if (singleX50Pair)
+        *singleX50Pair = tier1.size() == 1;
+    if (tier1.size() == 1)
+        return tier1;
+    QVector<PortPair> all = tier1;
+    all += tier2;
+    all += tier3;
+    if (all.size() > kMaxAttempts)
+        all.resize(kMaxAttempts);
+    return all;
+}
+
 void DiagnoseRunner::planAttempts()
 {
     const QString x50 = CliCommon::defaultPortSubstring();
     auto addAttempt = [this](const QString &out, const QString &in, const QString &why) {
-        for (const Attempt &a : qAsConst(m_attempts))
+        for (const Attempt &a : std::as_const(m_attempts))
             if (a.outSub == out && a.inSub == in)
                 return;
         Attempt a;
@@ -147,38 +182,20 @@ void DiagnoseRunner::planAttempts()
         addAttempt(out, in, QStringLiteral("chosen with --port / --in-port"));
         return;
     }
-    QStringList outX, inX;
-    for (const QString &n : qAsConst(m_ports.outputs))
-        if (n.contains(x50, Qt::CaseInsensitive))
-            outX << n;
-    for (const QString &n : qAsConst(m_ports.inputs))
-        if (n.contains(x50, Qt::CaseInsensitive))
-            inX << n;
-    if (outX.size() == 1 && inX.size() == 1) {
+    bool single = false;
+    const QVector<PortPair> pairs = planPortPairs(m_ports.outputs, m_ports.inputs, &single);
+    if (single) {
         m_choiceNote = QStringLiteral("Exactly one output and one input have \"X50\" in their name, so that pair is used.");
-        addAttempt(outX.first(), inX.first(), QStringLiteral("the only ports named X50"));
-        return;
+    } else {
+        m_choiceNote = QStringLiteral(
+            "No single X50-named pair. Every output is combined with every input (a trailing \" <number>\" "
+            "that Windows adds to port names is ignored): first pairs where both names contain \"X50\", then "
+            "pairs with the same name, then the rest; at most %1 pairs. \"Microsoft GS Wavetable Synth\" is "
+            "skipped. A Device Inquiry (a read-only question) is sent on each pair, 1 s each (asked twice "
+            "when unanswered), until one answers.").arg(kMaxAttempts);
     }
-    m_choiceNote = QStringLiteral(
-        "No single X50-named pair (%1 outputs and %2 inputs contain \"X50\"). Every output is paired with "
-        "the input of the same name, else the input with the same position in the list, and a Device "
-        "Inquiry (a read-only question) is sent on each pair, 1 s each, until one answers.")
-                       .arg(outX.size()).arg(inX.size());
-    for (int i = 0; i < m_ports.outputs.size(); ++i) {
-        const QString &out = m_ports.outputs.at(i);
-        QString in;
-        QString why;
-        if (m_ports.inputs.contains(out)) {
-            in = out;
-            why = QStringLiteral("output %1 and an input have the same name").arg(i);
-        } else if (i < m_ports.inputs.size()) {
-            in = m_ports.inputs.at(i);
-            why = QStringLiteral("output %1 paired with the input at the same position").arg(i);
-        } else {
-            continue;
-        }
-        addAttempt(out, in, why);
-    }
+    for (const PortPair &p : pairs)
+        addAttempt(p.out, p.in, p.why);
 }
 
 void DiagnoseRunner::nextAttempt()
@@ -220,6 +237,7 @@ void DiagnoseRunner::startAttempt()
             line += QStringLiteral("\n      raw bytes (%1): %2").arg(raw.size()).arg(hex(raw));
         m_errors << line;
     });
+    m_followUp = false;
     m_attemptClock.start();
     m_link->start();
     if (m_link->state() == X50Link::State::Disconnected) {
@@ -228,9 +246,50 @@ void DiagnoseRunner::startAttempt()
     }
 }
 
+void DiagnoseRunner::onRefusedInquiry(Attempt &a, const X50Link::ProbeResult &result)
+{
+    // A reply came but the parser refused it. Everything we still ask is read-only: Mode and
+    // State, then the bank and global dumps, on the channel nibble of the refused reply if it
+    // has the 0x0g form, else on the channel given with --channel, else channel 1.
+    a.refused = true;
+    a.refusedRaw = result.inquiryRaw;
+    a.result = QStringLiteral("reply refused, raw bytes in report");
+    int ch = m_options.channel > 0 ? m_options.channel : 1;
+    const QByteArray &raw = result.inquiryRaw;
+    if (raw.size() >= 3 && (static_cast<unsigned char>(raw.at(2)) & 0xF0) == 0x00)
+        ch = (static_cast<unsigned char>(raw.at(2)) & 0x0F) + 1;
+    a.channelTried = ch;
+    m_extraFiles.append({QStringLiteral("device-inquiry-reply-refused-%1.syx").arg(m_current + 1), raw});
+    m_backend->addEvent(QStringLiteral("Device Inquiry reply refused; asking Mode and State and the banks on channel %1").arg(ch));
+    m_link->setManualChannel(ch);
+    m_followUp = true;
+    m_link->probeModeAndStateOnly();
+    if (m_link->state() == X50Link::State::Disconnected) {
+        a.result += QStringLiteral("; the port was lost");
+        nextAttempt();
+    }
+}
+
 void DiagnoseRunner::onProbeFinished(const X50Link::ProbeResult &result)
 {
     Attempt &a = m_attempts[m_current];
+    if (m_followUp) {
+        m_followUp = false;
+        a.followUp = result;
+        a.haveFollowUp = true;
+        a.state = m_link->state();
+        if (a.state == X50Link::State::Disconnected) {
+            a.result += QStringLiteral("; the port was lost");
+            nextAttempt();
+            return;
+        }
+        a.result += result.state ? QStringLiteral("; Mode and State answered")
+                                 : QStringLiteral("; no usable Mode and State reply");
+        m_readAttempted = true;
+        m_stepClock.start();
+        m_link->readNames(true);
+        return;
+    }
     a.probe = result;
     a.probeMs = m_attemptClock.elapsed();
     a.state = m_link->state();
@@ -242,7 +301,18 @@ void DiagnoseRunner::onProbeFinished(const X50Link::ProbeResult &result)
         return;
     }
     if (!a.answered) {
-        a.result = QStringLiteral("no reply to the Device Inquiry");
+        if (result.inquiryRefused) {
+            onRefusedInquiry(a, result);
+            return;
+        }
+        if (!a.retried) {
+            // The port was only just opened (WinMM) or the X50 only just powered: ask once more.
+            a.retried = true;
+            m_backend->addEvent(QStringLiteral("no reply to the Device Inquiry; asking once more"));
+            m_link->probe();
+            return;
+        }
+        a.result = QStringLiteral("no reply to the Device Inquiry (asked twice)");
         nextAttempt();
         return;
     }
@@ -314,8 +384,16 @@ bool DiagnoseRunner::writeFiles()
         m_fileErrors << error;
         allOk = false;
     }
+    for (const auto &extra : std::as_const(m_extraFiles)) {
+        if (writeOne(extra.first, extra.second, false, &error)) {
+            m_writtenFiles << extra.first;
+        } else {
+            m_fileErrors << error;
+            allOk = false;
+        }
+    }
     QSet<QString> used;
-    for (const X50Link::RawDump &d : qAsConst(m_dumps)) {
+    for (const X50Link::RawDump &d : std::as_const(m_dumps)) {
         QString name = fileNameForLabel(d.label);
         for (int n = 2; used.contains(name); ++n)
             name = fileNameForLabel(d.label).replace(QStringLiteral(".syx"), QStringLiteral("-%1.syx").arg(n));
@@ -351,7 +429,7 @@ void DiagnoseRunner::finishRun()
 
     bool anyPort = false;
     bool x50Read = false;
-    for (const Attempt &a : qAsConst(m_attempts)) {
+    for (const Attempt &a : std::as_const(m_attempts)) {
         if (!a.noPort)
             anyPort = true;
         if (a.answered && a.probe.x50Confirmed)
@@ -373,7 +451,7 @@ void DiagnoseRunner::finishRun()
     out.setEncoding(QStringConverter::Utf8);
     if (!written) {
         QTextStream err(stderr);
-        for (const QString &e : qAsConst(m_fileErrors))
+        for (const QString &e : std::as_const(m_fileErrors))
             err << e << QLatin1Char('\n');
     }
     out << QStringLiteral("Report: %1\n").arg(QDir(m_options.diagnoseDir).filePath(QStringLiteral("report.txt")));
@@ -456,16 +534,8 @@ QString DiagnoseRunner::buildReport() const
                      .arg(i + 1).arg(a.outSub, a.inSub, a.why, a.result);
     }
 
-    for (int i = 0; i < m_attempts.size(); ++i) {
-        const Attempt &a = m_attempts.at(i);
-        if (a.probeMs < 0)
-            continue;
-        section(QStringLiteral("Probe, attempt %1").arg(i + 1));
-        L << QStringLiteral("Port opened: \"%1\"").arg(a.portName)
-          << QStringLiteral("State after the probe: %1").arg(stateName(a.state))
-          << QStringLiteral("Probe time (Device Inquiry and Mode and State): %1").arg(secs(a.probeMs))
-          << QStringLiteral("Checklist:");
-        for (const X50Link::CheckItem &item : a.probe.items) {
+    auto printProbe = [&](const X50Link::ProbeResult &probe) {
+        for (const X50Link::CheckItem &item : probe.items) {
             const QString tag = item.status == X50Link::CheckItem::Status::Ok     ? QStringLiteral("[ OK ]")
                                 : item.status == X50Link::CheckItem::Status::Failed ? QStringLiteral("[FAIL]")
                                                                                     : QStringLiteral("[WARN]");
@@ -475,23 +545,45 @@ QString DiagnoseRunner::buildReport() const
             if (!item.raw.isEmpty())
                 L << QStringLiteral("         raw bytes (%1): %2").arg(item.raw.size()).arg(hex(item.raw));
         }
-        if (a.probe.inquiry) {
-            const auto &q = *a.probe.inquiry;
+        if (probe.inquiry) {
+            const auto &q = *probe.inquiry;
             L << QStringLiteral("Device Inquiry reply: member code %1, system %2 (major %3, minor %4, release %5, build %6), global channel %7")
-                     .arg(q.memberCode, 2, 16, QLatin1Char('0')).arg(a.probe.versionText)
+                     .arg(q.memberCode, 2, 16, QLatin1Char('0')).arg(probe.versionText)
                      .arg(q.major).arg(q.minor).arg(q.release).arg(q.build).arg(q.channel);
         }
-        if (a.probe.state) {
-            const auto &s = *a.probe.state;
+        if (probe.state) {
+            const auto &st = *probe.state;
             static const char *const bankLetters = "ABCDE";
-            L << QStringLiteral("Mode and State reply: mode %1, Bank Map %2").arg(modeName(s.mode),
-                   s.bankMap == BankMap::Gm ? QStringLiteral("GM") : QStringLiteral("KORG"))
+            L << QStringLiteral("Mode and State reply: mode %1, Bank Map %2").arg(modeName(st.mode),
+                   st.bankMap == BankMap::Gm ? QStringLiteral("GM") : QStringLiteral("KORG"))
               << QStringLiteral("  enables: Program Change %1, Bank Change %2, Combination Change %3, Aftertouch %4, Control Change %5")
-                     .arg(yesNo(s.enableProgramChange), yesNo(s.enableBankChange), yesNo(s.enableCombinationChange),
-                          yesNo(s.enableAftertouch), yesNo(s.enableControlChange))
+                     .arg(yesNo(st.enableProgramChange), yesNo(st.enableBankChange), yesNo(st.enableCombinationChange),
+                          yesNo(st.enableAftertouch), yesNo(st.enableControlChange))
               << QStringLiteral("  current program: bank %1 number %2; current combination: bank %3 number %4")
-                     .arg(QLatin1Char(bankLetters[qBound(0, s.programBank, 4)])).arg(s.programNumber)
-                     .arg(QLatin1Char(bankLetters[qBound(0, s.combinationBank, 4)])).arg(s.combinationNumber);
+                     .arg(QLatin1Char(bankLetters[qBound(0, st.programBank, 4)])).arg(st.programNumber)
+                     .arg(QLatin1Char(bankLetters[qBound(0, st.combinationBank, 4)])).arg(st.combinationNumber);
+        }
+    };
+
+    for (int i = 0; i < m_attempts.size(); ++i) {
+        const Attempt &a = m_attempts.at(i);
+        if (a.probeMs < 0)
+            continue;
+        section(QStringLiteral("Probe, attempt %1").arg(i + 1));
+        L << QStringLiteral("Port opened: \"%1\"").arg(a.portName)
+          << QStringLiteral("State after the probe: %1").arg(stateName(a.state))
+          << QStringLiteral("Probe time (Device Inquiry and Mode and State): %1").arg(secs(a.probeMs))
+          << QStringLiteral("Checklist:");
+        printProbe(a.probe);
+        if (a.refused) {
+            L << QStringLiteral("The Device Inquiry reply was refused (the parser could not accept it); raw bytes (%1): %2")
+                     .arg(a.refusedRaw.size()).arg(hex(a.refusedRaw))
+              << QStringLiteral("Mode and State and the banks were then asked on channel %1 (read-only requests).")
+                     .arg(a.channelTried);
+            if (a.haveFollowUp) {
+                L << QStringLiteral("Mode and State, on its own:");
+                printProbe(a.followUp);
+            }
         }
     }
 

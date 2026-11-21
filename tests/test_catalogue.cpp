@@ -4,6 +4,7 @@
 #include <QDateTime>
 #include <QFile>
 #include <QTemporaryDir>
+#include <QTimeZone>
 #include <QTest>
 
 #include "core/Catalogue.h"
@@ -98,7 +99,7 @@ private slots:
         Catalogue c;
         QVERIFY(c.loadFromFile(QStringLiteral(X50_FACTORY_TSV)));
         const A a(A::Kind::Combi, A::Bank::A, 0);  // StereophonicKeys
-        const QDateTime when(QDate(2026, 5, 1), QTime(12, 0), Qt::UTC);
+        const QDateTime when(QDate(2026, 5, 1), QTime(12, 0), QTimeZone::utc());
         QVERIFY(!c.unitName(a));
         QVERIFY(!c.isEdited(a));
         QCOMPARE(c.effectiveName(a), QStringLiteral("StereophonicKeys"));

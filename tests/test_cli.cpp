@@ -4,6 +4,7 @@
 #include <QFileDevice>
 #include <QFileInfo>
 #include <QFile>
+#include <QMap>
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QTemporaryDir>
@@ -22,11 +23,14 @@ class TestCli : public QObject {
         env.remove(QStringLiteral("QT_QPA_PLATFORM"));
         return env;
     }
-    static int run(const QStringList &args, QString *out, bool microX = false) {
+    static int run(const QStringList &args, QString *out, bool microX = false,
+                   const QMap<QString, QString> &extraEnv = QMap<QString, QString>()) {
         QProcess p;
         QProcessEnvironment env = headlessEnv();
         if (microX)
             env.insert(QStringLiteral("X50_FAKE_MICROX"), QStringLiteral("1"));  // hidden hook in CliCommon::makeBackend
+        for (auto it = extraEnv.cbegin(); it != extraEnv.cend(); ++it)
+            env.insert(it.key(), it.value());  // hidden hooks in CliCommon::makeBackend
         p.setProcessEnvironment(env);
         p.start(QStringLiteral(X50_EXE), args);
         if (!p.waitForFinished(20000)) {
@@ -245,6 +249,58 @@ private slots:
         QCOMPARE(run({QStringLiteral("--diagnose"), tmp.path(), QStringLiteral("--fake-midi")}, &out, true), 5);
         QVERIFY(QFile::exists(tmp.filePath(QStringLiteral("report.txt"))));
         QVERIFY(QDir(tmp.path()).entryList({QStringLiteral("*.syx")}).isEmpty());
+    }
+    // R1: the Device Inquiry reply arrives but is refused (MIDI.md section 6 with the family byte
+    // 7A changed to 7B). Byte 2 is 0x02 = channel 3 and the fake sits on channel 3, so the
+    // read-only requests that follow (Mode and State, every bank, Global) are answered: the
+    // attempt says "reply refused", and the banks are saved.
+    void diagnoseRefusedInquiryStillReadsBanks() {
+        QTemporaryDir tmp;
+        QVERIFY(tmp.isValid());
+        QString out;
+        const int rc = run({QStringLiteral("--diagnose"), tmp.path(), QStringLiteral("--fake-midi")}, &out, false,
+                           {{QStringLiteral("X50_FAKE_INQUIRY_REPLY"), QStringLiteral("F07E0206 02427B00 01000105 0000F7")},
+                            {QStringLiteral("X50_FAKE_CHANNEL"), QStringLiteral("3")}});
+        QCOMPARE(rc, 1);  // an X50 was never confirmed, so not a clean run
+        QFile report(tmp.filePath(QStringLiteral("report.txt")));
+        QVERIFY(report.open(QIODevice::ReadOnly));
+        const QString text = QString::fromUtf8(report.readAll());
+        QVERIFY2(text.contains(QStringLiteral("reply refused, raw bytes in report")), qPrintable(text));
+        QVERIFY2(!text.contains(QStringLiteral("no reply to the Device Inquiry")), qPrintable(text));
+        QVERIFY2(text.contains(QStringLiteral("F0 7E 02 06 02 42 7B 00 01 00 01 05 00 00 F7")), qPrintable(text));
+        QVERIFY2(text.contains(QStringLiteral("OUT 6 bytes: F0 42 32 7A 12 F7")), qPrintable(text));  // MIDI.md section 5, channel 3
+        QVERIFY2(text.contains(QStringLiteral("Mode and State answered")), qPrintable(text));
+        QVERIFY2(text.contains(QStringLiteral("Read result: complete")), qPrintable(text));
+        for (const char *f : {"prog-A.syx", "prog-D.syx", "combi-A.syx", "combi-C.syx", "global.syx",
+                              "device-inquiry-reply-refused-1.syx"})
+            QVERIFY2(QFile::exists(tmp.filePath(QString::fromLatin1(f))), f);
+    }
+    // A refused reply without the 0x0g form in byte 2 (here 7F): the requests go on channel 1.
+    void diagnoseRefusedInquiryWithoutNibbleUsesChannelOne() {
+        QTemporaryDir tmp;
+        QVERIFY(tmp.isValid());
+        QString out;
+        QCOMPARE(run({QStringLiteral("--diagnose"), tmp.path(), QStringLiteral("--fake-midi")}, &out, false,
+                     {{QStringLiteral("X50_FAKE_INQUIRY_REPLY"), QStringLiteral("F07E7F06 02427B00 01000105 0000F7")}}), 1);
+        QFile report(tmp.filePath(QStringLiteral("report.txt")));
+        QVERIFY(report.open(QIODevice::ReadOnly));
+        const QString text = QString::fromUtf8(report.readAll());
+        QVERIFY2(text.contains(QStringLiteral("reply refused, raw bytes in report")), qPrintable(text));
+        QVERIFY2(text.contains(QStringLiteral("OUT 6 bytes: F0 42 30 7A 12 F7")), qPrintable(text));  // channel 1
+        QVERIFY2(text.contains(QStringLiteral("Read result: complete")), qPrintable(text));
+    }
+    // A silent unit: the Device Inquiry is asked twice before "no reply" is declared.
+    void diagnoseAsksTheInquiryTwice() {
+        QTemporaryDir tmp;
+        QVERIFY(tmp.isValid());
+        QString out;
+        QCOMPARE(run({QStringLiteral("--diagnose"), tmp.path(), QStringLiteral("--fake-midi")}, &out, false,
+                     {{QStringLiteral("X50_FAKE_DROP_REPLIES"), QStringLiteral("1")}}), 1);
+        QFile report(tmp.filePath(QStringLiteral("report.txt")));
+        QVERIFY(report.open(QIODevice::ReadOnly));
+        const QString text = QString::fromUtf8(report.readAll());
+        QVERIFY2(text.contains(QStringLiteral("no reply to the Device Inquiry (asked twice)")), qPrintable(text));
+        QCOMPARE(text.count(QStringLiteral("OUT 6 bytes: F0 7E 7F 06 01 F7")), 2);  // MIDI.md section 6 request, twice
     }
     // Exit 4: the diagnose folder cannot be created.
     void diagnoseUnwritableExitsFour() {

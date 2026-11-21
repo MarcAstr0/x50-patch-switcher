@@ -4,6 +4,7 @@
 
 #include <QElapsedTimer>
 #include <QObject>
+#include <QPair>
 #include <QString>
 #include <QStringList>
 #include <QVector>
@@ -27,9 +28,15 @@ public:
         QString why;              // why this pair was tried
         QString result;           // one line
         bool noPort = false;      // the names matched no port
-        bool answered = false;    // something replied to the Device Inquiry
+        bool answered = false;    // a parsable Device Inquiry reply arrived
+        bool refused = false;     // a SysEx reply arrived but the parser refused it
+        bool retried = false;     // the Device Inquiry was asked a second time
+        int channelTried = 0;     // refused: the channel the read-only requests then used
+        QByteArray refusedRaw;
         qint64 probeMs = -1;
         X50Link::ProbeResult probe;
+        bool haveFollowUp = false;  // refused: Mode and State was asked on its own
+        X50Link::ProbeResult followUp;
         X50Link::State state = X50Link::State::Disconnected;
         QString portName;
     };
@@ -38,6 +45,16 @@ public:
         QString label;
         qint64 ms = 0;
     };
+
+    struct PortPair
+    {
+        QString out, in, why;
+    };
+    // The output/input pairs to try when no --port is given (see planAttempts in the .cpp).
+    // `singleX50Pair` is set when exactly one pair has X50 in both names (then it is the only one).
+    static QVector<PortPair> planPortPairs(const QStringList &outputs, const QStringList &inputs,
+                                           bool *singleX50Pair = nullptr);
+    static constexpr int kMaxAttempts = 12;
 
     explicit DiagnoseRunner(const CliOptions &options, QObject *parent = nullptr);
     // Needs a QCoreApplication. Returns the process exit code (ExitCode::*).
@@ -51,6 +68,7 @@ private:
     void planAttempts();
     void startAttempt();
     void nextAttempt();
+    void onRefusedInquiry(Attempt &a, const X50Link::ProbeResult &result);
     void onProbeFinished(const X50Link::ProbeResult &result);
     void onReadProgress(int done, int total, const QString &completedBank);
     void onReadFinished(const X50Link::ReadResult &result);
@@ -76,6 +94,8 @@ private:
     bool m_readAttempted = false;
     bool m_readComplete = false;
     bool m_microX = false;
+    bool m_followUp = false;  // the Mode and State request after a refused Device Inquiry reply
+    QVector<QPair<QString, QByteArray>> m_extraFiles;  // refused replies saved as .syx
     bool m_finished = false;
     QStringList m_writtenFiles;
     QStringList m_fileErrors;
