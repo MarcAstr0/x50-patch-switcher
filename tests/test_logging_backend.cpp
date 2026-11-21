@@ -19,6 +19,7 @@ private slots:
         allowed.insert(X50Protocol::deviceInquiryRequest());
         allowed.insert(X50Protocol::modeAndStateRequest(1).value);
         log.setAllowedSends(allowed);
+        log.setRestricted(true);
         QVERIFY(log.openOutput(0).ok);
         QVERIFY(log.openInput(0).ok);
 
@@ -28,6 +29,20 @@ private slots:
         QVERIFY(!log.send(QByteArray::fromHex("C000")).ok);
         QCOMPARE(fake->received().size(), 1);
         QCOMPARE(fake->received().first(), X50Protocol::deviceInquiryRequest());
+    }
+    // Restricted with an empty allow-list refuses everything; unrestricted forwards.
+    void emptyAllowListRefusesWhenRestricted() {
+        auto *fake = new FakeX50;
+        LoggingBackend log(fake);
+        log.setRestricted(true);
+        QVERIFY(log.openOutput(0).ok);
+        QVERIFY(log.openInput(0).ok);
+        QVERIFY(!log.send(X50Protocol::modeChange(1, X50Protocol::Mode::ProgPlay).value).ok);  // MIDI.md section 4
+        QVERIFY(!log.send(QByteArray::fromHex("C000")).ok);                                    // section 3
+        QCOMPARE(fake->received().size(), 0);
+        log.setRestricted(false);
+        QVERIFY(log.send(QByteArray::fromHex("C000")).ok);
+        QCOMPARE(fake->received().size(), 1);
     }
     void logsTraffic() {
         auto *fake = new FakeX50;

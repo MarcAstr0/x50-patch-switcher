@@ -1,6 +1,8 @@
 // T1.0: the CLI must work with no display (no DISPLAY, WAYLAND_DISPLAY or
 // QT_QPA_PLATFORM), by running the built executable.
 #include <QDir>
+#include <QFileDevice>
+#include <QFileInfo>
 #include <QFile>
 #include <QProcess>
 #include <QProcessEnvironment>
@@ -19,9 +21,12 @@ class TestCli : public QObject {
         env.remove(QStringLiteral("QT_QPA_PLATFORM"));
         return env;
     }
-    static int run(const QStringList &args, QString *out) {
+    static int run(const QStringList &args, QString *out, bool microX = false) {
         QProcess p;
-        p.setProcessEnvironment(headlessEnv());
+        QProcessEnvironment env = headlessEnv();
+        if (microX)
+            env.insert(QStringLiteral("X50_FAKE_MICROX"), QStringLiteral("1"));  // hidden hook in CliCommon::makeBackend
+        p.setProcessEnvironment(env);
         p.start(QStringLiteral(X50_EXE), args);
         if (!p.waitForFinished(20000)) {
             p.kill();
@@ -195,6 +200,67 @@ private slots:
         QVERIFY2(text.contains(QStringLiteral("Outputs: 0: \"X50 Fake MIDI 1\"")), qPrintable(text));
         QVERIFY(text.contains(QStringLiteral("NO PORT")));
         QVERIFY(QDir(tmp.path()).entryList({QStringLiteral("*.syx")}).isEmpty());
+    }
+    // --in-port alone: the omitted side defaults to "X50", which the fake matches.
+    void inPortAlone() {
+        QString out;
+        QCOMPARE(run({QStringLiteral("--send"), QStringLiteral("PROG A000"), QStringLiteral("--in-port"),
+                      QStringLiteral("Fake"), QStringLiteral("--fake-midi")}, &out), 0);
+        // ... and the input substring really is honoured: a wrong one finds no port.
+        QCOMPARE(run({QStringLiteral("--send"), QStringLiteral("PROG A000"), QStringLiteral("--in-port"),
+                      QStringLiteral("zzz"), QStringLiteral("--fake-midi")}, &out), 3);
+        QTemporaryDir tmp;
+        QVERIFY(tmp.isValid());
+        QCOMPARE(run({QStringLiteral("--diagnose"), tmp.path(), QStringLiteral("--in-port"),
+                      QStringLiteral("zzz"), QStringLiteral("--fake-midi")}, &out), 3);
+        QCOMPARE(run({QStringLiteral("--diagnose"), tmp.path(), QStringLiteral("--in-port"),
+                      QStringLiteral("Fake"), QStringLiteral("--fake-midi")}, &out), 0);
+        QFile report(tmp.filePath(QStringLiteral("report.txt")));
+        QVERIFY(report.open(QIODevice::ReadOnly));
+        QVERIFY(QString::fromUtf8(report.readAll()).contains(QStringLiteral("output \"X50\", input \"Fake\"")));
+    }
+    // A microX answer exits 5 for --probe, --diagnose and --send (hidden X50_FAKE_MICROX hook).
+    void microXExitsFive() {
+        QString out;
+        QCOMPARE(run({QStringLiteral("--probe"), QStringLiteral("--fake-midi")}, &out, true), 5);
+        QCOMPARE(run({QStringLiteral("--send"), QStringLiteral("PROG A000"), QStringLiteral("--fake-midi")}, &out, true), 5);
+        QTemporaryDir tmp;
+        QVERIFY(tmp.isValid());
+        QCOMPARE(run({QStringLiteral("--diagnose"), tmp.path(), QStringLiteral("--fake-midi")}, &out, true), 5);
+        QVERIFY(QFile::exists(tmp.filePath(QStringLiteral("report.txt"))));
+        QVERIFY(QDir(tmp.path()).entryList({QStringLiteral("*.syx")}).isEmpty());
+    }
+    // Exit 4: the diagnose folder cannot be created.
+    void diagnoseUnwritableExitsFour() {
+        QTemporaryDir tmp;
+        QVERIFY(tmp.isValid());
+        QFile::setPermissions(tmp.path(), QFileDevice::ReadOwner | QFileDevice::ExeOwner);
+        if (QFileInfo(tmp.path()).isWritable()) {
+            QFile::setPermissions(tmp.path(), QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner);
+            QSKIP("directory permissions are not enforced (running as root?)");
+        }
+        QString out;
+        const int rc = run({QStringLiteral("--diagnose"), tmp.filePath(QStringLiteral("sub")),
+                            QStringLiteral("--fake-midi")}, &out);
+        QFile::setPermissions(tmp.path(), QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner);
+        QCOMPARE(rc, 4);
+    }
+    // One .syx cannot be written (a directory has its name): report.txt is still written,
+    // names the failure, the other files exist, and the exit code is 4.
+    void diagnoseSyxFailureKeepsReport() {
+        QTemporaryDir tmp;
+        QVERIFY(tmp.isValid());
+        QVERIFY(QDir(tmp.path()).mkdir(QStringLiteral("prog-A.syx")));
+        QString out;
+        QCOMPARE(run({QStringLiteral("--diagnose"), tmp.path(), QStringLiteral("--fake-midi")}, &out), 4);
+        QFile report(tmp.filePath(QStringLiteral("report.txt")));
+        QVERIFY(report.open(QIODevice::ReadOnly));
+        const QString text = QString::fromUtf8(report.readAll());
+        QVERIFY2(text.contains(QStringLiteral("WRITE ERROR: could not write")) && text.contains(QStringLiteral("prog-A.syx")),
+                 qPrintable(text));
+        QVERIFY(text.contains(QStringLiteral("Exit code: 4")));
+        QVERIFY(QFile::exists(tmp.filePath(QStringLiteral("prog-B.syx"))));
+        QVERIFY(QFile::exists(tmp.filePath(QStringLiteral("global.syx"))));
     }
 };
 

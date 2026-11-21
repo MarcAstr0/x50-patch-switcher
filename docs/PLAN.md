@@ -86,7 +86,7 @@ No GUI beyond the scaffold window. Everything testable headless.
 - ☑ **T1.8 Command line.** Every flag in SPEC §6 with its exit codes. `--diagnose`
   writes `report.txt` (probe checklist, port list, versions, timings) and one `.syx` per
   bank read. `packaging/windows/Diagnose X50.bat` runs it into
-  `%USERPROFILE%\Desktop\X50-diagnose-<date>` and opens that folder.
+  `X50-diagnose-<date-time>` on the real Desktop (`GetFolderPath`, fallback `%USERPROFILE%\Desktop`) and opens that folder.
   `scripts/midi-smoke.sh` checks `--send` bytes against `Midi Through` + `aseqdump`.
 - ☐ **T1.9 CI.** GitHub Actions on `windows-latest`, `ubuntu-24.04`, `macos-14`: build,
   test, and on Windows `windeployqt` into a portable zip containing the exe, the Qt

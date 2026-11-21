@@ -4,6 +4,7 @@
 #include "midi/RtMidiBackend.h"
 
 #include <QCoreApplication>
+#include <QtGlobal>
 #include <QStringConverter>
 #include <QTextStream>
 #include <QTimer>
@@ -12,8 +13,13 @@ namespace CliCommon {
 
 std::unique_ptr<MidiBackend> makeBackend(bool fake)
 {
-    if (fake)
-        return std::make_unique<FakeX50>();
+    if (fake) {
+        auto f = std::make_unique<FakeX50>();
+        // Hidden test hook (tests/test_cli.cpp): the simulated device answers as a microX.
+        if (qEnvironmentVariableIsSet("X50_FAKE_MICROX"))
+            f->setMicroX(true);
+        return f;
+    }
     return std::make_unique<RtMidiBackend>();
 }
 
@@ -98,7 +104,7 @@ void CliRunner::begin()
     const MidiBackend::Ports ports = m_backend->ports();
     if (!ports.error.isEmpty()) {
         err << QStringLiteral("MIDI is unavailable: ") << ports.error << QLatin1Char('\n');
-        finish(ExitCode::NoPort);
+        finish(ExitCode::Failed);
         return;
     }
     if (!CliCommon::anyContains(ports.outputs, outSub) || !CliCommon::anyContains(ports.inputs, inSub)) {
@@ -153,7 +159,8 @@ void CliRunner::onProbeFinished(const X50Link::ProbeResult &result)
     if (m_options.job == CliOptions::Job::Probe) {
         printChecklist(out, result);
         out.flush();
-        finish(result.allOk() ? ExitCode::Ok : ExitCode::Failed);
+        // A microX answer is its own exit code, checked before the generic outcome.
+        finish(result.microX ? ExitCode::MicroX : result.allOk() ? ExitCode::Ok : ExitCode::Failed);
         return;
     }
 

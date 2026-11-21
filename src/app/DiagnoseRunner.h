@@ -56,7 +56,8 @@ private:
     void onReadFinished(const X50Link::ReadResult &result);
     void onReadFailed(const QString &bank, const QString &reason, const QByteArray &raw);
     void finishRun();
-    bool writeFiles(QString *error);
+    bool writeOne(const QString &name, const QByteArray &bytes, bool text, QString *error);
+    bool writeFiles();
     QString buildReport() const;
 
     CliOptions m_options;
@@ -77,6 +78,6 @@ private:
     bool m_microX = false;
     bool m_finished = false;
     QStringList m_writtenFiles;
-    QString m_writeError;
+    QStringList m_fileErrors;
     int m_exit = ExitCode::Ok;
 };

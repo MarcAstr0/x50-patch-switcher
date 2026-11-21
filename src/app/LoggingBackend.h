@@ -29,8 +29,10 @@ public:
     // Takes ownership of inner.
     explicit LoggingBackend(MidiBackend *inner, QObject *parent = nullptr);
 
-    // Empty set = no restriction.
+    // When restricted, only messages in the allow-list are forwarded; an empty list
+    // therefore refuses everything. Unrestricted (the default) forwards everything.
     void setAllowedSends(const QSet<QByteArray> &allowed) { m_allowed = allowed; }
+    void setRestricted(bool restricted) { m_restricted = restricted; }
     const QVector<Entry> &log() const { return m_log; }
     void addEvent(const QString &text);
 
@@ -45,6 +47,7 @@ public:
 private:
     MidiBackend *m_inner;
     QSet<QByteArray> m_allowed;
+    bool m_restricted = false;
     QVector<Entry> m_log;
     QElapsedTimer m_clock;
 };

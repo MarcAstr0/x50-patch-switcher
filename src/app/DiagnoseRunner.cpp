@@ -118,6 +118,7 @@ void DiagnoseRunner::begin()
             allowed.insert(X50Protocol::combinationBankDumpRequest(ch, b).value);
     }
     m_backend->setAllowedSends(allowed);
+    m_backend->setRestricted(true);
 
     m_ports = m_backend->ports();
     planAttempts();
@@ -138,10 +139,12 @@ void DiagnoseRunner::planAttempts()
         m_attempts.append(a);
     };
 
-    if (!m_options.port.isEmpty()) {
-        m_choiceNote = QStringLiteral("--port was given, so only that pair is tried.");
-        addAttempt(m_options.port, m_options.inPort.isEmpty() ? m_options.port : m_options.inPort,
-                   QStringLiteral("chosen with --port"));
+    if (!m_options.port.isEmpty() || !m_options.inPort.isEmpty()) {
+        // Only the omitted side falls back: to the other side's substring, else "X50".
+        const QString out = m_options.port.isEmpty() ? x50 : m_options.port;
+        const QString in = !m_options.inPort.isEmpty() ? m_options.inPort : out;
+        m_choiceNote = QStringLiteral("--port and/or --in-port was given, so only that pair is tried.");
+        addAttempt(out, in, QStringLiteral("chosen with --port / --in-port"));
         return;
     }
     QStringList outX, inX;
@@ -283,29 +286,57 @@ void DiagnoseRunner::onReadFailed(const QString &bank, const QString &reason, co
     finishRun();
 }
 
-bool DiagnoseRunner::writeFiles(QString *error)
+bool DiagnoseRunner::writeOne(const QString &name, const QByteArray &bytes, bool text, QString *error)
 {
-    const QDir dir(m_options.diagnoseDir);
+    QFile f(QDir(m_options.diagnoseDir).filePath(name));
+    QIODevice::OpenMode mode = QIODevice::WriteOnly | QIODevice::Truncate;
+    if (text)
+        mode |= QIODevice::Text;
+    if (!f.open(mode)) {
+        *error = QStringLiteral("could not write %1: %2").arg(f.fileName(), f.errorString());
+        return false;
+    }
+    const bool ok = f.write(bytes) == bytes.size() && f.flush();
+    f.close();
+    if (!ok || f.error() != QFileDevice::NoError) {
+        *error = QStringLiteral("could not write %1: %2").arg(f.fileName(), f.errorString());
+        return false;
+    }
+    return true;
+}
+
+bool DiagnoseRunner::writeFiles()
+{
+    bool allOk = true;
+    QString error;
+    // The report goes first, so something readable exists even if a .syx fails.
+    if (!writeOne(QStringLiteral("report.txt"), buildReport().toUtf8(), true, &error)) {
+        m_fileErrors << error;
+        allOk = false;
+    }
     QSet<QString> used;
     for (const X50Link::RawDump &d : qAsConst(m_dumps)) {
         QString name = fileNameForLabel(d.label);
         for (int n = 2; used.contains(name); ++n)
             name = fileNameForLabel(d.label).replace(QStringLiteral(".syx"), QStringLiteral("-%1.syx").arg(n));
         used.insert(name);
-        QFile f(dir.filePath(name));
-        if (!f.open(QIODevice::WriteOnly) || f.write(d.bytes) != d.bytes.size()) {
-            *error = QStringLiteral("could not write %1: %2").arg(f.fileName(), f.errorString());
-            return false;
+        if (writeOne(name, d.bytes, false, &error)) {
+            m_writtenFiles << name;
+        } else {
+            m_fileErrors << error;
+            allOk = false;
         }
-        m_writtenFiles << name;
     }
-    QFile r(dir.filePath(QStringLiteral("report.txt")));
-    if (!r.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        *error = QStringLiteral("could not write %1: %2").arg(r.fileName(), r.errorString());
-        return false;
+    if (!allOk)
+        m_exit = ExitCode::SendFailed;
+    // Rewrite the report so it lists the files and any write errors.
+    if (!writeOne(QStringLiteral("report.txt"), buildReport().toUtf8(), true, &error)) {
+        if (!m_fileErrors.contains(error))
+            m_fileErrors << error;
+        m_exit = ExitCode::SendFailed;
+        allOk = false;
     }
-    r.write(buildReport().toUtf8());
-    return true;
+    return allOk;
 }
 
 void DiagnoseRunner::finishRun()
@@ -326,27 +357,29 @@ void DiagnoseRunner::finishRun()
         if (a.answered && a.probe.x50Confirmed)
             x50Read = true;
     }
-    if (!anyPort)
+    if (m_microX)
+        m_exit = ExitCode::MicroX;
+    else if (!m_ports.error.isEmpty())
+        m_exit = ExitCode::Failed;  // could not even list the ports
+    else if (!anyPort)
         m_exit = ExitCode::NoPort;
     else if (x50Read && m_readAttempted && m_readComplete)
         m_exit = ExitCode::Ok;
     else
         m_exit = ExitCode::Failed;
 
-    QString error;
-    const bool written = writeFiles(&error);
+    const bool written = writeFiles();
     QTextStream out(stdout);
     out.setEncoding(QStringConverter::Utf8);
     if (!written) {
-        m_writeError = error;
-        QTextStream(stderr) << error << QLatin1Char('\n');
-        m_exit = ExitCode::SendFailed;
-    } else {
-        out << QStringLiteral("Report written to %1\n").arg(QDir(m_options.diagnoseDir).filePath(QStringLiteral("report.txt")));
-        out << QStringLiteral("%1 bank file(s) saved.\n").arg(m_writtenFiles.size());
-        if (m_exit != ExitCode::Ok)
-            out << QStringLiteral("The run did not complete cleanly (exit code %1); see the report.\n").arg(m_exit);
+        QTextStream err(stderr);
+        for (const QString &e : qAsConst(m_fileErrors))
+            err << e << QLatin1Char('\n');
     }
+    out << QStringLiteral("Report: %1\n").arg(QDir(m_options.diagnoseDir).filePath(QStringLiteral("report.txt")));
+    out << QStringLiteral("%1 bank file(s) saved.\n").arg(m_writtenFiles.size());
+    if (m_exit != ExitCode::Ok)
+        out << QStringLiteral("The run did not complete cleanly (exit code %1); see the report.\n").arg(m_exit);
     out.flush();
     QCoreApplication::exit(m_exit);
 }
@@ -363,6 +396,7 @@ QString DiagnoseRunner::buildReport() const
     switch (m_exit) {
     case ExitCode::Ok: result = QStringLiteral("OK: an X50 answered and every bank was read."); break;
     case ExitCode::NoPort: result = QStringLiteral("NO PORT: no MIDI port could be matched."); break;
+    case ExitCode::SendFailed: result = QStringLiteral("FILE WRITE FAILED: see Files below."); break;
     default:
         result = m_microX ? QStringLiteral("A microX answered; this app supports the X50 only.")
                           : QStringLiteral("INCOMPLETE: see Probe and Banks below.");
@@ -515,6 +549,9 @@ QString DiagnoseRunner::buildReport() const
     section(QStringLiteral("Files in this folder"));
     for (const QString &f : m_writtenFiles)
         L << f;
-    L << QStringLiteral("report.txt") << QString();
+    L << QStringLiteral("report.txt");
+    for (const QString &e : m_fileErrors)
+        L << QStringLiteral("WRITE ERROR: %1").arg(e);
+    L << QString();
     return L.join(QLatin1Char('\n'));
 }

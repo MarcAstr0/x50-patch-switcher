@@ -41,7 +41,7 @@ void LoggingBackend::closePorts()
 
 MidiBackend::Status LoggingBackend::send(const QByteArray &message)
 {
-    if (!m_allowed.isEmpty() && !m_allowed.contains(message)) {
+    if (m_restricted && !m_allowed.contains(message)) {
         m_log.append({m_clock.elapsed(), Entry::Dir::Event, message,
                       QStringLiteral("REFUSED by the diagnose send filter (not a read-only request)")});
         return Status::failure(QStringLiteral("refused by the diagnose send filter"));

@@ -69,6 +69,7 @@ target_link_libraries(x50-patch-switcher PRIVATE x50ui x50midi x50core Qt6::Widg
 x50_target_options(x50-patch-switcher)
 if(WIN32)
   set_target_properties(x50-patch-switcher PROPERTIES WIN32_EXECUTABLE OFF)
+  target_link_libraries(x50-patch-switcher PRIVATE Shell32)
 endif()
 
 if(X50_BUILD_TESTS)
