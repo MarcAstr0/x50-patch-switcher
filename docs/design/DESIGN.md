@@ -258,8 +258,8 @@ col width (6) = (W - 48 - 2*20) / 3 = (W - 88u) / 3
 row height    = (H - 128u - 20u) / 2
 ```
 
-Buttons fill their cells; leftover pixels from rounding go to the last column and last
-row. At the reference size: 8-slot button 293 x 286, 6-slot 397 x 286. Because `u` is the
+Buttons fill their cells; each column width is rounded, and the last column and last row
+take whatever is left (at 1920x1080, 8 slots: 440, 440, 440, 438). At the reference size: 8-slot button 293 x 286, 6-slot 397 x 286. Because `u` is the
 minimum of the two ratios and the bars scale with `u`, the row height is always at
 least `286u`, and the column width at least `293u` (8) or `397u` (6). The anatomy below
 relies on those minimums.
@@ -273,7 +273,9 @@ Top to bottom inside the inner box:
 
 1. **Top row**, height 44. Left: slot badge, a 44 x 44 rounded square (radius 8),
    containing the slot digit (`live-badge`, centred). Right-aligned: state tag
-   (`live-tag`, vertically centred on the row) when the slot is NOW or NEXT.
+   (`live-tag`, vertically centred on the row) when the slot is NOW or NEXT; the tag's
+   triangle or chevron sits 8u left of the tag text, the tag's right edge at the inner
+   box's right edge.
 2. Gap 8.
 3. **Name box**: height = button height - 16 - 44 - 8 - 8 - 48 - 16 = **button height
    - 140** (146 at reference). Width = inner width (button width - 32). Text centred
@@ -315,6 +317,10 @@ Orchestra" (8.35 em) is two lines at 44u in the 8-slot grid and one line at 42u 
 **Bottom block fit.** `live-sound`: from 20u down to 14u in steps of 2u until the
 advance <= inner width; at 14u a 16-character name always fits, so there is no ellipsis.
 `live-addr` never needs fitting (longest is `PROG g(d)001`, 5.2 em at 22u = 114u).
+
+Stage B accepts a result of one line: a single long word (`StereophonicKeys`) that fails
+stage A at 36u is set on one line at the largest step of 44u down to 28u that fits (30u in
+the 8-slot grid at 1920x1080), which beats a mid-word break. Mockup `live-8` shows this.
 
 Text colours per state are in §5.4. The big text is always `text` on normal buttons
 and `on-cyan` on the lit button.
@@ -368,12 +374,14 @@ Three zones in one row, vertically centred:
    remaining width less the right zone. Contents, left to right, gap 12u:
    - mode chip: `COMBI`, `PROG` or `--` (mode unknown), `bar-status` text, 2u
      `text-dim` border, radius 6u, height 32u, padding 10u horizontal, text `text-dim`.
-   - address `live-addr` in `text-dim`, then the sound name `bar-now` in `text`,
+   - address `live-addr` in `text-dim` (bank and number only, `D104`: the chip already
+     says the mode; the same applies to the browse display strip), then the sound name `bar-now` in `text`,
      for example `COMBI A012  Lounge Orchestra`. Shrinks 24u to 16u in steps of 2u to
      fit, then wraps nothing and elides with `…` (it is a duplicate of the button text,
      which never truncates).
-   - When the X50 is on a sound **not in the set**: after the name, a tag `NOT IN SET`
-     (`live-tag` style at 18u, `cyan-text` text, 2u `cyan-text` border, radius 6u).
+   - When the X50 is on a sound **not in the set**: after the name (16u gap), a tag
+     `NOT IN SET` (`live-tag` style at 18u, `cyan-text` text, 2u `cyan-text` border, radius
+     6u, height 32u, padding 10u horizontal).
    - When the current sound is unknown (nothing sent, nothing followed): the readout
      is the single word `--`, `text-dim`.
 3. **Right, connection.** Right-aligned. LED 16u diameter, 12u gap, then `bar-status`
@@ -397,8 +405,8 @@ Bottom rule: 2u `line` along the bottom of the bar.
 - Text (exact): `Hold Esc for 1 second, or press Esc twice, to leave live view` in `hint`
   style, `text-dim`, centred in the hint strip.
 - Shown: always while the live view is visible, never hidden, never moves.
-- "Esc" is drawn as a key cap: 2px `text-dim` rounded rect (radius 4u), padding 6u
-  horizontal, the letters `Esc` inside (`hint` style, `text`). The cap is part of the
+- "Esc" is drawn as a key cap: 2u `text-dim` rounded rect (radius 4u), height 24u, padding
+  6u horizontal, one normal space either side, the letters `Esc` inside (`hint` style, `text`). The cap is part of the
   one-line layout, inline at the word "Esc" (first occurrence only, i.e. "Hold [Esc]
   for 1 second, or press Esc twice,"; the second "Esc" is plain text).
 - Armed state (first Esc pressed, or Esc held): the text becomes `Esc pressed: press Esc
@@ -539,13 +547,14 @@ Left to right, gap 8 between items:
 | Item | Width | Notes |
 |---|---|---|
 | Search field | stretch, min 260 | 40 high, §7.4 |
-| Kind toggles | 3 x 88, gap 4 | `Combis`, `Programs`, `GM`; §7.5 |
+| Kind toggles | 3 x 100, gap 4 | `Combis`, `Programs`, `GM`; §7.5 |
 | `Read names` button | 120 | secondary; disabled with tooltip text when not connected |
 | `Settings` button | 100 | secondary |
 | `Live  F5` button | 100 | **primary** (cyan fill); text `Live` plus `F5` in `label` style |
 
-Total at the minimum: 1000 - 32 = 968 available; fixed items 272 (3 x 88 + 2 x 4) + 120
-+ 100 + 100 = 592, plus 4 gaps of 8 = 624, so the search field gets 344.
+Total at the minimum: 1000 - 32 = 968 available; fixed items 308 (3 x 100 + 2 x 4) + 120
++ 100 + 100 = 628, plus 4 gaps of 8 = 660, so the search field gets 308 (min 260).
+(Toggles were 88 wide; `Programs` with its check mark did not fit, so they are 100.)
 
 ### 7.4 Search field
 
@@ -558,7 +567,7 @@ Focused on start (SPEC §4.1).
 
 ### 7.5 Kind toggles
 
-Three checkable buttons, 88 x 40, radius 6, text `body-strong` 15px. On: fill
+Three checkable buttons, 100 x 40, radius 6, text `body-strong` 15px. On: fill
 `sel-row`, 2px `cyan` border, text `text`, **plus a painted check mark 12 x 12 left of
 the text** (not colour only). Off: fill `panel-raised`, 1px `border`, text `text-dim`, no
 check. Hover: fill lightens to `#2C353C`. Pressed: fill `surface-pressed`. Focus: 2px
@@ -699,7 +708,7 @@ whose message is the "No reply..." text of SPEC §4.5; the other rows are not sh
 **Fix hint style.** A `fail` or `unknown` row followed by its hint on its own wrapped
 block: indent 36 (aligned with message text), `small` 13px Atkinson Regular `text-dim`,
 width = row width - 36, line height 1.35, padding 4 top, 8 bottom, and a **2px left
-rule** in `red` (fail) or `amber` (unknown) at x 24 (the glyph centre line, drawn from
+rule** in `red` (fail) or `amber` (unknown) at x 12 from the row's left edge (the glyph centre line, drawn from
 the bottom of the glyph to the end of the hint). The hint text uses the X50's own words
 and quotes, for example `GLOBAL 1: MIDI, tick "Bank"`, with the quoted words in
 `body-strong` weight. The "No reply" hint is the only multi-sentence hint and wraps in
@@ -819,3 +828,57 @@ mockup and this text disagree, this text wins and the mockup is a bug.
 - The 1 m legibility claim is computed, not measured (§5.7). Owner to test on the real laptop.
 - The `next-up` state and the "lit button stays when disconnected" rule are my decisions
   where SPEC is silent (§5.4, §6.3).
+
+---
+
+## 12. Mockups
+
+Sources are generated SVG in `docs/design/mockup/` (`lib.py`, `live.py`, `browse.py`,
+`settings.py`; `python3 build.py` rewrites the SVGs and renders the PNGs with Inkscape
+using a throwaway fontconfig that points at `assets/fonts/`, so Atkinson and Barlow are
+the committed files). Text is measured with the same font files, so the §5.3 fit rule in
+`live-8` and `live-6` is the real algorithm's output. All at 100% scale, 1x, no OS title bar.
+
+| File | Canvas | Shows |
+|---|---|---|
+| `docs/design/mockup/live-8.svg`, `docs/design/mockup-live-8.png` | 1920x1080, `u` = 1.5 | 8 slots; slot 2 lit (NOW), slot 3 next-up, slot 6 empty, 16-character `StereophonicKeys` (one line at 30u), connected top bar |
+| `docs/design/mockup/live-6.svg`, `docs/design/mockup-live-6.png` | 1920x1080, `u` = 1.5 | 6 slots; X50 on a sound not in the set: `NOT IN SET` tag, no lit button, no next-up |
+| `docs/design/mockup/browse.svg`, `docs/design/mockup-browse.png` | 1920x1080 client area (maximised window) | search `piano`, Combis and Programs on, GM off, program category list, 16 of 32 result rows, favourite stars, `EDITED` pill, selected row, current-sound triangle, display strip, transport bar, 8-slot set editor |
+| `docs/design/mockup/settings.svg`, `docs/design/mockup-settings.png` | 520x709 (content height; minimum is 560) | ports, manual settings, check running: pass, fail with hint, pass, unknown with hint, running |
+
+Values changed in this document while drawing (the text above already carries them):
+
+1. §7.3, §7.5: kind toggles 88 -> **100** wide (`Programs` plus its check mark did not fit
+   in 88). Search field at the minimum window 344 -> 308.
+2. §5.6: key cap border `2px` -> **2u**; cap height **24u** added.
+3. §8.1: hint rule x `24` -> **12** (the doc said glyph centre line, which is 12).
+
+Values that were implicit and are now fixed (also written into the sections above):
+
+4. §5.2: grid column widths are rounded, the last column takes the remainder (440, 440, 440, 438).
+5. §5.3: stage B may yield one line (`StereophonicKeys` sets at 30u on one line).
+6. §5.3: tag triangle or chevron sits 8u left of the tag text.
+7. §5.5: address in the top bar and the display strip is bank and number only (`D104`);
+   `NOT IN SET` tag 16u after the name, 32u high, 10u padding.
+
+Drawing choices the doc did not specify, used in the mockups (builder: treat as decided
+unless the owner objects):
+
+- Browse at 1920 wide: category column 200, then the 6 px splitter, then the right column
+  (1682). The result list's vertical scrollbar takes 12 of its width; rows are 1668 wide
+  inside the 1 px border, and the `Name` column is 1252. Sorted by name for the mockup;
+  the doc and SPEC do not say how results are ordered.
+- Live bottom block (72 px at `u` 1.5): the lower line's box is bottom-aligned, the address
+  line sits directly above it, any slack is at the top. Without a label the address line
+  alone is bottom-aligned.
+- Empty set-editor cell keeps its digit box (dashed, `disabled-text` digit) beside `EMPTY`.
+- Settings: card inset 16 from the dialog edge, padding 16, section title row 16 high with 8
+  below it, spin box arrows are two painted chevrons on the right, status word shows
+  `Checking…` while the probe runs, placeholder port name `X50 MIDI 1` (the real Windows
+  name is unknown, MIDI.md).
+- Settings dialog at this content is 709 high, under the 80% of 1080 cap (864).
+
+Open question for the owner, not changed: at wide browse windows the `EDITED` pill sits at
+the right edge of the very wide `Name` column, far from the name it describes (§7.7 puts
+it in its own 60 px column). Moving it to follow the name text would read better; this is
+left as specified until the owner says.
