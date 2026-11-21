@@ -3,15 +3,26 @@
 #include "core/Catalogue.h"
 #include "core/Library.h"
 #include "core/SoundAddress.h"
+#include "app/CliRunner.h"
+#include "midi/X50Link.h"
+#include "ui/BrowseView.h"
 #include "ui/DisplayStrip.h"
 #include "ui/MainWindow.h"
 #include "ui/Theme.h"
 
 #include <QApplication>
 #include <QByteArray>
+#include <QDateTime>
+#include <QElapsedTimer>
+#include <QLineEdit>
 #include <QPixmap>
+#include <QTableView>
 #include <QTemporaryDir>
 #include <QTextStream>
+#include <QThread>
+
+#include <functional>
+#include <memory>
 
 namespace {
 constexpr int kLogicalWidth = 1920;
@@ -49,6 +60,38 @@ void buildCannedLibrary(Library &lib)
         if (s.label)
             lib.setLabel(id, s.idx, QString::fromLatin1(s.label));
     }
+}
+
+// Favourites, use counts and one edited name, so the result list shows every marker of the
+// browse mockup (docs/design/mockup-browse.png).
+void buildCannedMarks(Library &lib, Catalogue &cat)
+{
+    using B = SoundAddress::Bank;
+    lib.setFavourite(combi(B::B, 64), true);
+    lib.setFavourite(combi(B::C, 96), true);
+    const struct { SoundAddress addr; int uses; } used[] = {
+        {combi(B::B, 64), 3}, {combi(B::C, 51), 5}, {prog(B::A, 81), 2},
+        {combi(B::C, 96), 11},  // the screenshot's own send makes it 12
+    };
+    for (const auto &u : used)
+        for (int i = 0; i < u.uses; ++i)
+            lib.recordUse(u.addr);
+    cat.setUnitName(prog(B::A, 65), QStringLiteral("M1 Piano Soft"), QStringLiteral("Keyboard"),
+                    QDateTime(QDate(2026, 11, 21), QTime(12, 0), Qt::UTC));
+}
+
+// Pumps the event loop until `done` or the timeout. Screenshot tool only.
+bool waitFor(const std::function<bool()> &done, int timeoutMs)
+{
+    QElapsedTimer t;
+    t.start();
+    while (!done()) {
+        if (t.elapsed() > timeoutMs)
+            return false;
+        QApplication::processEvents();
+        QThread::msleep(2);
+    }
+    return true;
 }
 
 void applyState(MainWindow &w, const QString &state)
@@ -89,25 +132,62 @@ int run(const CliOptions &options)
     Theme::loadFonts();
     Theme::applyStyleSheet(*qApp);
 
+    const bool browse = options.screenshotState == QLatin1String("browse") ||
+                        options.screenshotState == QLatin1String("browse-search");
+
     QTemporaryDir configDir;  // declared first so it outlives the library that saves into it
     Library library;
-    if (configDir.isValid()) {
-        library.load(configDir.path());
-        buildCannedLibrary(library);
-    }
     Catalogue catalogue;
     QString error;
     if (!catalogue.loadFromResource(&error))
         qWarning("catalogue: %s", qPrintable(error));
+    if (configDir.isValid()) {
+        library.load(configDir.path());
+        buildCannedLibrary(library);
+        buildCannedMarks(library, catalogue);
+    }
 
-    MainWindow window(&catalogue);
-    applyState(window, options.screenshotState);
+    // The browse states run the real link against the simulated X50, so the strip, the
+    // current-sound marker and the status line come from real signals.
+    std::unique_ptr<MidiBackend> backend = CliCommon::makeBackend(true);
+    X50Link link(backend.get());
+    link.setPortNames(CliCommon::defaultPortSubstring());
+    MainWindow window(&catalogue, &library, browse ? &link : nullptr);
+    if (browse) {
+        link.start();
+        const bool connected = waitFor([&] { return link.state() == X50Link::State::Connected; }, 3000);
+        if (connected) {
+            link.send(combi(SoundAddress::Bank::C, 96));
+            waitFor([&] { return link.currentSound().has_value(); }, 3000);
+        }
+        BrowseView *bv = window.browseView();
+        if (options.screenshotState == QLatin1String("browse-search")) {
+            bv->setKinds(true, true, false);
+            bv->setSearchText(QStringLiteral("piano"));
+            bv->highlight(combi(SoundAddress::Bank::B, 64));
+        } else {
+            bv->highlight(combi(SoundAddress::Bank::C, 96));
+        }
+        bv->searchField()->setFocus();
+    } else {
+        applyState(window, options.screenshotState);
+    }
     window.resize(kLogicalWidth, kLogicalHeight);
     window.show();
     QApplication::processEvents();
     QApplication::processEvents();
+    if (browse) {
+        // The highlight was set before the window had its size; now place the list.
+        QTableView *table = window.browseView()->resultTable();
+        if (options.screenshotState == QLatin1String("browse-search"))
+            table->scrollToTop();
+        else
+            table->scrollTo(table->currentIndex(), QAbstractItemView::PositionAtCenter);
+        QApplication::processEvents();
+    }
 
     const QPixmap shot = window.grab();
+    link.stop();
     if (!shot.save(options.screenshotPath, "PNG")) {
         QTextStream(stderr) << QStringLiteral("Could not write ") << options.screenshotPath << QStringLiteral("\n");
         return ExitCode::SendFailed;

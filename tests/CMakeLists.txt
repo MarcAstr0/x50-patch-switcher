@@ -39,3 +39,6 @@ x50_add_test(test_display_strip test_display_strip.cpp)
 # Same binary again at device pixel ratio 2 (k = 2): crisp-pixel checks hold at both.
 add_test(NAME test_display_strip_2x COMMAND test_display_strip)
 set_tests_properties(test_display_strip_2x PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_SCALE_FACTOR=2")
+x50_add_test(test_browse_view test_browse_view.cpp)
+add_test(NAME test_browse_view_2x COMMAND test_browse_view)
+set_tests_properties(test_browse_view_2x PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_SCALE_FACTOR=2")

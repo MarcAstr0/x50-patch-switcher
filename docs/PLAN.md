@@ -121,7 +121,7 @@ on the live mockups, that is the moment to send them to her.
 - ☑ **T3.1 Theme, DisplayStrip, screenshot harness.** `--screenshot` with
   `--fake-midi` and a canned library; states `browse`, `browse-search`, `settings`,
   `settings-errors`, `live-8`, `live-6`, `live-disconnected`.
-- ☐ **T3.2 BrowseView.** Search, kind toggles, categories, result list and delegate,
+- ☑ **T3.2 BrowseView.** Search, kind toggles, categories, result list and delegate,
   send on Enter / double-click / Play, prev/next, every shortcut in SPEC §4.1.
 - ☐ **T3.3 Favourites, recents, edited markers.**
 - ☐ **T3.4 Settings and probe checklist.** Ports, Test, Check X50, the checklist with
@@ -331,3 +331,8 @@ fixes go back to the builder as T5.x tasks.
   paintEvent (queue syncScale); test_display_strip at 1.25 and 1.5 plus an "only LCD
   colours inside the panel" check; distinct exit code for a failed screenshot write.
   (foreman)
+- 2026-11-21 · Browse details (T3.2), where SPEC §4.1 is silent: Prev/Next do not wrap
+  (status line says so); key auto-repeat never sends (no scanning by holding a key);
+  when the query changes, the first result is highlighted (highlight never sends; Enter
+  sends) so type-then-Enter works; with both kinds on, the category list shows program
+  categories; window geometry to be remembered (next fix round). (foreman)

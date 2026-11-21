@@ -58,6 +58,9 @@ x50_target_options(x50midi)
 
 add_library(x50ui STATIC src/ui/MainWindow.cpp src/ui/MainWindow.h
   src/ui/Theme.cpp src/ui/Theme.h src/ui/DisplayStrip.cpp src/ui/DisplayStrip.h
+  src/ui/BrowseView.cpp src/ui/BrowseView.h src/ui/Glyphs.cpp src/ui/Glyphs.h
+  src/ui/PanelFrame.cpp src/ui/PanelFrame.h src/ui/ResultModel.cpp src/ui/ResultModel.h
+  src/ui/ResultDelegate.cpp src/ui/ResultDelegate.h
   src/ui/x50ui.qrc)
 set_target_properties(x50ui PROPERTIES AUTORCC ON)
 target_include_directories(x50ui PUBLIC src)

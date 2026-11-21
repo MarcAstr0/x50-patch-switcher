@@ -10,10 +10,11 @@
 // library is never read or written), and a fixed window size of 1920x1080 logical px.
 // The PNG is 1920*s x 1080*s device pixels for scale s.
 //
-// The seven state names are all accepted from T3.1 on. Until the views exist, the
-// states other than browse render the current MainWindow with the DisplayStrip in the
-// matching connection state: T3.2 (browse-search), T3.4 (settings, settings-errors) and
-// T4.1 (live-8, live-6, live-disconnected) replace their entries in applyState().
+// The seven state names are all accepted from T3.1 on. `browse` and `browse-search` (T3.2)
+// render the real BrowseView, driven through X50Link against the simulated X50 (connect,
+// then send COMBI C096). The other states render the MainWindow with the DisplayStrip in
+// the matching connection state until their views exist: T3.4 (settings, settings-errors)
+// and T4.1 (live-8, live-6, live-disconnected) replace their entries in applyState().
 namespace ScreenshotRunner {
 
 // Sets QT_QPA_PLATFORM and QT_SCALE_FACTOR. Must run before the QApplication exists.

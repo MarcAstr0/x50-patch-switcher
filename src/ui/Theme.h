@@ -75,6 +75,16 @@ constexpr int browseMargin = 16, browseGap = 12;
 constexpr int browseToolbarHeight = 40, browseStatusHeight = 24;
 constexpr int browseCategoryWidth = 200, browseSplitterHandle = 6;
 constexpr int browseTransportHeight = 56, browseSetEditorHeight = 200;
+constexpr int browseCategoryMinWidth = 160, browseCategoryMaxWidth = 260;
+constexpr int browseCategoryTitleHeight = 24, browseCategoryRowHeight = 32;
+
+// ---- DESIGN 7.3-7.8 toolbar, kind toggles, transport, result list (logical px) ----
+constexpr int kindToggleWidth = 100, readNamesWidth = 120, settingsWidth = 100, liveWidth = 100;
+constexpr int transportPrevWidth = 88, transportNextWidth = 88, transportPlayWidth = 120, transportStarWidth = 88;
+constexpr int resultHeaderHeight = 28, resultRowHeight = 36;
+// Result columns (DESIGN 7.7). Star and Used include the 12 px row padding on the outer side.
+constexpr int colStar = 48, colAddress = 112, colEdited = 60, colCategory = 140, colUsed = 56;
+constexpr int resultStarSize = 18, resultCellPadding = 12;
 
 // ---- DESIGN 7.2 display strip, in units of k (device px per font pixel) ----
 constexpr int stripHeightK = 74;      // strip height = 74k device px

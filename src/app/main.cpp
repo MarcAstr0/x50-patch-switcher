@@ -6,8 +6,11 @@
 #include "core/ConfigLocation.h"
 #include "core/Library.h"
 #include "core/Version.h"
+#include "midi/X50Link.h"
 #include "ui/MainWindow.h"
 #include "ui/Theme.h"
+
+#include <memory>
 
 #include <QApplication>
 #include <QCoreApplication>
@@ -75,20 +78,27 @@ int main(int argc, char *argv[])
     QApplication app(argc, argv);
     Theme::loadFonts();
     Theme::applyStyleSheet(app);
-    // The library is loaded here until MainWindow takes it over (M3); it only
-    // writes when something changes, and is flushed on exit.
+    // Library, catalogue, MIDI link and window. Declaration order is destruction order
+    // reversed: the window goes first, then the link, then its backend.
     Library library;
     library.load(ConfigLocation::resolveForApp(cli.configDir()));
-    if (!library.loadError().isEmpty())
-        qWarning("%s", qPrintable(library.loadError()));
     QObject::connect(&app, &QCoreApplication::aboutToQuit, &library, [&library]() { library.flush(); });
     Catalogue catalogue;
     QString catalogueError;
     if (!catalogue.loadFromResource(&catalogueError))
         qWarning("%s", qPrintable(catalogueError));
-    MainWindow window(&catalogue);
+    std::unique_ptr<MidiBackend> backend = CliCommon::makeBackend(cli.options().fakeMidi);
+    X50Link link(backend.get());
+    // Settings (T3.4) will store the ports; until then the CLI or the default "X50" decides.
+    const QString outSub = cli.options().port.isEmpty() ? CliCommon::defaultPortSubstring() : cli.options().port;
+    link.setPortNames(outSub, cli.options().inPort.isEmpty() ? outSub : cli.options().inPort);
+    if (cli.options().channel > 0)
+        link.setManualChannel(cli.options().channel);
+    MainWindow window(&catalogue, &library, &link);
     window.show();
+    link.start();  // never blocks: connecting and probing run on the event loop
     const int rc = QApplication::exec();
+    link.stop();
     library.flush();
     return rc;
 }
