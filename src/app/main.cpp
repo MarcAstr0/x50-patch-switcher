@@ -1,10 +1,13 @@
 #include "app/CliRunner.h"
 #include "app/CommandLine.h"
 #include "app/DiagnoseRunner.h"
+#include "app/ScreenshotRunner.h"
+#include "core/Catalogue.h"
 #include "core/ConfigLocation.h"
 #include "core/Library.h"
 #include "core/Version.h"
 #include "ui/MainWindow.h"
+#include "ui/Theme.h"
 
 #include <QApplication>
 #include <QCoreApplication>
@@ -52,7 +55,6 @@ int main(int argc, char *argv[])
         return cli.exitCode();
     case CommandLine::Result::Run: {
         // --send, --probe, --diagnose: no widgets, but X50Link needs an event loop.
-        // Hook for M3: --screenshot needs QApplication on the offscreen platform.
         QCoreApplication app(argc, argv);
         if (cli.options().job == CliOptions::Job::Diagnose)
             return DiagnoseRunner(cli.options()).run();
@@ -62,7 +64,17 @@ int main(int argc, char *argv[])
         break;
     }
 
+    if (cli.options().job == CliOptions::Job::Screenshot) {
+        // QApplication on the offscreen platform at the requested scale; both are
+        // environment variables Qt reads when the application object is created.
+        ScreenshotRunner::prepareEnvironment(cli.options());
+        QApplication shotApp(argc, argv);
+        return ScreenshotRunner::run(cli.options());
+    }
+
     QApplication app(argc, argv);
+    Theme::loadFonts();
+    Theme::applyStyleSheet(app);
     // The library is loaded here until MainWindow takes it over (M3); it only
     // writes when something changes, and is flushed on exit.
     Library library;
@@ -70,7 +82,11 @@ int main(int argc, char *argv[])
     if (!library.loadError().isEmpty())
         qWarning("%s", qPrintable(library.loadError()));
     QObject::connect(&app, &QCoreApplication::aboutToQuit, &library, [&library]() { library.flush(); });
-    MainWindow window;
+    Catalogue catalogue;
+    QString catalogueError;
+    if (!catalogue.loadFromResource(&catalogueError))
+        qWarning("%s", qPrintable(catalogueError));
+    MainWindow window(&catalogue);
     window.show();
     const int rc = QApplication::exec();
     library.flush();

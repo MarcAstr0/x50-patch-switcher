@@ -118,7 +118,7 @@ on the live mockups, that is the moment to send them to her.
 
 ## M3 · Browse view (builder; designer reviews) · after G2
 
-- ☐ **T3.1 Theme, DisplayStrip, screenshot harness.** `--screenshot` with
+- ☑ **T3.1 Theme, DisplayStrip, screenshot harness.** `--screenshot` with
   `--fake-midi` and a canned library; states `browse`, `browse-search`, `settings`,
   `settings-errors`, `live-8`, `live-6`, `live-disconnected`.
 - ☐ **T3.2 BrowseView.** Search, kind toggles, categories, result list and delegate,
@@ -316,3 +316,8 @@ fixes go back to the builder as T5.x tasks.
   becomes a fixture), the LCD shows "Category:Keyboard" without a number, and the browse
   category list uses the order of first appearance in the factory catalogue per kind.
   After a read, the unit's 16 + 16 names and their order are used. (foreman)
+- 2026-11-21 · T3.1 details: --screenshot sizes are logical (1920x1080 window, PNG is
+  1920s x 1080s device px at scale s); screenshot states set the strip state directly
+  (deterministic) rather than probing the fake; GM or unlisted categories show
+  "Category --:<name>" once unit categories are known. assets/theme/app.qss header still
+  lists the retired lcd-bg/lcd-text tokens: designer to fix at D3. (foreman)

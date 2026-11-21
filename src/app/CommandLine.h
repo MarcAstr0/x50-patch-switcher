@@ -19,7 +19,7 @@ constexpr int MicroX = 5;     // a microX answered; nothing is sent
 // What the command line asked for, once validated.
 struct CliOptions
 {
-    enum class Job { None, Send, Probe, Diagnose };
+    enum class Job { None, Send, Probe, Diagnose, Screenshot };
     Job job = Job::None;
     SoundAddress address;   // Job::Send
     QString diagnoseDir;    // Job::Diagnose, absolute
@@ -28,11 +28,18 @@ struct CliOptions
     int channel = 0;        // --channel, 0 = not given
     bool fakeMidi = false;  // --fake-midi
     QString configDir;      // --config-dir
+    QString screenshotPath;   // Job::Screenshot: PNG to write, absolute
+    QString screenshotState = QStringLiteral("browse");  // --screenshot-state
+    double screenshotScale = 1.0;                       // --screenshot-scale
 };
 
 class CommandLine
 {
 public:
+    // Gui: start a QApplication. That is the normal window, or, when options().job is
+    // Screenshot, the offscreen render (--fake-midi is forced on for it).
+    // The valid --screenshot-state names, in the order they are listed in errors.
+    static QStringList screenshotStates();
     // Gui: start the GUI. Exit: a flag was handled (or was wrong) and the
     // process should exit with exitCode(). Run: a non-GUI job (--send, --probe,
     // --diagnose) needs a QCoreApplication event loop; see options().

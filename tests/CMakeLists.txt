@@ -34,3 +34,8 @@ x50_add_test(test_logging_backend test_logging_backend.cpp ../src/app/LoggingBac
 x50_add_test(test_diagnose_ports test_diagnose_ports.cpp
   ../src/app/DiagnoseRunner.cpp ../src/app/DiagnoseRunner.h ../src/app/CliRunner.cpp ../src/app/CliRunner.h
   ../src/app/LoggingBackend.cpp ../src/app/LoggingBackend.h)
+x50_add_test(test_theme test_theme.cpp)
+x50_add_test(test_display_strip test_display_strip.cpp)
+# Same binary again at device pixel ratio 2 (k = 2): crisp-pixel checks hold at both.
+add_test(NAME test_display_strip_2x COMMAND test_display_strip)
+set_tests_properties(test_display_strip_2x PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_SCALE_FACTOR=2")

@@ -56,7 +56,10 @@ target_include_directories(x50midi PUBLIC src)
 target_link_libraries(x50midi PUBLIC x50core Qt6::Core rtmidi)
 x50_target_options(x50midi)
 
-add_library(x50ui STATIC src/ui/MainWindow.cpp src/ui/MainWindow.h)
+add_library(x50ui STATIC src/ui/MainWindow.cpp src/ui/MainWindow.h
+  src/ui/Theme.cpp src/ui/Theme.h src/ui/DisplayStrip.cpp src/ui/DisplayStrip.h
+  src/ui/x50ui.qrc)
+set_target_properties(x50ui PROPERTIES AUTORCC ON)
 target_include_directories(x50ui PUBLIC src)
 target_link_libraries(x50ui PUBLIC x50core x50midi Qt6::Widgets)
 x50_target_options(x50ui)
@@ -65,6 +68,7 @@ add_executable(x50-patch-switcher
   src/app/main.cpp src/app/CommandLine.cpp src/app/CommandLine.h
   src/app/CliRunner.cpp src/app/CliRunner.h
   src/app/DiagnoseRunner.cpp src/app/DiagnoseRunner.h
+  src/app/ScreenshotRunner.cpp src/app/ScreenshotRunner.h
   src/app/LoggingBackend.cpp src/app/LoggingBackend.h)
 target_link_libraries(x50-patch-switcher PRIVATE x50ui x50midi x50core Qt6::Widgets)
 x50_target_options(x50-patch-switcher)

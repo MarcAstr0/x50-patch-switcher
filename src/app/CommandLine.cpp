@@ -22,6 +22,13 @@ void printList(QTextStream &out, const QString &title, const QStringList &names)
 }
 } // namespace
 
+QStringList CommandLine::screenshotStates()
+{
+    return {QStringLiteral("browse"),      QStringLiteral("browse-search"), QStringLiteral("settings"),
+            QStringLiteral("settings-errors"), QStringLiteral("live-8"),    QStringLiteral("live-6"),
+            QStringLiteral("live-disconnected")};
+}
+
 CommandLine::Result CommandLine::process(const QStringList &arguments)
 {
     QCommandLineParser parser;
@@ -61,8 +68,19 @@ CommandLine::Result CommandLine::process(const QStringList &arguments)
     const QCommandLineOption fakeOpt(QStringLiteral("fake-midi"),
                                      QStringLiteral("Use the simulated X50 instead of real MIDI ports."));
     parser.addOption(fakeOpt);
-    // --screenshot <png> [--screenshot-state <name>] arrives with M3: it needs
-    // QApplication on the offscreen platform (see main.cpp).
+    const QCommandLineOption screenshotOpt(QStringLiteral("screenshot"),
+                                           QStringLiteral("Render a view headless to a PNG and exit."),
+                                           QStringLiteral("png"));
+    parser.addOption(screenshotOpt);
+    const QCommandLineOption screenshotStateOpt(QStringLiteral("screenshot-state"),
+                                                QStringLiteral("State to render (default browse): ")
+                                                    + screenshotStates().join(QStringLiteral(", ")) + QStringLiteral("."),
+                                                QStringLiteral("name"));
+    parser.addOption(screenshotStateOpt);
+    const QCommandLineOption screenshotScaleOpt(QStringLiteral("screenshot-scale"),
+                                                QStringLiteral("Device pixel ratio for --screenshot: 1, 1.25, 1.5 or 2 (default 1)."),
+                                                QStringLiteral("factor"));
+    parser.addOption(screenshotScaleOpt);
 
     if (!parser.parse(arguments)) {
         QTextStream(stderr) << parser.errorText() << QStringLiteral("\n");
@@ -115,9 +133,34 @@ CommandLine::Result CommandLine::process(const QStringList &arguments)
             return usageError(QStringLiteral("--channel must be a number from 1 to 16"));
         m_options.channel = ch;
     }
-    const int jobs = int(parser.isSet(sendOpt)) + int(parser.isSet(probeOpt)) + int(parser.isSet(diagnoseOpt));
+    const int jobs = int(parser.isSet(sendOpt)) + int(parser.isSet(probeOpt)) + int(parser.isSet(diagnoseOpt))
+                   + int(parser.isSet(screenshotOpt));
     if (jobs > 1)
-        return usageError(QStringLiteral("Use only one of --send, --probe and --diagnose"));
+        return usageError(QStringLiteral("Use only one of --send, --probe, --diagnose and --screenshot"));
+    if (parser.isSet(screenshotOpt)) {
+        const QString path = parser.value(screenshotOpt);
+        if (path.trimmed().isEmpty())
+            return usageError(QStringLiteral("--screenshot needs a file name"));
+        if (parser.isSet(screenshotStateOpt)) {
+            m_options.screenshotState = parser.value(screenshotStateOpt);
+            if (!screenshotStates().contains(m_options.screenshotState))
+                return usageError(QStringLiteral("Unknown --screenshot-state \"%1\". Valid states: %2")
+                                      .arg(m_options.screenshotState, screenshotStates().join(QStringLiteral(", "))));
+        }
+        if (parser.isSet(screenshotScaleOpt)) {
+            bool ok = false;
+            const double scale = parser.value(screenshotScaleOpt).toDouble(&ok);
+            if (!ok || (scale != 1.0 && scale != 1.25 && scale != 1.5 && scale != 2.0))
+                return usageError(QStringLiteral("--screenshot-scale must be 1, 1.25, 1.5 or 2"));
+            m_options.screenshotScale = scale;
+        }
+        m_options.job = CliOptions::Job::Screenshot;
+        m_options.screenshotPath = QDir(path).absolutePath();
+        m_options.fakeMidi = true;  // a screenshot never opens a real port
+        return Result::Gui;
+    }
+    if (parser.isSet(screenshotStateOpt) || parser.isSet(screenshotScaleOpt))
+        return usageError(QStringLiteral("--screenshot-state and --screenshot-scale need --screenshot <png>"));
     if (parser.isSet(sendOpt)) {
         const QString text = parser.value(sendOpt);
         const SoundAddress::ParseResult pr = SoundAddress::parse(text);

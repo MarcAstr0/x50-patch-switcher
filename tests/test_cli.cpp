@@ -4,6 +4,7 @@
 #include <QFileDevice>
 #include <QFileInfo>
 #include <QFile>
+#include <QImage>
 #include <QMap>
 #include <QProcess>
 #include <QProcessEnvironment>
@@ -335,6 +336,63 @@ private slots:
         QVERIFY(text.contains(QStringLiteral("Exit code: 4")));
         QVERIFY(QFile::exists(tmp.filePath(QStringLiteral("prog-B.syx"))));
         QVERIFY(QFile::exists(tmp.filePath(QStringLiteral("global.syx"))));
+    }
+
+    // T3.1: --screenshot runs with no display (the exe picks the offscreen platform
+    // itself, headlessEnv() removed QT_QPA_PLATFORM), writes a PNG of 1920x1080 device
+    // pixels at scale 1 and exits 0.
+    void screenshotBrowse() {
+        QTemporaryDir tmp;
+        QVERIFY(tmp.isValid());
+        const QString png = tmp.filePath(QStringLiteral("browse.png"));
+        QString out;
+        QCOMPARE(run({QStringLiteral("--screenshot"), png, QStringLiteral("--screenshot-state"), QStringLiteral("browse")},
+                     &out),
+                 0);
+        QImage img(png);
+        QVERIFY2(!img.isNull(), qPrintable(out));
+        QCOMPARE(img.size(), QSize(1920, 1080));
+        QVERIFY(QFileInfo(png).size() > 1000);
+    }
+    void screenshotScale2() {
+        QTemporaryDir tmp;
+        QVERIFY(tmp.isValid());
+        const QString png = tmp.filePath(QStringLiteral("browse2.png"));
+        QString out;
+        QCOMPARE(run({QStringLiteral("--screenshot"), png, QStringLiteral("--screenshot-scale"), QStringLiteral("2")}, &out), 0);
+        QCOMPARE(QImage(png).size(), QSize(3840, 2160));
+    }
+    // All seven names are accepted (T3.2, T3.4 and T4.1 replace the stand-in views).
+    void screenshotAllStatesAccepted() {
+        QTemporaryDir tmp;
+        QVERIFY(tmp.isValid());
+        const QStringList states = {QStringLiteral("browse"),         QStringLiteral("browse-search"),
+                                    QStringLiteral("settings"),       QStringLiteral("settings-errors"),
+                                    QStringLiteral("live-8"),         QStringLiteral("live-6"),
+                                    QStringLiteral("live-disconnected")};
+        for (const QString &state : states) {
+            const QString png = tmp.filePath(state + QStringLiteral(".png"));
+            QString out;
+            QCOMPARE(run({QStringLiteral("--screenshot"), png, QStringLiteral("--screenshot-state"), state}, &out), 0);
+            QVERIFY2(QFileInfo(png).size() > 1000, qPrintable(state));
+        }
+    }
+    void screenshotUnknownStateExitsTwo() {
+        QTemporaryDir tmp;
+        QVERIFY(tmp.isValid());
+        const QString png = tmp.filePath(QStringLiteral("x.png"));
+        QString out;
+        QCOMPARE(run({QStringLiteral("--screenshot"), png, QStringLiteral("--screenshot-state"), QStringLiteral("nope")}, &out), 2);
+        QVERIFY2(out.contains(QStringLiteral("live-disconnected")) && out.contains(QStringLiteral("settings-errors")),
+                 qPrintable(out));
+        QVERIFY(!QFileInfo::exists(png));
+    }
+    void screenshotBadScaleExitsTwo() {
+        QString out;
+        QCOMPARE(run({QStringLiteral("--screenshot"), QStringLiteral("x.png"), QStringLiteral("--screenshot-scale"),
+                      QStringLiteral("3")},
+                     &out),
+                 2);
     }
 };
 
