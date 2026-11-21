@@ -426,3 +426,9 @@ fixes go back to the builder as T5.x tasks.
   one core (exact 0 would be flaky on CI). Windows working set enforced in CI.
   X50_START_LIVE=1 env hook starts in live view (measurement only). Settings dialog now
   displays the link's effective manual channel/Bank Map (no re-apply on open). (foreman)
+- 2026-11-21 · D4 (designer, docs/design/review-M4/D4.md): live view matches DESIGN at
+  1x-2x, names crisp (two colours) at all scales; the Bold `&` redrawn again (open right
+  side) because it still read as `8`; one minor: at 2x stroke widths are 1 px too thick
+  (rounded in logical px before scaling): builder fix next. Windows working set in CI:
+  29.2 MB (limit 60). For the owner at G3: 16-character names at k=3 (1080p) / k=2
+  (1366x768) on the real laptop at stage distance. (foreman)

@@ -65,12 +65,12 @@ BOLD = {
         '..XXX...',
         '.XX.XX..',
         '.XX.XX..',
-        '..XXX.X.',
-        '..XXXX..',
-        '.XXXXX..',
+        '..XXX...',
+        '..XXX.XX',
         '.XX.XXX.',
-        '.XX..XX.',
-        '..XXXXX.',
+        '.XX.XX..',
+        '.XX.XXX.',
+        '..XXX.XX',
     ],
 }
 
