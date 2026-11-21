@@ -432,3 +432,11 @@ fixes go back to the builder as T5.x tasks.
   (rounded in logical px before scaling): builder fix next. Windows working set in CI:
   29.2 MB (limit 60). For the owner at G3: 16-character names at k=3 (1080p) / k=2
   (1366x768) on the real laptop at stage distance. (foreman)
+- 2026-11-21 · R4 (reviewer: "ship to G3"). Decisions: a spontaneous window close
+  (Alt+F4, taskbar) is ignored while live; leave live with Esc first (session end and
+  QCoreApplication::quit still close); X50_START_LIVE honoured only with --fake-midi.
+  For T3.5: entering live while names are being read must cancel the read (or refuse
+  F5 with a status message). For G3 checklist: after Alt+Tab and back one pedal press
+  advances; a held pedal sends once; a tap works after a Windows notification; the
+  display stays on past the OS timeout while live and sleeps again after leaving. The
+  display-sleep inhibit stays held while live is backgrounded (intended). (foreman)
