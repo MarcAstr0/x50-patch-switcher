@@ -112,6 +112,15 @@ I verified on 2026-11-21 that these four TTFs and both OFL.txt files exist at th
 URLs (GitHub tree listing) and that the four files download (sizes 54 KB, 55 KB,
 164 KB, 169 KB). The Windows-in-Qt family-name behaviour (below) is not verified.
 
+Verified with `fc-scan` on 2026-11-21 (T2.3): the Atkinson files report family
+`Atkinson Hyperlegible`, styles `Regular` and `Bold`. Each Barlow file reports two
+families: `Barlow Semi Condensed` (typographic family, name ID 16) and `Barlow Semi
+Condensed Medium` / `Barlow Semi Condensed SemiBold` (name ID 1), with style `Medium` or
+`SemiBold`. Qt on Windows commonly registers the ID 1 name, so `Theme` must take the
+string returned by `applicationFontFamilies()` and not hard-code one. Files as committed:
+`assets/fonts/` (4 TTF plus 2 OFL texts), `assets/icons/` (`app.svg`, `app-small.svg` for
+the 16 and 24 px frames, `app-256.png`, `app.ico`), `assets/theme/app.qss`.
+
 Loading: `QFontDatabase::addApplicationFont` from Qt resources, once at start. After
 loading, the builder logs `applicationFontFamilies()` for each. If the Barlow files come
 back as family `Barlow Semi Condensed SemiBold` (a name-ID-1 style family) instead of

@@ -109,7 +109,7 @@ Touches only `docs/design/` and `assets/`. No C++.
 
 - ☑ **T2.1 References** per the brief.
 - ☑ **T2.2 `DESIGN.md`** per the brief, complete enough that the builder never guesses.
-- ☐ **T2.3 Assets**: fonts with licences, icon set including `.ico`, `app.qss`.
+- ☑ **T2.3 Assets**: fonts with licences, icon set including `.ico`, `app.qss`.
 - ☐ **T2.4 Mockups**: live 8, live 6, browse, settings.
 
 **Gate G2 (owner).** Mockups published as an artifact page (or paths given). One round
