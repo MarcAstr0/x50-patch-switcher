@@ -37,7 +37,7 @@ desktop app, never a web app, and it has no network code.
 | Language | C++17 |
 | Toolkit | Qt 6 Widgets, API floor 6.4 (the Linux dev box has 6.4.2; CI uses 6.8). No QML |
 | MIDI | RtMidi 6.0.0 via CMake `FetchContent` (WinMM on Windows, ALSA on Linux, CoreMIDI on macOS). SysEx input must be enabled (`ignoreTypes(false, true, true)`) |
-| Build | CMake ≥ 3.22; GCC 13 / MSVC 2022 / AppleClang |
+| Build | CMake ≥ 3.24 (RtMidi 6.0.0 requires it); GCC 13 / MSVC 2022 / AppleClang |
 | Tests | Qt Test under `ctest`, headless (`QT_QPA_PLATFORM=offscreen`) |
 | **Primary target** | **Windows 10/11 x64, portable `.zip`** (no installer, no admin rights) |
 | Secondary | Linux x86_64 AppImage (the owner's dev box), macOS 12+ universal `.dmg` |

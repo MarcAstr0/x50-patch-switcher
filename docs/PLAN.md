@@ -55,7 +55,7 @@ No GUI beyond the scaffold window. Everything testable headless.
   spot rows `COMBI A000` = StereophonicKeys (Keyboard), `PROG A000` = Portamento Pad
   (SlowSynth), `PROG A065` = M1 Piano, `PROG G001` = Acoustic Piano; no name over 16
   characters; no duplicate address.
-- ☐ **T1.2 Proofread the catalogue** (clerk). Compare every row of the TSV with VNL, page
+- ☑ **T1.2 Proofread the catalogue** (clerk). Compare every row of the TSV with VNL, page
   by page. Write `docs/proofread-T1.2.md` listing each mismatch (address, TSV value,
   VNL value, page). Edit nothing else. The builder fixes the script from that list;
   the clerk re-checks only the listed rows.
@@ -186,3 +186,10 @@ fixes go back to the builder as T5.x tasks.
 - 2026-11-21 · Default catalogue order (`SoundAddress::operator<`): COMBI before PROG,
   then bank A, B, C, D, G, g(d), then number. Prev/next steps through the current result
   list (SPEC §4.1), which uses this order when unsorted. (foreman, detail)
+- 2026-11-21 · CMake floor raised from 3.22 to 3.24: RtMidi 6.0.0's own CMakeLists
+  requires 3.24 (R-T1.0, both reviewers). SPEC §2 updated. (foreman, detail)
+- 2026-11-21 · `--list-ports` exits 1 if port enumeration itself fails (SPEC §6 said
+  only "exit 0"); an empty list is still 0. (foreman, detail)
+- 2026-11-21 · Windows subsystem: the exe is a console app for now so CLI output works.
+  Before G3, T1.8/T5.1 must make a double-clicked GUI launch open no console window
+  (GUI subsystem plus `AttachConsole` for CLI flags, or a second target). (foreman)
