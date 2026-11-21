@@ -55,7 +55,7 @@ public:
     // full screen, forbids Settings and leaves every browse widget hidden (so no set-editor
     // dialog, context menu or browse shortcut can be reached); the link's errors go to the live
     // top bar, never to a dialog or toast. Entering sends nothing. Returns false if already live.
-    // Leaving (T4.2 wires Esc to it) restores the browse page and the window state it had.
+    // Leaving (Esc held 1 s or twice within 1 s, from the live view) restores the browse page and the window state it had.
     LiveView *liveView() const { return m_live; }
     bool isLive() const { return m_isLive; }
     // Entering live shows the window full screen (default). Tests and --screenshot turn this off.
@@ -89,6 +89,8 @@ private:
     void updateMinimumHeight();
     void syncFromLink();
     void syncLive();
+    void sendSlot(int index);
+    void stepSet(int direction);
 
     std::unique_ptr<Catalogue> m_ownedCatalogue;
     std::unique_ptr<Library> m_ownedLibrary;
@@ -104,6 +106,7 @@ private:
     bool m_isLive = false;
     bool m_liveFullScreen = true;
     Qt::WindowStates m_stateBeforeLive;
+    QRect m_geometryBeforeLive;  // normal (not maximised) geometry when live began
     BrowseView *m_browse = nullptr;
     QLabel *m_status = nullptr;
     bool m_statusError = false;

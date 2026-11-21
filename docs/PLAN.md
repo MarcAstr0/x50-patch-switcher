@@ -137,7 +137,7 @@ on the live mockups, that is the moment to send them to her.
 
 - ☑ **T4.1 LiveView** painting per DESIGN.md: 6 and 8 grids, lit, empty, label + sound
   name, fit-to-width text, top bar.
-- ☐ **T4.2 Live input**: click/touch, `1`-`8`, next/previous keys with empty-slot
+- ☑ **T4.2 Live input**: click/touch, `1`-`8`, next/previous keys with empty-slot
   skipping and no wrap, re-send on current, set switching, Esc hold / double-Esc,
   no dialogs in live view. Tests drive it with `QTest::keyClick`.
 - ☐ **T4.3 Display-sleep inhibit** on Windows while live (SPEC §4.2), no-op elsewhere;
@@ -398,3 +398,8 @@ fixes go back to the builder as T5.x tasks.
   known sound stays lit until the link is Connected with an unknown sound; a sound in two
   slots lights the first; no set at all shows an empty 8-slot grid. For D4: the patched
   `&` still reads close to `8` at k=6 in "Piano &Strings". (foreman)
+- 2026-11-21 · T4.2 details: with the current sound not in the set, Next goes to the first
+  non-empty slot and Previous to the last; next/previous start from the lit slot; one 1 s
+  single-shot timer serves Esc hold and the second-press window; every key is swallowed
+  in live view and auto-repeat never acts. `[` and `]` need AltGr on some layouts:
+  Ctrl+Left/Right remains the reliable set switch (both kept per SPEC). (foreman)

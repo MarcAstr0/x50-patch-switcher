@@ -4,6 +4,8 @@
 #include "ui/Theme.h"
 
 #include <QEvent>
+#include <QFocusEvent>
+#include <QKeyEvent>
 #include <QFontMetrics>
 #include <QFontMetricsF>
 #include <QMouseEvent>
@@ -58,6 +60,9 @@ LiveView::LiveView(const Catalogue *catalogue, QWidget *parent)
         layoutBar();
         update(m_bar.rect);
     });
+    m_escTimer.setSingleShot(true);
+    m_escTimer.setInterval(1000);  // SPEC 4.2: Esc held 1 s, or a second Esc within 1 s
+    connect(&m_escTimer, &QTimer::timeout, this, [this]() { escTimeout(); });
     resize(1280, 720);
     layoutAll();
 }
@@ -80,11 +85,26 @@ void LiveView::setSet(const SetModel &set)
 {
     if (sameSlots(set, m_set))
         return;
+    if (set.size() != m_set.size())
+        m_pressed = -1;  // a different grid: the pressed slot means nothing now
     m_set = set;
-    layoutButtons();
+    layoutButtons();   // also drops a pressed slot that became empty
     m_lit = findLit();
     layoutBar();  // the set name, and whether the sound is in the set
+    m_nameSig = nameSignature();
     update();
+}
+
+QStringList LiveView::nameSignature() const
+{
+    QStringList sig;
+    if (!m_catalogue)
+        return sig;
+    for (int i = 0; i < m_set.size(); ++i)
+        if (const auto &a = m_set.slot(i).address)
+            sig << m_catalogue->effectiveName(*a);
+    sig << (m_current ? m_catalogue->effectiveName(*m_current) : QString());
+    return sig;
 }
 
 int LiveView::findLit() const
@@ -106,6 +126,7 @@ void LiveView::setCurrentSound(const std::optional<SoundAddress> &sound)
     m_current = s;
     m_lit = findLit();
     layoutBar();
+    m_nameSig = nameSignature();
     update(m_bar.rect);
     if (old != m_lit) {
         if (old >= 0)
@@ -147,6 +168,9 @@ void LiveView::setEscArmed(bool armed)
 
 void LiveView::refresh()
 {
+    const QStringList sig = nameSignature();
+    if (sig == m_nameSig)
+        return;  // recordUse and friends fire this on every send: nothing shown changed
     layoutAll();
 }
 
@@ -223,6 +247,7 @@ void LiveView::layoutAll()
     layoutButtons();
     layoutBar();
     layoutHint();
+    m_nameSig = nameSignature();
     update();
 }
 
@@ -319,6 +344,7 @@ void LiveView::layoutButtons()
 
     m_buttons.clear();
     m_buttons.resize(n);
+    // (the pressed slot is validated below, once the buttons know which are empty)
     int x = m;
     QVector<int> xs, ws;
     for (int c = 0; c < m_cols; ++c) {
@@ -411,6 +437,8 @@ void LiveView::layoutButtons()
         const double addrBase = hasLabel ? soundBase - b.soundFont.pixelSize() : bottom - qRound(fmAddr.descent() / 2.0);
         b.addrPos = QPointF(qRound(ix * m_dpr), qRound(addrBase - fmAddr.ascent()));
     }
+    if (m_pressed >= m_buttons.size() || (m_pressed >= 0 && m_buttons[m_pressed].empty))
+        m_pressed = -1;
 }
 
 void LiveView::layoutBar()
@@ -625,6 +653,7 @@ void LiveView::showEvent(QShowEvent *)
 void LiveView::hideEvent(QHideEvent *)
 {
     setPressed(-1);
+    resetEsc();
 }
 
 bool LiveView::event(QEvent *e)
@@ -686,10 +715,122 @@ void LiveView::mouseReleaseEvent(QMouseEvent *e)
     if (e->button() != Qt::LeftButton)
         return;
     const int i = m_pressed;
-    const bool inside = i >= 0 && m_buttons[i].rect.contains(e->position().toPoint());
+    const bool inside = i >= 0 && i < m_buttons.size() && !m_buttons[i].empty
+                        && m_buttons[i].rect.contains(e->position().toPoint());
     setPressed(-1);
     if (inside)
         emit slotClicked(i);
+}
+
+// ---------------------------------------------------------------- keys (SPEC 4.2)
+
+int LiveView::stepTarget(int direction) const
+{
+    const int n = m_buttons.size();
+    // The current sound is not in the set (or unknown): Next goes to the first non-empty slot,
+    // Previous to the last. Otherwise the next/previous non-empty one; none past the ends (no wrap).
+    int i = m_lit >= 0 ? m_lit + direction : (direction > 0 ? 0 : n - 1);
+    for (; i >= 0 && i < n; i += direction)
+        if (!m_buttons[i].empty)
+            return i;
+    return -1;
+}
+
+bool LiveView::focusNextPrevChild(bool)
+{
+    return false;  // Tab never moves focus in live view
+}
+
+void LiveView::keyPressEvent(QKeyEvent *e)
+{
+    e->accept();  // every key is ours; none may reach a shortcut or a parent
+    const int key = e->key();
+    const Qt::KeyboardModifiers mods = e->modifiers() & ~Qt::KeypadModifier;
+    if (key == Qt::Key_Escape) {
+        if (!e->isAutoRepeat() && mods == Qt::NoModifier)
+            escPressed();
+        return;
+    }
+    if (e->isAutoRepeat())
+        return;  // a held key or a stuck pedal must never burst MIDI
+    if (mods == Qt::ControlModifier && (key == Qt::Key_Left || key == Qt::Key_Right)) {
+        emit setStepRequested(key == Qt::Key_Right ? 1 : -1);
+        return;
+    }
+    if (mods != Qt::NoModifier)
+        return;
+    int target = -1;
+    switch (key) {
+    case Qt::Key_1: case Qt::Key_2: case Qt::Key_3: case Qt::Key_4:
+    case Qt::Key_5: case Qt::Key_6: case Qt::Key_7: case Qt::Key_8:
+        target = key - Qt::Key_1;
+        if (target >= m_buttons.size() || m_buttons[target].empty)
+            target = -1;
+        break;
+    case Qt::Key_Right: case Qt::Key_Down: case Qt::Key_Space: case Qt::Key_PageDown:
+        target = stepTarget(1);
+        break;
+    case Qt::Key_Left: case Qt::Key_Up: case Qt::Key_PageUp:
+        target = stepTarget(-1);
+        break;
+    case Qt::Key_BracketRight:
+        emit setStepRequested(1);
+        return;
+    case Qt::Key_BracketLeft:
+        emit setStepRequested(-1);
+        return;
+    default:
+        return;  // F5 and everything else: nothing
+    }
+    if (target >= 0)
+        emit slotClicked(target);
+}
+
+void LiveView::keyReleaseEvent(QKeyEvent *e)
+{
+    e->accept();
+    if (e->key() == Qt::Key_Escape && !e->isAutoRepeat())
+        escReleased();
+}
+
+void LiveView::focusOutEvent(QFocusEvent *e)
+{
+    resetEsc();  // a release we will never see must not complete a hold
+    QWidget::focusOutEvent(e);
+}
+
+// DESIGN 5.6: the first Esc arms the hint and starts the 1 s timer. A second press while it runs
+// leaves; so does the timer ending with Esc still down (a hold). Otherwise it disarms.
+void LiveView::escPressed()
+{
+    if (m_escTimer.isActive()) {
+        resetEsc();
+        emit leaveRequested();
+        return;
+    }
+    m_escDown = true;
+    setEscArmed(true);
+    m_escTimer.start();
+}
+
+void LiveView::escReleased()
+{
+    m_escDown = false;  // the timer keeps running: a second press may still come
+}
+
+void LiveView::escTimeout()
+{
+    const bool held = m_escDown;
+    resetEsc();
+    if (held)
+        emit leaveRequested();
+}
+
+void LiveView::resetEsc()
+{
+    m_escTimer.stop();
+    m_escDown = false;
+    setEscArmed(false);
 }
 
 // ---------------------------------------------------------------- painting
@@ -705,7 +846,11 @@ void LiveView::paintEvent(QPaintEvent *event)
     QPainter p(this);
     Theme::enterDeviceSpace(p, QPointF(0, 0));
     const QRect &clip = event->rect();
-    p.fillRect(toDevice(clip), m_brBg);
+    // At a fractional device pixel ratio the logical clip rounds inwards on some edges: pad by 1 device px.
+    QRect fill = toDevice(clip);
+    if (!qFuzzyCompare(m_dpr, qRound(m_dpr) * 1.0))
+        fill.adjust(-1, -1, 1, 1);
+    p.fillRect(fill, m_brBg);
     if (clip.intersects(m_bar.rect))
         paintBar(p);
     for (int i = 0; i < m_buttons.size(); ++i)

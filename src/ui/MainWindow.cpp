@@ -75,11 +75,22 @@ MainWindow::MainWindow(Catalogue *catalogue, Library *library, X50Link *link, QW
     connect(m_browse, &BrowseView::liveRequested, this, &MainWindow::enterLive);
     // Set changes while live (none can be made from the live page, but the library is shared).
     connect(m_library, &Library::changed, this, [this]() {
-        if (m_isLive)
-            syncLive();
+        if (!m_isLive)
+            return;
+        m_live->refresh();  // unit names read while live (only relays out if a shown name changed)
+        syncLive();
     });
-    connect(m_library, &Library::saveFailed, this,
-            [this](const QString &error) { showStatus(QStringLiteral("Could not save the library: %1").arg(error), true); });
+    connect(m_library, &Library::saveFailed, this, [this](const QString &error) {
+        const QString text = QStringLiteral("Could not save the library: %1").arg(error);
+        showStatus(text, true);
+        if (m_isLive)
+            m_live->flashSendFailure(text);  // live shows errors in the top bar only
+    });
+
+    // Live input (SPEC 4.2). The view only says what was chosen; sending is explicit and ours.
+    connect(m_live, &LiveView::slotClicked, this, [this](int index) { sendSlot(index); });
+    connect(m_live, &LiveView::setStepRequested, this, [this](int direction) { stepSet(direction); });
+    connect(m_live, &LiveView::leaveRequested, this, &MainWindow::leaveLive);
 
     if (m_link) {
         connect(m_link, &X50Link::stateChanged, this, [this]() {
@@ -206,6 +217,32 @@ void MainWindow::syncLive()
     }
 }
 
+void MainWindow::sendSlot(int index)
+{
+    if (!m_isLive || !m_link)
+        return;
+    const SetModel::Slot &slot = m_live->set().slot(index);  // bounds-checked
+    if (slot.address)
+        m_link->send(*slot.address);
+}
+
+void MainWindow::stepSet(int direction)
+{
+    if (!m_isLive)
+        return;
+    const QVector<SetModel> &sets = m_library->sets();
+    if (sets.isEmpty())
+        return;
+    int idx = -1;
+    for (int i = 0; i < sets.size(); ++i)
+        if (sets[i].id() == m_library->currentSetId())
+            idx = i;
+    const int target = idx < 0 ? (direction > 0 ? 0 : sets.size() - 1) : idx + direction;
+    if (target < 0 || target >= sets.size() || target == idx)
+        return;  // no wrap; switching a set sends nothing
+    m_library->setCurrentSet(sets[target].id());
+}
+
 bool MainWindow::enterLive()
 {
     if (m_isLive)
@@ -213,6 +250,7 @@ bool MainWindow::enterLive()
     m_isLive = true;
     setSettingsAllowed(false);
     m_stateBeforeLive = windowState();
+    m_geometryBeforeLive = (isMaximized() || isFullScreen() || isMinimized()) ? normalGeometry() : QRect(pos(), size());
     m_live->refresh();  // unit names may have been read in browse
     syncLive();
     m_stack->setCurrentWidget(m_live);
@@ -236,10 +274,13 @@ void MainWindow::leaveLive()
         m_browse->searchField()->setFocus();
         return;
     }
-    if (m_stateBeforeLive.testFlag(Qt::WindowMaximized))
+    if (m_stateBeforeLive.testFlag(Qt::WindowMaximized)) {
         showMaximized();
-    else
+    } else {
         showNormal();
+        resize(m_geometryBeforeLive.size());
+        move(m_geometryBeforeLive.topLeft());
+    }
     m_browse->searchField()->setFocus();
 }
 
@@ -319,8 +360,11 @@ void MainWindow::saveLayout()
     // aboutToQuit can run after the window was closed (hidden, geometry still valid): idempotent.
     QSettings settings(m_layoutPath, QSettings::IniFormat);
     // A maximized or minimized window remembers its normal size and position.
-    const bool maximized = isMaximized();
-    const QRect normal = (maximized || isMinimized()) ? normalGeometry() : QRect(pos(), size());
+    // While live and full screen, the layout to remember is the one from before going live.
+    const bool fullLive = m_isLive && isFullScreen();
+    const bool maximized = fullLive ? m_stateBeforeLive.testFlag(Qt::WindowMaximized) : isMaximized();
+    const QRect normal = fullLive ? m_geometryBeforeLive
+                                  : ((maximized || isMinimized()) ? normalGeometry() : QRect(pos(), size()));
     settings.setValue(QStringLiteral("window/x"), normal.x());
     settings.setValue(QStringLiteral("window/y"), normal.y());
     settings.setValue(QStringLiteral("window/width"), normal.width());

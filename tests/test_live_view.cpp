@@ -5,6 +5,10 @@
 // logical window (1920/s) x (1080/s) (DESIGN 5.7).
 #include <QApplication>
 #include <QImage>
+#include <QKeyEvent>
+#include <QLineEdit>
+#include <QPaintEvent>
+#include <QRegion>
 #include <QPixmap>
 #include <QScreen>
 #include <QSet>
@@ -58,6 +62,22 @@ SetModel oneSlot(int size, const QString &label)
 }
 
 QRgb px(const QImage &img, int x, int y) { return img.pixelColor(x, y).rgb() | 0xFF000000u; }
+
+// A LiveView that remembers what each paint event covered (logical px), for the dirty-rect tests.
+class PaintSpy : public LiveView
+{
+public:
+    using LiveView::LiveView;
+    QRegion painted;
+    void forget() { painted = QRegion(); }
+
+protected:
+    void paintEvent(QPaintEvent *e) override
+    {
+        painted += e->region();
+        LiveView::paintEvent(e);
+    }
+};
 } // namespace
 
 class TestLiveView : public QObject
@@ -498,6 +518,142 @@ private slots:
         QCOMPARE(v.buttonState(6), LiveView::ButtonState::Normal);
     }
 
+    // DESIGN 6.5 + T4.1 review: a sound change repaints exactly the old button, the new button and the
+    // bar (as the paint events' regions), and a send-failure flash repaints the bar only.
+    void dirtyRectsOnSoundChangeAndFlash()
+    {
+        PaintSpy v(&m_cat);
+        v.setSet(friday());
+        v.setCurrentSound(prog(B::D, 104));  // slot 1
+        v.show();
+        sizeTo(v, 1280, 720);
+        QVERIFY(QTest::qWaitForWindowExposed(&v));
+        QTest::qWait(100);
+        v.forget();
+        v.setCurrentSound(combi(B::C, 96));  // slot 2
+        QTRY_VERIFY(!v.painted.isEmpty());
+        QTest::qWait(50);
+        auto covers = [&](const QRect &r) { return QRegion(r).subtracted(v.painted).isEmpty(); };
+        QVERIFY2(covers(v.buttonRect(1)), "the old lit button was not repainted");
+        QVERIFY2(covers(v.buttonRect(2)), "the new lit button was not repainted");
+        QVERIFY2(covers(v.barRectDevice().isEmpty() ? QRect() : QRect(0, 0, v.width(), qRound(56 * v.unit()))), "the top bar was not repainted");
+        for (int i : {0, 3, 4, 5, 6, 7})
+            QVERIFY2(!v.painted.intersects(v.buttonRect(i)), qPrintable(QStringLiteral("button %1 was repainted").arg(i)));
+        QVERIFY2(!v.painted.intersects(QRect(0, v.height() - qRound(32 * v.unit()) + 1, v.width(), qRound(32 * v.unit()) - 1)),
+                 "the hint strip was repainted");
+
+        v.forget();
+        v.flashSendFailure(QStringLiteral("Send failed"));
+        QTRY_VERIFY(!v.painted.isEmpty());
+        QTest::qWait(50);
+        QVERIFY2(covers(QRect(v.width() / 2, 0, v.width() / 2, qRound(56 * v.unit()))), "the flash did not repaint the bar");
+        for (int i = 0; i < 8; ++i)
+            QVERIFY(!v.painted.intersects(v.buttonRect(i)));
+        // The flash ends by itself after 2 s and repaints the bar again.
+        v.forget();
+        QTRY_VERIFY_WITH_TIMEOUT(!v.painted.isEmpty(), 3000);
+        QVERIFY(!v.sendFailureShown());
+    }
+
+    // T4.1 review: a pressed slot does not outlive a set whose size changed, or a slot that became empty.
+    void pressedResetsWhenTheSetChanges()
+    {
+        LiveView v(&m_cat);
+        v.setSet(friday());
+        v.show();
+        sizeTo(v, 1280, 720);
+        QSignalSpy spy(&v, &LiveView::slotClicked);
+        QTest::mousePress(&v, Qt::LeftButton, Qt::NoModifier, v.buttonRect(0).center());
+        QCOMPARE(v.buttonState(0), LiveView::ButtonState::Pressed);
+        SetModel six(QStringLiteral("f"), QStringLiteral("Six"), 6);
+        six.setSlot(0, combi(B::A, 2));
+        v.setSet(six);  // the size changed
+        QCOMPARE(v.buttonState(0), LiveView::ButtonState::Normal);
+        QTest::mouseRelease(&v, Qt::LeftButton, Qt::NoModifier, v.buttonRect(0).center());
+        QCOMPARE(spy.count(), 0);
+        // The pressed slot becomes empty, then is filled again: it is not pressed any more.
+        QTest::mousePress(&v, Qt::LeftButton, Qt::NoModifier, v.buttonRect(0).center());
+        QCOMPARE(v.buttonState(0), LiveView::ButtonState::Pressed);
+        SetModel emptied(QStringLiteral("f"), QStringLiteral("Six"), 6);
+        v.setSet(emptied);
+        QCOMPARE(v.buttonState(0), LiveView::ButtonState::Empty);
+        v.setSet(six);
+        QCOMPARE(v.buttonState(0), LiveView::ButtonState::Normal);
+        QTest::mouseRelease(&v, Qt::LeftButton, Qt::NoModifier, v.buttonRect(0).center());
+        QCOMPARE(spy.count(), 0);
+        // A release on an empty slot never emits.
+        QTest::mouseClick(&v, Qt::LeftButton, Qt::NoModifier, v.buttonRect(4).center());
+        QCOMPARE(spy.count(), 0);
+    }
+
+    // DESIGN 5.3 step 3, tie: "Warm pad" with a box that holds it exactly on one line at kcap (U = 1.5,
+    // kcap = 7) and whose height allows two lines: s2 == s1, so one line.
+    void fitTieGoesToOneLine()
+    {
+        const QFontMetrics fm1(Theme::pixelFont(1, true));
+        const QString text = QStringLiteral("Warm pad");
+        const int w = 7 * NameFit::fontPixelAdvance(fm1, text);
+        const NameFit::Result r = NameFit::fit(text, w, 26 * 7, 1.5, fm1);
+        QCOMPARE(r.k, 7);
+        QCOMPARE(r.lines, (QStringList{text}));
+        // One font pixel narrower: one line no longer fits at 7, two lines do, and two larger lines win.
+        const NameFit::Result r2 = NameFit::fit(text, w - 7, 26 * 7, 1.5, fm1);
+        QCOMPARE(r2.k, 7);
+        QCOMPARE(r2.lines, (QStringList{QStringLiteral("Warm"), QStringLiteral("pad")}));
+    }
+
+    // DESIGN 5.3 step 2: two breaks give the same widest line: the earlier space wins.
+    void fitTieGoesToEarlierSpace()
+    {
+        const QFontMetrics fm1(Theme::pixelFont(1, true));
+        const QString text = QStringLiteral("aa aa aa");
+        const int half = NameFit::fontPixelAdvance(fm1, QStringLiteral("aa aa"));
+        QCOMPARE(NameFit::fontPixelAdvance(fm1, text) - NameFit::fontPixelAdvance(fm1, QStringLiteral("aa ")), half);
+        const NameFit::Result r = NameFit::fit(text, 7 * half, 26 * 7, 1.5, fm1);
+        QCOMPARE(r.k, 7);
+        QCOMPARE(r.lines, (QStringList{QStringLiteral("aa"), QStringLiteral("aa aa")}));
+    }
+
+    // DESIGN 2.2 (pixel font, no antialiasing): inside a name box there are exactly two colours, the
+    // button fill and the text colour, at every device scale the binary runs at.
+    void nameBoxesHaveTwoColours()
+    {
+        for (int size : {8, 6}) {
+            LiveView v(&m_cat);
+            SetModel s = friday();
+            if (size == 6) {
+                s = SetModel(QStringLiteral("g"), QStringLiteral("G"), 6);
+                s.setSlot(0, combi(B::A, 2));
+                s.setLabel(0, QStringLiteral("Warm pad"));
+                s.setSlot(1, prog(B::D, 104));
+                s.setLabel(1, QStringLiteral("Verse EP"));
+                s.setSlot(2, combi(B::C, 96));
+                s.setSlot(4, prog(B::A, 28));
+                s.setLabel(4, QStringLiteral("Solo lead"));
+            }
+            v.setSet(s);
+            v.setCurrentSound(prog(B::D, 104));
+            v.show();
+            const QSize sz = screenLogical(1920, 1080);
+            sizeTo(v, sz.width(), sz.height());
+            const QImage img = grab(v);
+            for (int i = 0; i < v.slotCount(); ++i) {
+                if (v.buttonState(i) == LiveView::ButtonState::Empty)
+                    continue;
+                const bool lit = v.buttonState(i) == LiveView::ButtonState::Lit;
+                const QRgb fill = lit ? Theme::cyan : Theme::surface, ink = lit ? Theme::onCyan : Theme::text;
+                const QRect box = v.nameBoxDevice(i);
+                QVERIFY(!box.isEmpty());
+                QSet<QRgb> colours;
+                for (int y = box.top(); y <= box.bottom(); ++y)
+                    for (int x = box.left(); x <= box.right(); ++x)
+                        colours.insert(px(img, x, y));
+                QVERIFY2(colours == (QSet<QRgb>{fill, ink}) || colours == (QSet<QRgb>{fill}),
+                         qPrintable(QStringLiteral("name box %1 (size %2) has %3 colours").arg(i).arg(size).arg(colours.size())));
+            }
+        }
+    }
+
     // The window renders at the DESIGN 5.7 sizes without crashing at tiny and huge sizes.
     void screenshotSmoke()
     {
@@ -589,7 +745,8 @@ private slots:
         w.setLiveFullScreen(false);
         w.show();
         QVERIFY(QTest::qWaitForWindowExposed(&w));
-        emit w.browseView()->liveRequested();
+        // A real F5 key event in the search field (where browse focus starts), not the signal.
+        QTest::keyClick(w.browseView()->searchField(), Qt::Key_F5);
         QVERIFY(w.isLive());
         QVERIFY(w.liveView()->isVisible());
         QCOMPARE(w.liveView()->slotCount(), 8);  // no set at all: an empty 8-slot set, every slot Empty
@@ -615,15 +772,22 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(link.state(), X50Link::State::Connected, 3000);
         w.show();
         QVERIFY(w.enterLive());
+        link.send(prog(B::D, 104));
+        QTRY_COMPARE_WITH_TIMEOUT(w.liveView()->litSlot(), 0, 3000);
         // A send that fails flashes the right zone.
         fake.setFailSend(true);
         link.send(prog(B::D, 104));
         QTRY_VERIFY_WITH_TIMEOUT(w.liveView()->sendFailureShown(), 3000);
+        // The chip says why (the failure reason replaces the status text), in the bar, with no dialog.
+        QCOMPARE(w.liveView()->connectionText(), QStringLiteral("COULD NOT SEND TO THE X50: FAKE: WRITE FAILED"));
+        QVERIFY(!QApplication::activeModalWidget());
         fake.setFailSend(false);
         // The unit goes away: the bar says so, the lit state of the last known sound stays.
         fake.unplug();
         QTRY_VERIFY_WITH_TIMEOUT(!w.liveView()->isConnected(), 5000);
-        QVERIFY(!w.liveView()->connectionText().isEmpty());
+        QTRY_VERIFY_WITH_TIMEOUT(!w.liveView()->sendFailureShown(), 3000);
+        QVERIFY2(w.liveView()->connectionText().startsWith(QStringLiteral("NO X50")), qPrintable(w.liveView()->connectionText()));
+        QCOMPARE(w.liveView()->litSlot(), 0);  // the last known sound stays lit
         QVERIFY(w.isLive());
         QVERIFY(w.liveView()->isVisible());
         link.stop();

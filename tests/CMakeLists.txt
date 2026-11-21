@@ -56,6 +56,11 @@ set_tests_properties(test_settings_dialog_2x PROPERTIES ENVIRONMENT "QT_QPA_PLAT
 x50_add_test(test_set_editor test_set_editor.cpp)
 add_test(NAME test_set_editor_2x COMMAND test_set_editor)
 set_tests_properties(test_set_editor_2x PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_SCALE_FACTOR=2")
+x50_add_test(test_live_input test_live_input.cpp)
+foreach(scale 1.5 2)
+  add_test(NAME test_live_input_${scale}x COMMAND test_live_input)
+  set_tests_properties(test_live_input_${scale}x PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_SCALE_FACTOR=${scale}")
+endforeach()
 x50_add_test(test_live_view test_live_view.cpp)
 # Same binary at the DESIGN 5.3 / 5.7 scale factors: the pixel-exact checks hold at each.
 foreach(scale 1.25 1.5 2)

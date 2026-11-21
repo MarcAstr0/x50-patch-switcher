@@ -11,6 +11,7 @@
 #include <QRectF>
 #include <QStaticText>
 #include <QString>
+#include <QStringList>
 #include <QTimer>
 #include <QTransform>
 #include <QVector>
@@ -22,6 +23,8 @@
 #include "ui/PixelRun.h"
 
 class Catalogue;
+class QFocusEvent;
+class QKeyEvent;
 class QPainter;
 
 // The live view (SPEC 4.2, DESIGN 5 and 6): a top bar, a 2 x 3 or 2 x 4 grid of large buttons
@@ -34,9 +37,16 @@ class QPainter;
 // never repaints. There are no timers except the 2 s single-shot that ends the red "failed
 // send" chip (DESIGN 5.5), which is a state change, not an animation.
 //
-// The view sends nothing. A click or touch released inside a non-empty button emits
-// slotClicked(); what to do with it is the caller's (T4.2). The widget takes no focus ring
-// and shows no dialogs.
+// The view sends nothing. It turns input into signals and the caller acts (T4.2):
+//  - a click or touch released inside a non-empty button, keys 1-8 and next/previous (which skip
+//    empty slots, do not wrap, and start from the first or last slot when the current sound is not
+//    in the set) emit slotClicked(index) for a non-empty slot; the current slot's own key or button
+//    emits it again (re-send);
+//  - Ctrl+Left/Right and [ / ] emit setStepRequested(-1/+1);
+//  - Esc held 1 s or pressed twice within 1 s emits leaveRequested(); the first press arms the
+//    hint. The two Esc timers are the one allowed timer under 2 s.
+// Auto-repeat of any key does nothing. Every other key is swallowed. The widget takes no focus
+// ring, never moves focus and shows no dialogs.
 class LiveView : public QWidget
 {
     Q_OBJECT
@@ -60,7 +70,8 @@ public:
     void flashSendFailure(const QString &reason = QString());
     // DESIGN 5.6 armed text (first Esc pressed or Esc held). Used by T4.2.
     void setEscArmed(bool armed);
-    // Names in the catalogue changed (unit names read): lay out again.
+    // Names in the catalogue may have changed (unit names read): lays out again only if a name
+    // that is shown differs from the one the layout was built with.
     void refresh();
 
     // ---- state and layout, for the screenshot harness and the tests ----
@@ -95,8 +106,12 @@ public:
     int paintCount() const { return m_paintCount; }
 
 signals:
-    // Released inside a non-empty button (index is 0-based). Sends nothing itself.
+    // A non-empty slot was chosen by click, touch or key (index is 0-based). Sends nothing itself.
     void slotClicked(int index);
+    // Previous (-1) or next (+1) set was asked for. Nothing is sent for it.
+    void setStepRequested(int direction);
+    // Esc was held 1 s or pressed twice within 1 s.
+    void leaveRequested();
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -104,6 +119,10 @@ protected:
     void showEvent(QShowEvent *event) override;
     void hideEvent(QHideEvent *event) override;
     bool event(QEvent *event) override;
+    void keyPressEvent(QKeyEvent *event) override;
+    void keyReleaseEvent(QKeyEvent *event) override;
+    void focusOutEvent(QFocusEvent *event) override;
+    bool focusNextPrevChild(bool next) override;
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
@@ -196,6 +215,12 @@ private:
     ButtonState stateOf(int i) const;
     int hit(const QPoint &pos) const;
     void setPressed(int idx);
+    QStringList nameSignature() const;
+    int stepTarget(int direction) const;      // next/previous non-empty slot from the lit one, or -1
+    void escPressed();
+    void escReleased();
+    void escTimeout();
+    void resetEsc();
 
     // ---- painting ----
     void paintBar(QPainter &p);
@@ -215,6 +240,9 @@ private:
     int m_pressed = -1;
     int m_cols = 4;
     QTimer m_flashTimer;
+    QTimer m_escTimer;            // 1 s single-shot: the Esc hold, and the window for a second press
+    bool m_escDown = false;
+    QStringList m_nameSig;        // the names the layout was built with (refresh() compares)
 
     double m_u = 1.0;
     qreal m_dpr = 0;
