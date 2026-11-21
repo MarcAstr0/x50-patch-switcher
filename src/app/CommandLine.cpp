@@ -29,6 +29,10 @@ CommandLine::Result CommandLine::process(const QStringList &arguments)
     const QCommandLineOption listPorts(QStringLiteral("list-ports"),
                                        QStringLiteral("Print output and input port names and exit."));
     parser.addOption(listPorts);
+    const QCommandLineOption configDir(QStringLiteral("config-dir"),
+                                       QStringLiteral("Use another config directory."),
+                                       QStringLiteral("dir"));
+    parser.addOption(configDir);
 
     if (!parser.parse(arguments)) {
         QTextStream(stderr) << parser.errorText() << QStringLiteral("\n");
@@ -50,5 +54,6 @@ CommandLine::Result CommandLine::process(const QStringList &arguments)
         m_exitCode = ports.error.isEmpty() ? 0 : 1;
         return Result::Exit;
     }
+    m_configDir = parser.value(configDir);
     return Result::Gui;
 }

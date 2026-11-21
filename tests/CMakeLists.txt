@@ -23,3 +23,6 @@ target_compile_definitions(test_search_query PRIVATE
 x50_add_test(test_cli test_cli.cpp)
 target_compile_definitions(test_cli PRIVATE X50_EXE="$<TARGET_FILE:x50-patch-switcher>")
 add_dependencies(test_cli x50-patch-switcher)
+x50_add_test(test_config_location test_config_location.cpp)
+x50_add_test(test_set_model test_set_model.cpp)
+x50_add_test(test_library test_library.cpp)

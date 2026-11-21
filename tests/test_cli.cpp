@@ -45,6 +45,15 @@ private slots:
         QCOMPARE(run({QStringLiteral("--help-all")}, &out), 0);
         QVERIFY(out.contains(QStringLiteral("--list-ports")));
     }
+    void configDirInHelp() {
+        QString out;
+        QCOMPARE(run({QStringLiteral("--help")}, &out), 0);
+        QVERIFY(out.contains(QStringLiteral("--config-dir")));
+    }
+    void configDirNeedsValue() {
+        QString out;
+        QCOMPARE(run({QStringLiteral("--config-dir")}, &out), 2);
+    }
     void unknownOption() {
         QString out;
         QCOMPARE(run({QStringLiteral("--bogus")}, &out), 2);

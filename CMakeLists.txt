@@ -38,6 +38,9 @@ add_library(x50core STATIC src/core/Version.cpp src/core/Version.h
   src/core/SoundAddress.cpp src/core/SoundAddress.h src/core/BankMap.h
   src/core/Catalogue.cpp src/core/Catalogue.h
   src/core/SearchQuery.cpp src/core/SearchQuery.h
+  src/core/ConfigLocation.cpp src/core/ConfigLocation.h
+  src/core/SetModel.cpp src/core/SetModel.h
+  src/core/Library.cpp src/core/Library.h
   data/x50data.qrc)
 set_target_properties(x50core PROPERTIES AUTORCC ON)
 target_include_directories(x50core PUBLIC src)

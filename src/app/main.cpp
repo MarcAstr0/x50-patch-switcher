@@ -1,4 +1,6 @@
 #include "app/CommandLine.h"
+#include "core/ConfigLocation.h"
+#include "core/Library.h"
 #include "core/Version.h"
 #include "ui/MainWindow.h"
 
@@ -29,7 +31,15 @@ int main(int argc, char *argv[])
     }
 
     QApplication app(argc, argv);
+    // The library is loaded here until MainWindow takes it over (M3); it only
+    // writes when something changes, and is flushed on exit.
+    Library library;
+    library.load(ConfigLocation::resolveForApp(cli.configDir()));
+    if (!library.loadError().isEmpty())
+        qWarning("%s", qPrintable(library.loadError()));
     MainWindow window;
     window.show();
-    return QApplication::exec();
+    const int rc = QApplication::exec();
+    library.flush();
+    return rc;
 }

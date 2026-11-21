@@ -66,7 +66,7 @@ No GUI beyond the scaffold window. Everything testable headless.
 - ☑ **T1.4 `Catalogue` and `SearchQuery`.** Factory names, unit-name overlay, *edited*
   flag, categories per kind. Search per SPEC §4.1: at least 25 table cases including
   accents, multi-token AND, address tokens, `cat:`, bare address matching both kinds.
-- ☐ **T1.5 `Library` and `SetModel`.** JSON per SPEC §3.3, `QSaveFile`, 500 ms debounce,
+- ☑ **T1.5 `Library` and `SetModel`.** JSON per SPEC §3.3, `QSaveFile`, 500 ms debounce,
   broken-file sidelining, `--config-dir`, portable-mode rule (SPEC §7.2). Set
   operations: create, rename, duplicate, delete, resize 6↔8 (resize to 6 keeps slots
   1-6 and refuses if 7-8 are filled, saying so), move slot, set/clear slot and label.
@@ -199,3 +199,14 @@ fixes go back to the builder as T5.x tasks.
   (`cat:mallet` finds Bell/Mallet), quoted values allowed; adjacent tokens joined (up to
   3) when they parse as an address; an out-of-range address token matches nothing.
   (foreman, detail)
+- 2026-11-21 · R-T1.4 (reviewer + Codex) fixes queued after T1.5: reject split addresses
+  atomically (`C D000` must not become text "C" + PROG D000); join tokens only when the
+  first is a kind prefix or bank letter; quoted tokens are always text; drop empty
+  tokens; `Catalogue` takes the unit's 16 + 16 category names from the global dump
+  (MIDI.md §7, TABLE 4) and `categories()` returns them once read; help shows the
+  program name. (foreman)
+- 2026-11-21 · Library details where SPEC §3.3 is silent (T1.5): unknown JSON fields
+  ignored; no version field; ISO 8601 UTC timestamps; `bankMap` "korg"/"gm"; an address
+  that no longer parses drops that entry with a load warning, a structural error
+  sidelines the file; `moveSlot` onto an occupied slot swaps; `duplicateSet` names the
+  copy "<name> copy". (foreman, detail)
