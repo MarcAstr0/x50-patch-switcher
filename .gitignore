@@ -1,0 +1,19 @@
+# Build trees
+build/
+build-*/
+cmake-build-*/
+_deps/
+
+# IDE / editor
+.vscode/
+.idea/
+*.user
+.DS_Store
+
+# Local, never-committed artwork and Korg documents
+assets/local/
+*.pdf
+
+# Claude Code local state
+.claude/settings.local.json
+.claude/worktrees/
