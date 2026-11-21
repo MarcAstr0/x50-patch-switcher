@@ -355,3 +355,12 @@ fixes go back to the builder as T5.x tasks.
   top of the category list (SPEC §4.1 updated); they combine with search and the kind
   toggles; Recent is most recent first. Designer adds them to DESIGN §7.6 (T3.3b), then
   the builder implements them. (owner)
+- 2026-11-21 · R-T3.6 (reviewer: do not ship until #1). Fix round after T3.3b: keys
+  typed in the inline label editor or on a focused slot cell must never reach browse
+  shortcuts (PgUp/PgDn/Ctrl+Left/Right would send MIDI; Ctrl+1..8 overwrite a slot;
+  Ctrl+D; F5; Return), with key-isolation tests asserting nothing sent and slots
+  unchanged; current cell shows only the corner triangle (DESIGN §7.9, no cyan border);
+  focus ring offset per DESIGN; no QPolygonF built in SetCombo/triangle paint; clamp the
+  selected slot after a shrink; drag tests through a factored makeDragMime() and the
+  table's drag setup. Kept as designed: a label stays when a different sound is dropped
+  on its slot (the label names the song part). (foreman)
