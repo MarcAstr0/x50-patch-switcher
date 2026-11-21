@@ -367,3 +367,7 @@ fixes go back to the builder as T5.x tasks.
 - 2026-11-21 · T3.3b done: Favourites and Recent in the category list. Recent does not
   re-order while it is shown (Prev/Next must follow the order on screen); the new order
   appears on the next rebuild. (foreman)
+- 2026-11-21 · R-T3.3b (reviewer: ship). Test gaps for the R3 fix round: separator vs
+  PgUp/PgDn/Home/End and mouse click; Prev/Next no-wrap and Enter order in Favourites and
+  Recent; Ctrl+D on a row no longer a favourite; Ctrl+1..8 from these views; stronger
+  screenshot pixel checks (text colour in its rect, clock glyph text-dim). (foreman)
