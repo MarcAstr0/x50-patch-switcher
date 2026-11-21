@@ -449,3 +449,6 @@ fixes go back to the builder as T5.x tasks.
   concurrently running builder's half-done version change. Fixed by 08b5d3a. Process:
   never commit with -A while another builder is working in the main tree; stage the
   files of the reporting task by name. (foreman)
+- 2026-11-21 · **G3 on hold** (owner): v0.9.0 beta zip (CI run 44958148618) and
+  docs/gates/G3-checklist.md ready, also covering G1; not sent yet. M5 work that does not
+  depend on the keyboard player continues: T5.1, T5.2. (owner)
