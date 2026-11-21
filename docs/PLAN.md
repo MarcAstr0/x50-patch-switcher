@@ -124,7 +124,7 @@ on the live mockups, that is the moment to send them to her.
 - ☑ **T3.2 BrowseView.** Search, kind toggles, categories, result list and delegate,
   send on Enter / double-click / Play, prev/next, every shortcut in SPEC §4.1.
 - ☐ **T3.3 Favourites, recents, edited markers.**
-- ☐ **T3.4 Settings and probe checklist.** Ports, Test, Check X50, the checklist with
+- ☑ **T3.4 Settings and probe checklist.** Ports, Test, Check X50, the checklist with
   per-line fix hints, manual channel and Bank Map when the probe fails.
 - ☐ **T3.5 Read names** UI with progress and cancel (after G1 / T1.10).
 - ☐ **T3.6 SetEditor.** Set picker and operations, slot grid, drag reorder, labels,
@@ -344,3 +344,10 @@ fixes go back to the builder as T5.x tasks.
   glyphs are placed per character at integer advances (Qt 6.4 FreeType drifts);
   Prev/Next chevron spacing unspecified; Programs toggle check-mark inset. Window layout
   is stored in <configDir>/window.ini. (foreman)
+- 2026-11-21 · Settings details (T3.4): Test = apply the chosen ports, reconnect and run
+  the read-only probe (SPEC §4.5 "a Test button that sends a probe"); port choices and
+  manual channel/Bank Map in <configDir>/settings.ini; the checklist shows all rows as
+  running, then the results (no per-stage signal; the probe is two short requests).
+  Queued for the T3.4 fix round: shorten the "No reply" message to "No reply from the
+  X50" (the hint carries the Exclusive instruction); "Last check" time from Library
+  unit.lastSeen. (foreman)

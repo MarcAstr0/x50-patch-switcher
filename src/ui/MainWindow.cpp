@@ -5,6 +5,7 @@
 #include "core/Version.h"
 #include "ui/BrowseView.h"
 #include "ui/DisplayStrip.h"
+#include "ui/SettingsDialog.h"
 #include "ui/Theme.h"
 
 #include <QCloseEvent>
@@ -60,6 +61,7 @@ MainWindow::MainWindow(Catalogue *catalogue, Library *library, X50Link *link, QW
     resize(Theme::browseDefaultWidth, Theme::browseDefaultHeight);
 
     connect(m_browse, &BrowseView::statusMessage, this, &MainWindow::showStatus);
+    connect(m_browse, &BrowseView::settingsRequested, this, &MainWindow::openSettings);
     connect(m_library, &Library::saveFailed, this,
             [this](const QString &error) { showStatus(QStringLiteral("Could not save the library: %1").arg(error), true); });
 
@@ -95,6 +97,14 @@ MainWindow::MainWindow(Catalogue *catalogue, Library *library, X50Link *link, QW
 }
 
 MainWindow::~MainWindow() = default;
+
+void MainWindow::openSettings()
+{
+    if (!m_link)
+        return;
+    SettingsDialog dialog(m_link, m_backend, m_configDir, this);
+    dialog.exec();
+}
 
 void MainWindow::updateMinimumHeight()
 {
@@ -152,6 +162,7 @@ QRect MainWindow::clampToScreen(const QRect &saved, const QRect &available, cons
 
 void MainWindow::restoreLayout(const QString &configDir, const QRect &availableOverride)
 {
+    m_configDir = configDir;
     m_layoutPath = QDir(configDir).filePath(layoutFileName());
     const QSettings settings(m_layoutPath, QSettings::IniFormat);
     const QSize size(settings.value(QStringLiteral("window/width")).toInt(), settings.value(QStringLiteral("window/height")).toInt());

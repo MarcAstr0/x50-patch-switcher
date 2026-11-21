@@ -14,7 +14,9 @@ class Catalogue;
 class DisplayStrip;
 class Library;
 class QCloseEvent;
+class MidiBackend;
 class QLabel;
+class SettingsDialog;
 
 // Browse window (DESIGN 7.1): display strip, the browse page, status line, in a column with
 // a 16 px margin and 12 px gaps.
@@ -38,6 +40,10 @@ public:
     QString statusText() const;
     bool statusIsError() const { return m_statusError; }
 
+    // The backend the Settings dialog lists ports from (not owned). Without it the dialog lists none.
+    void setMidiBackend(MidiBackend *backend) { m_backend = backend; }
+    // Opens the settings dialog (modal, browse view only). The Settings button calls this.
+    void openSettings();
     // Shows a message in the status line (replacing the previous one).
     void showStatus(const QString &text, bool isError);
 
@@ -67,6 +73,8 @@ private:
     std::unique_ptr<Library> m_ownedLibrary;
     Library *m_library = nullptr;
     X50Link *m_link = nullptr;
+    MidiBackend *m_backend = nullptr;
+    QString m_configDir;  // empty until restoreLayout()
     DisplayStrip *m_strip = nullptr;
     BrowseView *m_browse = nullptr;
     QLabel *m_status = nullptr;

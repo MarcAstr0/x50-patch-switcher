@@ -4,17 +4,24 @@
 #include "core/Library.h"
 #include "core/SoundAddress.h"
 #include "app/CliRunner.h"
+#include "midi/FakeX50.h"
 #include "midi/X50Link.h"
 #include "ui/BrowseView.h"
 #include "ui/DisplayStrip.h"
 #include "ui/MainWindow.h"
+#include "ui/ProbeChecklist.h"
+#include "ui/SettingsDialog.h"
 #include "ui/Theme.h"
 
 #include <QApplication>
 #include <QByteArray>
 #include <QDateTime>
 #include <QElapsedTimer>
+#include <QComboBox>
+#include <QLabel>
 #include <QLineEdit>
+#include <QPushButton>
+#include <QSpinBox>
 #include <QPixmap>
 #include <QTableView>
 #include <QTemporaryDir>
@@ -119,6 +126,54 @@ void applyState(MainWindow &w, const QString &state)
 
 namespace ScreenshotRunner {
 
+namespace {
+// The real settings dialog on the real link against the simulated X50. `settings`: every line
+// passes. `settings-errors` matches docs/design/mockup-settings.png: Bank Change off (a real
+// probe line), then the Bank Map line edited to "not reported" and the last line to "running"
+// (the fake always answers Mode and State, so those two cannot come from a probe).
+int runSettings(const CliOptions &options)
+{
+    const bool errors = options.screenshotState == QLatin1String("settings-errors");
+    std::unique_ptr<MidiBackend> backend = CliCommon::makeBackend(true);
+    if (auto *fake = dynamic_cast<FakeX50 *>(backend.get()))
+        fake->setEnables(true, !errors, true);
+    X50Link link(backend.get());
+    link.setPortNames(CliCommon::defaultPortSubstring());
+    link.start();
+    waitFor([&] { return link.state() == X50Link::State::Connected; }, 3000);
+
+    SettingsDialog dialog(&link, backend.get(), QString());
+    dialog.setHeightLimit(kLogicalHeight);  // the virtual screen is small; show every line
+    if (errors) {
+        QVector<ProbeChecklist::Row> rows = dialog.checklist()->rows();
+        if (rows.size() == 6) {
+            rows[4] = {ProbeChecklist::State::Unknown, QStringLiteral("Bank Map: not reported"),
+                       QStringLiteral("The X50 did not say which Bank Map it uses. Sending as GM; change Bank Map above if banks come out wrong.")};
+            rows[5] = {ProbeChecklist::State::Running, QStringLiteral("SysEx replies"), QString()};
+            dialog.checklist()->setRows(rows);
+        }
+        dialog.statusWord()->setText(QStringLiteral("Checking..."));
+        dialog.channelSpin()->setEnabled(true);
+        dialog.bankMapCombo()->setEnabled(true);
+        dialog.fitToContent();
+    } else {
+        dialog.statusWord()->setText(QStringLiteral("Last check: 14:02"));
+    }
+    dialog.show();
+    QApplication::processEvents();
+    if (QWidget *f = dialog.focusWidget())
+        f->clearFocus();  // the mockup shows no focus ring
+    QApplication::processEvents();
+    const QPixmap shot = dialog.grab();
+    link.stop();
+    if (!shot.save(options.screenshotPath, "PNG")) {
+        QTextStream(stderr) << QStringLiteral("Could not write ") << options.screenshotPath << QStringLiteral("\n");
+        return ExitCode::ScreenshotFailed;
+    }
+    return ExitCode::Ok;
+}
+} // namespace
+
 void prepareEnvironment(const CliOptions &options)
 {
     // Always offscreen, even when the caller's environment names another platform: the
@@ -132,6 +187,10 @@ int run(const CliOptions &options)
 {
     Theme::loadFonts();
     Theme::applyStyleSheet(*qApp);
+
+    if (options.screenshotState == QLatin1String("settings") ||
+        options.screenshotState == QLatin1String("settings-errors"))
+        return runSettings(options);
 
     const bool browse = options.screenshotState == QLatin1String("browse") ||
                         options.screenshotState == QLatin1String("browse-search");

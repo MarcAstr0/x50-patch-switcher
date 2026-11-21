@@ -95,7 +95,7 @@ public:
     QPushButton *nextButton() const { return m_next; }
     QPushButton *playButton() const { return m_play; }
     QPushButton *starButton() const { return m_star; }
-    // Enabled by T3.4 (settings) and T3.5 (read names); disabled until then.
+    // Settings is enabled whenever there is a link (MainWindow opens the dialog); Read names is T3.5.
     QPushButton *settingsButton() const { return m_settings; }
     QPushButton *readNamesButton() const { return m_readNames; }
     QPushButton *liveButton() const { return m_live; }

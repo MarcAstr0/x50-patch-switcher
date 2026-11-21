@@ -150,7 +150,7 @@ void BrowseView::buildUi()
     m_readNames->setEnabled(false);  // T3.5 enables it while connected
     m_readNames->setToolTip(QStringLiteral("Not connected to an X50"));
     m_settings = makeButton(QStringLiteral("Settings"), Theme::settingsWidth, this);
-    m_settings->setEnabled(false);  // T3.4
+    m_settings->setEnabled(m_link != nullptr);  // the dialog needs a link
     m_live = makeButton(QStringLiteral("Live  F5"), Theme::liveWidth, this, true);
     m_live->setToolTip(QStringLiteral("F5"));
     connect(m_readNames, &QPushButton::clicked, this, &BrowseView::readNamesRequested);

@@ -7,6 +7,7 @@
 #include "core/Library.h"
 #include "core/Version.h"
 #include "midi/X50Link.h"
+#include "ui/ConnectionSettings.h"
 #include "ui/MainWindow.h"
 #include "ui/Theme.h"
 
@@ -90,12 +91,19 @@ int main(int argc, char *argv[])
         qWarning("%s", qPrintable(catalogueError));
     std::unique_ptr<MidiBackend> backend = CliCommon::makeBackend(cli.options().fakeMidi);
     X50Link link(backend.get());
-    // Settings (T3.4) will store the ports; until then the CLI or the default "X50" decides.
-    const QString outSub = cli.options().port.isEmpty() ? CliCommon::defaultPortSubstring() : cli.options().port;
-    link.setPortNames(outSub, cli.options().inPort.isEmpty() ? outSub : cli.options().inPort);
+    // Saved settings first (ports, manual channel and Bank Map), then the command line over them.
+    const ConnectionSettings saved = ConnectionSettings::load(configDir);
+    saved.applyTo(link);
+    const QString savedOut = saved.outputPort.isEmpty() ? CliCommon::defaultPortSubstring() : saved.outputPort;
+    const QString outSub = cli.options().port.isEmpty() ? savedOut : cli.options().port;
+    QString inSub = cli.options().inPort;
+    if (inSub.isEmpty())
+        inSub = cli.options().port.isEmpty() && !saved.inputPort.isEmpty() ? saved.inputPort : outSub;
+    link.setPortNames(outSub, inSub);
     if (cli.options().channel > 0)
         link.setManualChannel(cli.options().channel);
     MainWindow window(&catalogue, &library, &link);
+    window.setMidiBackend(backend.get());
     window.restoreLayout(configDir);  // window geometry and splitter, next to the library
     window.show();
     link.start();  // never blocks: connecting and probing run on the event loop
