@@ -43,9 +43,12 @@ protected:
 QPushButton *makeButton(const QString &text, int width, QWidget *parent, const char *role)
 {
     auto *b = new QPushButton(text, parent);
-    b->setMinimumWidth(width);  // DESIGN 7.9: max(listed, advance + 32)
     b->setProperty("role", QString::fromLatin1(role));
     b->setStyleSheet(QStringLiteral("QPushButton { min-height: %1px; max-height: %1px; }").arg(kHeaderHeight - 2));
+    // DESIGN 7.9: width = max(listed, advance + 32), exactly (a minimum width alone lets Qt's
+    // sizeHint make the button wider on some platforms).
+    b->ensurePolished();
+    b->setFixedWidth(qMax(width, b->fontMetrics().horizontalAdvance(text) + 32));
     return b;
 }
 

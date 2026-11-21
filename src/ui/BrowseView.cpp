@@ -47,8 +47,11 @@ bool isGm(const SoundAddress &a)
 QPushButton *makeButton(const QString &text, int width, QWidget *parent, bool primary = false)
 {
     auto *b = new QPushButton(text, parent);
-    b->setMinimumWidth(width);  // DESIGN widths are the floor: a wider text grows the button, never clips
+    // DESIGN 7.3: width = max(listed, advance + 32), exactly, on every platform. A minimum width alone
+    // lets Qt's sizeHint (QSS padding, border, style margins) make the button wider than the rule.
     b->setProperty("role", primary ? QStringLiteral("primary") : QStringLiteral("secondary"));
+    b->ensurePolished();
+    b->setFixedWidth(qMax(width, b->fontMetrics().horizontalAdvance(text) + 32));
     return b;
 }
 
@@ -67,8 +70,8 @@ public:
         setStyleSheet(QStringLiteral("QPushButton { padding-left: %1px; padding-right: %2px; }")
                           .arg(chevronLeft ? reserve : 0)
                           .arg(chevronLeft ? 0 : reserve));
-        const int adv = QFontMetrics(Theme::roleFont(Theme::Role::BodyStrong)).horizontalAdvance(text);
-        setMinimumWidth(qMax(width, adv + reserve + 2 * Theme::s4));
+        ensurePolished();  // the stylesheet font (not the default) decides the advance
+        setFixedWidth(qMax(width, fontMetrics().horizontalAdvance(text) + reserve + 2 * Theme::s4));
     }
 
 protected:
