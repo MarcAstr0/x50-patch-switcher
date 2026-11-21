@@ -15,8 +15,8 @@ FILES = {
     'ab': ('AtkinsonHyperlegible-Bold.ttf', 'Atkinson Hyperlegible', 700),
     'bm': ('BarlowSemiCondensed-Medium.ttf', 'Barlow Semi Condensed', 500),
     'bs': ('BarlowSemiCondensed-SemiBold.ttf', 'Barlow Semi Condensed', 600),
-    'po': ('PixelOperator.ttf', 'Pixel Operator', 400),
-    'pb': ('PixelOperator-Bold.ttf', 'Pixel Operator', 700),
+    'po': ('PixelOperatorX50.ttf', 'Pixel Operator X50', 400),
+    'pb': ('PixelOperatorX50-Bold.ttf', 'Pixel Operator X50', 700),
 }
 
 C = dict(

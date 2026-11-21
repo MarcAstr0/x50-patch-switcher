@@ -6,9 +6,9 @@
 <rect x="277.31" y="11" width="691" height="60" rx="9" fill="#3A413B"/>
 <rect x="280.31" y="14" width="685" height="54" rx="6" fill="#BFC3BA"/>
 <rect x="286.31" y="17" width="184" height="48" fill="#111411"/>
-<text x="298.31" y="47" text-anchor="start" style="font-family:'Pixel Operator';font-weight:700;font-size:32px;fill:#BFC3BA;">PROG 0:Play</text>
+<text x="298.31" y="47" text-anchor="start" style="font-family:'Pixel Operator X50';font-weight:700;font-size:32px;fill:#BFC3BA;">PROG 0:Play</text>
 <rect x="479.31" y="17" width="480" height="48" fill="#111411"/>
-<text x="494.31" y="50" text-anchor="start" style="font-family:'Pixel Operator';font-weight:700;font-size:48px;fill:#BFC3BA;">D104: Classic E.Piano</text>
+<text x="494.31" y="50" text-anchor="start" style="font-family:'Pixel Operator X50';font-weight:700;font-size:48px;fill:#BFC3BA;">D104: Classic E.Piano</text>
 <text x="1886" y="53.7" text-anchor="end" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:33px;fill:#F2F5F7;letter-spacing:2px;">X50 CONNECTED</text>
 <circle cx="1619.59" cy="40.5" r="12" fill="#5DB0D0"/>
 <rect x="36" y="114" width="440" height="429" rx="21" fill="#1A1F24"/>

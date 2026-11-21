@@ -4,7 +4,7 @@
 |---|---|---|
 | `fonts/AtkinsonHyperlegible-Regular.ttf`, `-Bold.ttf` | https://github.com/googlefonts/atkinson-hyperlegible (`fonts/ttf/`) | SIL OFL 1.1, `fonts/OFL-AtkinsonHyperlegible.txt` |
 | `fonts/BarlowSemiCondensed-Medium.ttf`, `-SemiBold.ttf` | https://github.com/jpt/barlow (`fonts/ttf/`) | SIL OFL 1.1, `fonts/OFL-Barlow.txt` |
-| `fonts/PixelOperator.ttf`, `-Bold.ttf` | Pixel Operator by Jayvee Enaguas (HarvettFox96), zip from https://www.dafont.com/pixel-operator.font (upstream https://notabug.org/HarvettFox96/ttf-pixeloperator); used for the LCD panels only | CC0 1.0, `fonts/CC0-PixelOperator.txt` |
+| `fonts/PixelOperatorX50.ttf`, `-Bold.ttf` | Pixel Operator by Jayvee Enaguas (HarvettFox96), zip from https://www.dafont.com/pixel-operator.font (upstream https://notabug.org/HarvettFox96/ttf-pixeloperator), **modified**: the zero is redrawn as a dotted zero and the ampersand is redrawn as a classic pixel ampersand (upstream `&` read as `6`, slashed zero read as `8`); family renamed "Pixel Operator X50"; metrics and all other glyphs unchanged. Reproduce with `docs/design/mockup/patch_font.py`. Used for the LCD panels only | CC0 1.0, `fonts/CC0-PixelOperator.txt` |
 | `fonts/CC0-PixelOperator.txt` | `LICENSE.txt` from the same zip | CC0 1.0 Universal legal text |
 | `fonts/OFL-AtkinsonHyperlegible.txt` | https://raw.githubusercontent.com/googlefonts/atkinson-hyperlegible/main/OFL.txt | OFL 1.1 text |
 | `fonts/OFL-Barlow.txt` | https://raw.githubusercontent.com/jpt/barlow/master/OFL.txt | OFL 1.1 text |

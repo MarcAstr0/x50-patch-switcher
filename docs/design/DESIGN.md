@@ -107,8 +107,8 @@ hardware-silkscreen feel for labels, addresses and numerals in a narrow width.
 | `BarlowSemiCondensed-Medium.ttf` | Barlow Semi Condensed | 500 | https://raw.githubusercontent.com/jpt/barlow/master/fonts/ttf/BarlowSemiCondensed-Medium.ttf |
 | `BarlowSemiCondensed-SemiBold.ttf` | Barlow Semi Condensed | 600 | https://raw.githubusercontent.com/jpt/barlow/master/fonts/ttf/BarlowSemiCondensed-SemiBold.ttf |
 
-| `PixelOperator.ttf` | Pixel Operator | 400 | https://www.dafont.com/pixel-operator.font (zip `https://dl.dafont.com/dl/?f=pixel_operator`; upstream https://notabug.org/HarvettFox96/ttf-pixeloperator, not reachable from the design machine) |
-| `PixelOperator-Bold.ttf` | Pixel Operator | 700 | same zip |
+| `PixelOperatorX50.ttf` | Pixel Operator X50 | 400 | patched Pixel Operator (CC0): upstream zip https://www.dafont.com/pixel-operator.font (`https://dl.dafont.com/dl/?f=pixel_operator`; upstream repo https://notabug.org/HarvettFox96/ttf-pixeloperator, not reachable from the design machine); patched by `docs/design/mockup/patch_font.py` (§2.2) |
+| `PixelOperatorX50-Bold.ttf` | Pixel Operator X50 | 700 | same, patched |
 
 Licences (T2.3 fetches, saves beside the fonts):
 
@@ -162,10 +162,10 @@ Line height is a multiple of the pixel size.
 | `label` | Barlow SemiBold | 12px | 1.5px | 1.2 | upper |
 | `address` | Barlow SemiBold | 15px | 0.5px | 1.2 | as typed |
 | `strip-main` | superseded by the `lcd-*` roles below (Pixel Operator) | | | | |
-| `lcd-row` | Pixel Operator Regular (Bold where §7.2 says) | `16k` device px | 0 | cell grid, §2.2 | as typed |
-| `lcd-bar-browse` | Pixel Operator Regular | `32k` device px | 0 | cell grid | as typed |
-| `lcd-live-bar` | Pixel Operator Bold | `16*kb` device px | 0 | cell grid | as typed |
-| `lcd-live-mode` | Pixel Operator Bold | `16*km` device px | 0 | cell grid | as typed |
+| `lcd-row` | Pixel Operator X50 Regular (Bold where §7.2 says) | `16k` device px | 0 | cell grid, §2.2 | as typed |
+| `lcd-bar-browse` | Pixel Operator X50 Regular | `32k` device px | 0 | cell grid | as typed |
+| `lcd-live-bar` | Pixel Operator X50 Bold | `16*kb` device px | 0 | cell grid | as typed |
+| `lcd-live-mode` | Pixel Operator X50 Bold | `16*km` device px | 0 | cell grid | as typed |
 | `title` | Atkinson Bold | 20px | 0 | 1.2 | as typed |
 
 `k`, `kb`, `km` are whole numbers of device pixels per font pixel (§2.2).
@@ -186,12 +186,27 @@ Why this face (research, 2026-11-21, against the Operation Guide screenshots, "P
 0:Play" printed p.2 and "COMBI 0:Play" p.4): the X50 LCD has a chunky proportional bitmap face in
 two weights, bold for the header and the bank, regular for the category line and the big
 sound bar, with a slashed or dotted zero. Pixel Operator is a proportional 16-pixel
-face with a Regular and a Bold, a slashed zero, 9-pixel capitals and 7-pixel lowercase,
+face with a Regular and a Bold (upstream slashed zero, replaced by a dotted zero, below), 9-pixel capitals and 7-pixel lowercase,
 and it covers every character in `data/x50-factory.tsv` (checked with fontTools against
 every character of every name and category in the file, including `& ' ( ) / . : + !`) and `…` (U+2026). It is not the KORG
-face and carries no trademark. Known weakness: `&` is drawn like a `6` with a hook, so
-`&Strings` can read as `6Strings` (visible in the mockups). It is acceptable only because
-the same name is also shown in Atkinson on the button and in the lists.
+face and carries no trademark. Two upstream glyphs failed at readout sizes (`&` read as `6`, "D104" read as "D184"), so
+the committed files are **patched copies**, family `Pixel Operator X50`, made by
+`docs/design/mockup/patch_font.py` from the upstream TTFs (CC0 allows it). Only two
+glyph outlines change; metrics, grid, advances and every other glyph are identical:
+
+- `0`: dotted zero. The slash is gone. Regular: oval as upstream (5 wide, rows 0 to 8)
+  with a 1 x 3 pixel centre mark (column 3, rows 3 to 5), leaving a 1 px gap each side.
+  Bold: oval as upstream (6 wide, 2 px strokes) with a 2 x 3 centre mark (columns 3 and 4,
+  rows 3 to 5); at those three rows the side strokes thin to 1 px so a 1 px gap shows each
+  side. Reads as a zero with something inside, never as the waisted `8`, nor as `O` or `D`.
+- `&`: classic pixel ampersand, a top loop, a crossing diagonal, an arm at the upper right
+  of the lower half and a closed lower loop. Regular 5 px wide (columns 1 to 5), Bold 6 px
+  wide (columns 1 to 6), cap height 9, inside the upstream advance (7 and 8 px).
+  Checked on `docs/design/mockup/glyph-test.png`. The Operation Guide's LCD figures show
+  no factory name with an ampersand, so the shape is not copied from the X50.
+
+The family name in the name table is `Pixel Operator X50` for both files (Bold has style
+`Bold`), so it is never confused with upstream. Source of the upstream files: §2.
 
 Grid. `unitsPerEm` is 1600 and every outline coordinate is a multiple of 100, so one font
 pixel is `size / 16` px. The face is crisp only when the pixel size is `16 * k` with `k` a
@@ -221,7 +236,7 @@ Rendering rules for the builder:
    bottom): `baseline = top + round((h - 12k) / 2) + 9k`. §7.2 gives the browse
    positions as fixed offsets that this formula reproduces.
 5. Family registration like Barlow: log `applicationFontFamilies()`; the Bold file reports
-   family `Pixel Operator` style `Bold` (name ID 1 and 2), so one family string with
+   family `Pixel Operator X50` style `Bold` (name ID 1 and 2), so one family string with
    weight Bold works. `Theme` holds the string. If loading fails the panels fall back to
    Barlow SemiBold at `16*k` px and the same boxes (they only look different).
 
@@ -997,7 +1012,7 @@ mockup and this text disagree, this text wins and the mockup is a bug.
 - Category index order (§7.2): only `Keyboard` = 00 (both modes) and PROG `SlowSynth` =
   09 are proven by the manual. The mockup's program category list (§7.6) puts SlowSynth
   at position 8, so its order is wrong somewhere; it must come from the unit or the VNL.
-- Pixel Operator's `&` reads like `6` (§2.2). Decision for the owner.
+- (Resolved in change round G2c: `&` and `0` redrawn in the patched font, §2.2.)
 
 - Whether Barlow Semi Condensed registers under the family name `Barlow Semi Condensed`
   on Windows Qt: check at first run (§2); not verified.
@@ -1092,6 +1107,16 @@ Change round G2b (2026-11-21, owner follow-up on typography):
   index (the brief said 01; the manual says 00).
 - `mockup-live-8-pixelfont.png` added for the owner to compare names in Pixel Operator.
   Regenerated: `mockup-live-8.png`, `mockup-live-6.png`, `mockup-browse.png`.
+
+Change round G2c (2026-11-21, glyph defects):
+
+- `&` read as `6` and the slashed zero as `8`. `PixelOperator.ttf` and `-Bold.ttf` are
+  replaced by `PixelOperatorX50.ttf` and `-Bold.ttf` (dotted zero, redrawn ampersand,
+  family `Pixel Operator X50`; §2, §2.2). Unpatched files deleted; CC0 licence kept.
+  `assets/README.md` records the modification. Reproduce with
+  `docs/design/mockup/patch_font.py`; test strip `docs/design/mockup/glyph-test.png`
+  (`glyph_test.py`). Builder: load the new file names and use family `Pixel Operator X50`.
+  Regenerated all mockup PNGs.
 
 Open question for the owner, not changed: at wide browse windows the `EDITED` pill sits at
 the right edge of the very wide `Name` column, far from the name it describes (§7.7 puts
