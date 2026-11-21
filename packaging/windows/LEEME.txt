@@ -16,3 +16,5 @@ El programa solo le pregunta al X50 que es y que sonido tiene seleccionado.
 Modo portatil (opcional): para guardar la configuracion y tus sets en un
 pendrive, crea un archivo vacio llamado "portable" (sin extension) junto al
 exe. El programa guardara todo en su propia carpeta y no en el perfil de usuario.
+
+Guia rapida: el archivo "Guia rapida.pdf" (una pagina) esta en la misma carpeta que el exe.

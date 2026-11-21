@@ -1,0 +1,12 @@
+/* @FONTDIR@ and @DEJAVU@ are replaced by build-guide-pdf.sh with file:// URLs. */
+@font-face { font-family: "GuideSans"; font-weight: 400; src: url("@FONTDIR@/AtkinsonHyperlegible-Regular.ttf"); }
+@font-face { font-family: "GuideSans"; font-weight: 700; src: url("@FONTDIR@/AtkinsonHyperlegible-Bold.ttf"); }
+/* Atkinson has the Latin accents and the arrows but not the check-mark glyph U+2717. */
+@font-face { font-family: "GuideFallback"; src: url("@DEJAVU@"); }
+@page { size: A4; margin: 11mm 14mm; }
+html { font-size: 10.4pt; }
+body { font-family: "GuideSans", "GuideFallback", sans-serif; line-height: 1.28; color: #111; margin: 0; }
+h1 { font-size: 17pt; margin: 0 0 4pt 0; }
+h2 { font-size: 11.5pt; margin: 8pt 0 2pt 0; border-bottom: 1px solid #999; }
+ul { margin: 2pt 0; padding-left: 15pt; }
+li { margin: 1.5pt 0; }

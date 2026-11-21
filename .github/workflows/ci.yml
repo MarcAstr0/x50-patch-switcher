@@ -7,8 +7,38 @@ on:
   workflow_dispatch:
 
 jobs:
+  guide:
+    name: guide pdf
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build "Guia rapida.pdf" (pandoc + headless Chrome, no LaTeX)
+        run: |
+          set -eux
+          sudo apt-get update
+          sudo apt-get install -y pandoc fonts-dejavu-core poppler-utils
+          mkdir -p guide
+          packaging/guide/build-guide-pdf.sh "guide/Guia rapida.pdf" "$(command -v google-chrome || command -v chromium-browser || command -v chromium)"
+          pdfinfo "guide/Guia rapida.pdf" | tee pdfinfo.txt
+          # One A4 page; accents, arrows and the cross mark come from embedded fonts.
+          grep -q '^Pages: *1$' pdfinfo.txt
+          pdffonts "guide/Guia rapida.pdf"
+          pdftotext "guide/Guia rapida.pdf" - | grep -q 'guía rápida'
+          pdftotext "guide/Guia rapida.pdf" - | grep -q '✗'
+          pdftotext "guide/Guia rapida.pdf" - | grep -q '↑'
+      - uses: actions/upload-artifact@v7
+        with:
+          name: guide-pdf
+          path: guide/Guia rapida.pdf
+          retention-days: 30
+          if-no-files-found: error
+
   build:
     name: ${{ matrix.name }}
+    needs: guide
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -33,6 +63,12 @@ jobs:
       QT_QPA_PLATFORM: offscreen
     steps:
       - uses: actions/checkout@v7
+
+      - name: Fetch the guide PDF
+        uses: actions/download-artifact@v7
+        with:
+          name: guide-pdf
+          path: guide-pdf
 
       - name: Install Qt 6.8
         uses: jurplel/install-qt-action@v4
@@ -123,6 +159,7 @@ jobs:
           cp build/Release/x50-patch-switcher.exe "$stage/"
           cp "packaging/windows/Diagnose X50.bat" packaging/windows/LEEME.txt \
              packaging/windows/README.txt "$stage/"
+          cp "guide-pdf/Guia rapida.pdf" "$stage/"
           # Copies the Qt DLLs and platform plugins next to the exe. The VC runtime is copied
           # below from the toolset's own redist folder, so windeployqt must not add vc_redist.
           windeployqt --release --no-translations --no-system-d3d-compiler \
@@ -187,6 +224,7 @@ jobs:
         run: |
           $dir = 'X50-Patch-Switcher'
           $bad = $false
+          if (-not (Test-Path (Join-Path $dir 'Guia rapida.pdf'))) { Write-Host "MISSING from ${dir}: Guia rapida.pdf"; $bad = $true }
           foreach ($f in 'vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll', 'msvcp140_1.dll', 'msvcp140_2.dll') {
             if (Test-Path (Join-Path $dir $f)) { Write-Host "present: $f" } else { Write-Host "MISSING from ${dir}: $f"; $bad = $true }
           }
@@ -262,7 +300,7 @@ jobs:
           Expand-Archive -Path $env:ZIP_NAME -DestinationPath $work
           $dir = Join-Path $work 'X50-Patch-Switcher'
           $bad = $false
-          foreach ($f in 'x50-patch-switcher.exe', 'Diagnose X50.bat', 'LEEME.txt', 'README.txt',
+          foreach ($f in 'x50-patch-switcher.exe', 'Diagnose X50.bat', 'LEEME.txt', 'README.txt', 'Guia rapida.pdf',
                          'vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll', 'Qt6Core.dll') {
             if (-not (Test-Path (Join-Path $dir $f))) { Write-Host "MISSING in the zip: $f"; $bad = $true }
           }
@@ -380,9 +418,29 @@ jobs:
           export APPIMAGE_EXTRACT_AND_RUN=1   # no FUSE on the runner
           export QMAKE="$(command -v qmake6 || command -v qmake)"
           export OUTPUT="$name"
-          tools/linuxdeploy --appdir AppDir --plugin qt --output appimage \
+          mkdir -p AppDir/usr/share/doc/x50-patch-switcher
+          cp "guide-pdf/Guia rapida.pdf" AppDir/usr/share/doc/x50-patch-switcher/
+
+          # Step 1: deploy Qt into the AppDir, no image yet, so it can be pruned.
+          tools/linuxdeploy --appdir AppDir --plugin qt \
             --desktop-file packaging/linux/x50-patch-switcher.desktop \
             --icon-file icon/x50-patch-switcher.png
+          # The app links no network module (CLAUDE.md). Report who pulls Qt6Network in, then drop
+          # it and the plugins that need it (tls, networkinformation; generic = TUIO over the network).
+          find AppDir -name 'libQt6Network*' || true
+          for f in $(find AppDir -type f \( -name '*.so*' -o -path '*/usr/bin/*' \)); do
+            if readelf -d "$f" 2>/dev/null | grep -q 'NEEDED.*libQt6Network'; then echo "needs Qt6Network: $f"; fi
+          done
+          rm -rf AppDir/usr/plugins/tls AppDir/usr/plugins/networkinformation AppDir/usr/plugins/generic
+          rm -f AppDir/usr/lib/libQt6Network*
+          bad=0
+          for f in $(find AppDir -type f \( -name '*.so*' -o -path '*/usr/bin/*' \)); do
+            if readelf -d "$f" 2>/dev/null | grep -q 'NEEDED.*libQt6Network'; then echo "STILL needs Qt6Network: $f"; bad=1; fi
+          done
+          test "$bad" = 0
+
+          # Step 2: build the image from the pruned AppDir (no plugin, so nothing is re-deployed).
+          tools/linuxdeploy --appdir AppDir --output appimage
           mv "$name" dist/
           ls -l dist
 
@@ -413,7 +471,9 @@ jobs:
           # The app links no network module (CLAUDE.md).
           if find squashfs-root -name 'libQt6Network*' | grep -q .; then
             echo "libQt6Network is in the AppImage"; find squashfs-root -name 'libQt6Network*'
+            exit 1
           fi
+          test -s "squashfs-root/usr/share/doc/x50-patch-switcher/Guia rapida.pdf"
 
       - name: Upload Linux AppImage
         if: runner.os == 'Linux'
@@ -447,25 +507,41 @@ jobs:
           plutil -lint "$app/Contents/Info.plist"
           cp LICENSE "$app/Contents/Resources/"
 
-          # .icns generated at build time from the 256 px master (no 512/1024 master exists,
-          # so the 512 slots are left out; macOS scales the 256@1x/128@2x images).
+          # .icns generated at build time from the 1024 px master: every slot up to 512@2x.
           iset="$RUNNER_TEMP/x50.iconset"
           rm -rf "$iset"; mkdir "$iset"
-          src=assets/icons/app-256.png
-          sips -z 16 16   "$src" --out "$iset/icon_16x16.png"
-          sips -z 32 32   "$src" --out "$iset/icon_16x16@2x.png"
-          sips -z 32 32   "$src" --out "$iset/icon_32x32.png"
-          sips -z 64 64   "$src" --out "$iset/icon_32x32@2x.png"
-          sips -z 128 128 "$src" --out "$iset/icon_128x128.png"
-          cp "$src" "$iset/icon_128x128@2x.png"
-          cp "$src" "$iset/icon_256x256.png"
+          src=assets/icons/app-1024.png
+          for px in 16 32 64 128 256 512; do
+            sips -z $px $px "$src" --out "$iset/icon_${px}x${px}.png"
+          done
+          # @2x slots are the next size up (16@2x = 32 px, ... 256@2x = 512 px, 512@2x = 1024 px).
+          cp "$iset/icon_32x32.png"   "$iset/icon_16x16@2x.png"
+          cp "$iset/icon_64x64.png"   "$iset/icon_32x32@2x.png"
+          cp "$iset/icon_256x256.png" "$iset/icon_128x128@2x.png"
+          cp "$iset/icon_512x512.png" "$iset/icon_256x256@2x.png"
+          cp "$src"                   "$iset/icon_512x512@2x.png"
+          rm "$iset/icon_64x64.png"   # not an iconset slot name
           iconutil -c icns "$iset" -o "$app/Contents/Resources/x50-patch-switcher.icns"
 
           macdeployqt "$app" -always-overwrite
+          # The app links no network module (CLAUDE.md). Report who pulls QtNetwork in, then drop
+          # it and the plugins that need it (tls, networkinformation; generic = TUIO).
+          find "$app" -name 'QtNetwork*' || true
+          while IFS= read -r f; do
+            if otool -L "$f" 2>/dev/null | grep -q 'QtNetwork'; then echo "links QtNetwork: $f"; fi
+          done < <(find "$app/Contents" -type f \( -name '*.dylib' -o -path '*/MacOS/*' -o -path '*/Frameworks/*/Versions/*/Qt*' \))
+          rm -rf "$app/Contents/PlugIns/tls" "$app/Contents/PlugIns/networkinformation" \
+                 "$app/Contents/PlugIns/generic" "$app/Contents/Frameworks/QtNetwork.framework"
+          bad=0
+          while IFS= read -r f; do
+            if otool -L "$f" 2>/dev/null | grep -q 'QtNetwork'; then echo "STILL links QtNetwork: $f"; bad=1; fi
+          done < <(find "$app/Contents" -type f \( -name '*.dylib' -o -path '*/MacOS/*' -o -path '*/Frameworks/*/Versions/*/Qt*' \))
+          test "$bad" = 0
           # Ad-hoc signature: no developer account. Gatekeeper still asks the user to
           # right-click > Open the first time.
           codesign --force --deep --sign - "$app"
           ln -s /Applications "$stage/Applications"
+          cp "guide-pdf/Guia rapida.pdf" "$stage/"
           hdiutil create -volname "X50 Patch Switcher" -srcfolder "$stage" -ov -format UDZO "dist/$dmg"
           ls -l dist
 
@@ -481,6 +557,7 @@ jobs:
           app="$mnt/X50 Patch Switcher.app"
           bin="$app/Contents/MacOS/x50-patch-switcher"
           test -L "$mnt/Applications"
+          test -s "$mnt/Guia rapida.pdf"
           info="$(lipo -info "$bin")"
           echo "$info"
           echo "$info" | grep -q x86_64
@@ -501,7 +578,14 @@ jobs:
           if "$bin" --no-such-flag; then echo "bad flag exited 0"; exit 1; fi
           if find "$app" -name 'QtNetwork*' | grep -q .; then
             echo "QtNetwork is in the bundle"; find "$app" -name 'QtNetwork*'
+            exit 1
           fi
+          while IFS= read -r f; do
+            if otool -L "$f" 2>/dev/null | grep -q 'QtNetwork'; then echo "links QtNetwork: $f"; exit 1; fi
+          done < <(find "$app/Contents" -type f)
+          # The iconset had every slot, so the .icns carries the 1024 px representation.
+          iconutil -c iconset "$app/Contents/Resources/x50-patch-switcher.icns" -o "$RUNNER_TEMP/check.iconset"
+          test -s "$RUNNER_TEMP/check.iconset/icon_512x512@2x.png"
 
       - name: Upload macOS dmg
         if: runner.os == 'macOS'

@@ -16,3 +16,5 @@ The program only asks the X50 what it is and which sound is selected.
 Portable mode (optional): to keep the settings and your sets on a USB stick,
 create an empty file named "portable" (no extension) next to the exe. The
 program then saves everything in its own folder instead of the user profile.
+
+Quick guide: "Guia rapida.pdf" (Spanish, one page) is in the same folder as the exe.
