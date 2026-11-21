@@ -43,7 +43,11 @@ public:
     // The backend the Settings dialog lists ports from (not owned). Without it the dialog lists none.
     void setMidiBackend(MidiBackend *backend) { m_backend = backend; }
     // Opens the settings dialog (modal, browse view only). The Settings button calls this.
-    void openSettings();
+    // Returns false when it did not open: no link, or settings are not allowed (live view).
+    bool openSettings();
+    // The live view sets this false while it is active (M4) and true on leaving it.
+    void setSettingsAllowed(bool allowed) { m_settingsAllowed = allowed; }
+    bool settingsAllowed() const { return m_settingsAllowed; }
     // Shows a message in the status line (replacing the previous one).
     void showStatus(const QString &text, bool isError);
 
@@ -79,6 +83,7 @@ private:
     BrowseView *m_browse = nullptr;
     QLabel *m_status = nullptr;
     bool m_statusError = false;
+    bool m_settingsAllowed = true;
     QString m_layoutPath;  // empty: layout is not remembered
     QString m_linkError;  // the link's last error while disconnected, shown in the strip
 };

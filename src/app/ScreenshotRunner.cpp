@@ -147,8 +147,7 @@ int runSettings(const CliOptions &options)
     if (errors) {
         QVector<ProbeChecklist::Row> rows = dialog.checklist()->rows();
         if (rows.size() == 6) {
-            rows[4] = {ProbeChecklist::State::Unknown, QStringLiteral("Bank Map: not reported"),
-                       QStringLiteral("The X50 did not say which Bank Map it uses. Sending as GM; change Bank Map above if banks come out wrong.")};
+            rows[4] = SettingsDialog::bankMapNotReportedRow(BankMap::Gm);
             rows[5] = {ProbeChecklist::State::Running, QStringLiteral("SysEx replies"), QString()};
             dialog.checklist()->setRows(rows);
         }

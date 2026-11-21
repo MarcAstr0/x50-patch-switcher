@@ -9,6 +9,7 @@
 #include "ui/ProbeChecklist.h"
 
 class MidiBackend;
+class Library;
 class QComboBox;
 class QLabel;
 class QPushButton;
@@ -26,8 +27,10 @@ class QSpinBox;
 //   Check X50  runs the probe on the ports already open (opens them first when none is).
 //
 // The manual channel and Bank Map are enabled only when the last probe could not read them
-// (the X50 gave no answer); changing them applies them to the link at once. Port choices and
-// manual values are stored in "<configDir>/settings.ini" (ConnectionSettings) on every change.
+// (the X50 gave no answer); changing them applies them to the link at once. A channel the X50
+// reported is shown (and its spin box disabled) rather than overwritten. Port choices and manual
+// values are stored in "<configDir>/settings.ini" (ConnectionSettings) on Test, Check and close,
+// not on every change. Test and Check are disabled while the link is busy, with the reason in the note.
 // Neither the link nor the backend is owned.
 class SettingsDialog : public QDialog
 {
@@ -46,7 +49,15 @@ public:
     QLabel *statusWord() const { return m_statusWord; }
     // Connection problem of the last Test or Check (port busy, no port found); empty when none.
     QString note() const;
+    // The manual Bank Map is editable (the channel too unless the X50 reported one).
     bool manualEnabled() const;
+    // True when the last save of the settings file failed (read-only folder); the note says so.
+    bool saveFailed() const { return m_saveFailed; }
+    static QString saveFailedText();
+    // "Last check" shows the library's unit.lastSeen when a probe confirmed the X50. Not owned.
+    void setLibrary(const Library *library);
+    // Pure: the "Bank Map: not reported" line, shared with the screenshot runner.
+    static ProbeChecklist::Row bankMapNotReportedRow(BankMap effective);
 
     // Re-read the port lists from the backend (opening the dialog does this once).
     void refreshPorts();
@@ -61,6 +72,10 @@ public:
     // screenshot's virtual screen is smaller than a real one. 0 restores the screen rule.
     void setHeightLimit(int pixels);
 
+protected:
+    // Saves the settings once, on the way out.
+    void done(int result) override;
+
 private:
     void applyPorts();
     void startTest();
@@ -69,12 +84,15 @@ private:
     void onManualChanged();
     void updateEnabled();
     void setNote(const QString &text);
-    void saveSettings();
+    void clearNote();
+    bool saveSettings();
+    void updateLastCheck();
 
     X50Link *m_link;
     MidiBackend *m_backend;
     QString m_configDir;
     ConnectionSettings m_settings;
+    const Library *m_library = nullptr;
     QComboBox *m_output = nullptr, *m_input = nullptr, *m_bankMap = nullptr;
     QSpinBox *m_channel = nullptr;
     QPushButton *m_test = nullptr, *m_check = nullptr, *m_close = nullptr;
@@ -85,4 +103,5 @@ private:
     bool m_building = false;
     bool m_hasPorts = false;
     bool m_checkedThisSession = false;
+    bool m_saveFailed = false;
 };

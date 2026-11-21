@@ -27,7 +27,8 @@ bool ConnectionSettings::save(const QString &configDir) const
 {
     if (configDir.isEmpty())
         return true;
-    QDir().mkpath(configDir);
+    if (!QDir().mkpath(configDir))
+        return false;
     QSettings out(QDir(configDir).filePath(fileName()), QSettings::IniFormat);
     out.setValue(QStringLiteral("midi/output"), outputPort);
     out.setValue(QStringLiteral("midi/input"), inputPort);

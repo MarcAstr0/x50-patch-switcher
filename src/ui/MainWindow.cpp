@@ -9,6 +9,7 @@
 #include "ui/Theme.h"
 
 #include <QCloseEvent>
+#include <QDateTime>
 #include <QColor>
 #include <QDir>
 #include <QGuiApplication>
@@ -74,7 +75,19 @@ MainWindow::MainWindow(Catalogue *catalogue, Library *library, X50Link *link, QW
         connect(m_link, &X50Link::sent, this, [this]() { syncFromLink(); });
         connect(m_link, &X50Link::followedSound, this, [this]() { syncFromLink(); });
         connect(m_link, &X50Link::followedMode, this, [this]() { syncFromLink(); });
-        connect(m_link, &X50Link::probeFinished, this, [this]() { syncFromLink(); });
+        connect(m_link, &X50Link::probeFinished, this, [this](const X50Link::ProbeResult &result) {
+            // A completed probe that confirmed an X50 and read its state records the unit (SPEC 3.3).
+            if (result.x50Confirmed && result.inquiry && result.state) {
+                Library::UnitInfo unit;
+                unit.memberCode = result.inquiry->memberCode;
+                unit.version = result.versionText;
+                unit.globalChannel = result.inquiry->channel;
+                unit.bankMap = result.state->bankMap;
+                unit.lastSeen = QDateTime::currentDateTimeUtc();
+                m_library->setUnit(unit);
+            }
+            syncFromLink();
+        });
         connect(m_link, &X50Link::errorOccurred, this, [this](const QString &message, const QByteArray &) {
             m_linkError = message;
             showStatus(message, true);
@@ -98,12 +111,16 @@ MainWindow::MainWindow(Catalogue *catalogue, Library *library, X50Link *link, QW
 
 MainWindow::~MainWindow() = default;
 
-void MainWindow::openSettings()
+bool MainWindow::openSettings()
 {
-    if (!m_link)
-        return;
+    if (!m_link || !m_settingsAllowed)
+        return false;
     SettingsDialog dialog(m_link, m_backend, m_configDir, this);
+    dialog.setLibrary(m_library);
     dialog.exec();
+    if (dialog.saveFailed())
+        showStatus(SettingsDialog::saveFailedText(), true);
+    return true;
 }
 
 void MainWindow::updateMinimumHeight()

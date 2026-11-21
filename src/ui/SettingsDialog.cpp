@@ -1,5 +1,6 @@
 #include "ui/SettingsDialog.h"
 
+#include "core/Library.h"
 #include "midi/MidiBackend.h"
 #include "ui/Glyphs.h"
 #include "ui/Theme.h"
@@ -23,6 +24,9 @@
 namespace {
 constexpr int kDialogWidth = 520, kDialogMinHeight = 560;
 constexpr int kControlHeight = 40, kLabelColumn = 96;
+// Height of everything above the checklist's scroll area (title, ports, manual box, check row)
+// plus the card and dialog margins, with no note shown.
+constexpr int kHeightAboveChecklist = 460;
 constexpr int kChecklistWidth = kDialogWidth - 2 * Theme::s4 - 2 * Theme::s4;  // card padding inside the margin
 
 // app.qss gives min-height/max-height as the content box; the 1 px border adds 2 px (see BrowseView).
@@ -145,11 +149,33 @@ QVector<ProbeChecklist::Row> SettingsDialog::rowsFromProbe(const X50Link::ProbeR
     }
     if (result.x50Confirmed && !result.state && !result.microX) {
         // The Device Inquiry answered but Mode and State did not: the Bank Map is unknown.
-        rows.append({S::Unknown, QStringLiteral("Bank Map: not reported"),
-                     QStringLiteral("The X50 did not say which Bank Map it uses. Sending as %1; change Bank Map above if banks come out wrong.")
-                         .arg(bankMapName(effective))});
+        rows.append(bankMapNotReportedRow(effective));
     }
     return rows;
+}
+
+ProbeChecklist::Row SettingsDialog::bankMapNotReportedRow(BankMap effective)
+{
+    return {ProbeChecklist::State::Unknown, QStringLiteral("Bank Map: not reported"),
+            QStringLiteral("The X50 did not say which Bank Map it uses. Sending as %1; change Bank Map above if banks come out wrong.")
+                .arg(bankMapName(effective))};
+}
+
+QString SettingsDialog::saveFailedText()
+{
+    return QStringLiteral("Settings could not be saved (folder is read-only?)");
+}
+
+void SettingsDialog::setLibrary(const Library *library)
+{
+    m_library = library;
+    updateLastCheck();
+}
+
+void SettingsDialog::done(int result)
+{
+    saveSettings();
+    QDialog::done(result);
 }
 
 SettingsDialog::SettingsDialog(X50Link *link, MidiBackend *backend, const QString &configDir, QWidget *parent)
@@ -300,6 +326,7 @@ SettingsDialog::SettingsDialog(X50Link *link, MidiBackend *backend, const QStrin
     if (m_link) {
         connect(m_link, &X50Link::stateChanged, this, [this]() { onLinkChanged(); });
         connect(m_link, &X50Link::probeFinished, this, [this]() { onLinkChanged(); });
+        connect(m_link, &X50Link::busyChanged, this, [this]() { onLinkChanged(); });
         connect(m_link, &X50Link::errorOccurred, this, [this](const QString &message, const QByteArray &) {
             if (m_link->state() == X50Link::State::Disconnected)
                 setNote(message);
@@ -311,7 +338,14 @@ SettingsDialog::SettingsDialog(X50Link *link, MidiBackend *backend, const QStrin
 
 QString SettingsDialog::note() const { return m_note->isHidden() ? QString() : m_note->text(); }
 
-bool SettingsDialog::manualEnabled() const { return m_channel->isEnabled() && m_bankMap->isEnabled(); }
+bool SettingsDialog::manualEnabled() const { return m_bankMap->isEnabled(); }
+
+// Clears the note, except the one about a failed save (it stays until a save works).
+void SettingsDialog::clearNote()
+{
+    if (m_note->text() != saveFailedText())
+        setNote(QString());
+}
 
 void SettingsDialog::setNote(const QString &text)
 {
@@ -346,19 +380,28 @@ void SettingsDialog::refreshPorts()
     updateEnabled();
 }
 
-void SettingsDialog::saveSettings()
+bool SettingsDialog::saveSettings()
 {
     m_settings.outputPort = m_output->count() ? m_output->currentText() : m_settings.outputPort;
     m_settings.inputPort = m_input->count() ? m_input->currentText() : m_settings.inputPort;
-    m_settings.channel = m_channel->value();
+    if (m_channel->isEnabled())  // a disabled spin box shows the learned channel, not a manual one
+        m_settings.channel = m_channel->value();
     m_settings.bankMap = m_bankMap->currentIndex() == 1 ? BankMap::Korg : BankMap::Gm;
-    m_settings.save(m_configDir);
+    const bool ok = m_settings.save(m_configDir);
+    m_saveFailed = !ok;
+    if (!ok)
+        setNote(saveFailedText());
+    else if (m_note->text() == saveFailedText())
+        setNote(QString());
+    return ok;
 }
 
-// Port choices take effect at the next (re)connect: this only tells the link and saves them.
+// Port choices take effect at the next (re)connect: this only tells the link (saving is done by
+// Test, Check and closing).
 void SettingsDialog::applyPorts()
 {
-    saveSettings();
+    m_settings.outputPort = m_output->count() ? m_output->currentText() : m_settings.outputPort;
+    m_settings.inputPort = m_input->count() ? m_input->currentText() : m_settings.inputPort;
     if (m_link && m_hasPorts)
         m_link->setPortNames(m_settings.outputPort, m_settings.inputPort);
 }
@@ -367,22 +410,25 @@ void SettingsDialog::onManualChanged()
 {
     if (m_building)
         return;
-    saveSettings();
+    if (m_channel->isEnabled())
+        m_settings.channel = m_channel->value();
+    m_settings.bankMap = m_bankMap->currentIndex() == 1 ? BankMap::Korg : BankMap::Gm;
     if (!m_link)
         return;
-    m_link->setManualChannel(m_settings.channel);
+    m_link->setManualChannel(m_settings.channel);  // the link ignores it when the X50 reported one
     m_link->setManualBankMap(m_settings.bankMap);
 }
 
 void SettingsDialog::startTest()
 {
-    if (!m_link)
+    if (!m_link || m_link->isBusy())
         return;
     refreshPorts();
     if (!m_hasPorts)
         return;
     applyPorts();
     setNote(QString());
+    saveSettings();
     m_checkedThisSession = true;
     m_link->stop();   // close the ports and forget what was learned ...
     m_link->start();  // ... open the chosen ones; connecting runs the probe
@@ -393,9 +439,10 @@ void SettingsDialog::startTest()
 
 void SettingsDialog::startCheck()
 {
-    if (!m_link)
+    if (!m_link || m_link->isBusy())
         return;
     setNote(QString());
+    saveSettings();
     m_checkedThisSession = true;
     if (m_link->state() == X50Link::State::Disconnected) {
         refreshPorts();
@@ -411,6 +458,24 @@ void SettingsDialog::startCheck()
     onLinkChanged();
 }
 
+void SettingsDialog::updateLastCheck()
+{
+    if (!m_link)
+        return;
+    const X50Link::ProbeResult &r = m_link->lastProbe();
+    if (r.items.isEmpty())
+        return;
+    // A confirmed X50 is recorded in the library with the time of the probe (MainWindow).
+    if (m_library && r.x50Confirmed && m_library->unit() && m_library->unit()->lastSeen.isValid()) {
+        m_statusWord->setText(QStringLiteral("Last check: %1")
+                                  .arg(m_library->unit()->lastSeen.toLocalTime().toString(QStringLiteral("HH:mm"))));
+    } else if (m_checkedThisSession) {
+        m_statusWord->setText(QStringLiteral("Last check: %1").arg(QTime::currentTime().toString(QStringLiteral("HH:mm"))));
+    } else if (m_statusWord->text() == QLatin1String("Not checked yet") || m_statusWord->text() == QLatin1String("Checking...")) {
+        m_statusWord->setText(QStringLiteral("Last check: earlier"));
+    }
+}
+
 void SettingsDialog::onLinkChanged()
 {
     if (!m_link)
@@ -419,20 +484,16 @@ void SettingsDialog::onLinkChanged()
     if (probing) {
         m_list->setRows(runningRows());
         m_statusWord->setText(QStringLiteral("Checking..."));
-        setNote(QString());
+        clearNote();
     } else {
         const X50Link::ProbeResult &r = m_link->lastProbe();
-        if (r.items.isEmpty()) {
+        if (r.items.isEmpty())
             m_list->setRows({});
-        } else {
+        else
             m_list->setRows(rowsFromProbe(r, m_link->bankMap()));
-            if (m_checkedThisSession)
-                m_statusWord->setText(QStringLiteral("Last check: %1").arg(QTime::currentTime().toString(QStringLiteral("HH:mm"))));
-            else if (m_statusWord->text() == QLatin1String("Not checked yet") || m_statusWord->text() == QLatin1String("Checking..."))
-                m_statusWord->setText(QStringLiteral("Last check: earlier"));
-        }
+        updateLastCheck();
         if (m_link->state() == X50Link::State::Connected || m_link->state() == X50Link::State::Manual)
-            setNote(QString());
+            clearNote();
     }
     updateEnabled();
     fitToContent();
@@ -440,17 +501,31 @@ void SettingsDialog::onLinkChanged()
 
 void SettingsDialog::updateEnabled()
 {
-    const bool probing = m_link && m_link->state() == X50Link::State::Probing;
-    m_test->setEnabled(m_link && m_hasPorts && !probing);
-    m_check->setEnabled(m_link && !probing);
-    // The manual values are for a probe that could not read them (SPEC 4.5): a probe has run,
-    // it learned no Mode and State, and the unit is not a microX.
+    const bool busy = m_link && m_link->isBusy();
+    // Test and Check stay off while the link probes, reads names or waits on a Mode Change;
+    // the note says why (and goes away with the busy state).
+    m_test->setEnabled(m_link && m_hasPorts && !busy);
+    m_check->setEnabled(m_link && !busy);
+    const QString busyText = QStringLiteral("The X50 is busy (checking, reading names or switching mode). Try again in a moment.");
+    if (busy && m_note->text() != saveFailedText())
+        setNote(busyText);
+    else if (m_note->text() == busyText)
+        setNote(QString());
+
+    // The manual values are for a probe that could not read them (SPEC 4.5): the link is in
+    // manual mode, or a probe has run, learned no Mode and State, and the unit is not a microX.
     bool manual = false;
-    if (m_link && !probing) {
+    bool channelLearned = false;
+    if (m_link && !busy) {
         const X50Link::ProbeResult &r = m_link->lastProbe();
-        manual = !r.items.isEmpty() && !r.state.has_value() && !r.microX;
+        manual = m_link->state() == X50Link::State::Manual ||
+                 (!r.items.isEmpty() && !r.state.has_value() && !r.microX);
+        channelLearned = manual && r.x50Confirmed;
     }
-    m_channel->setEnabled(manual);
+    m_building = true;
+    m_channel->setValue(channelLearned ? m_link->channel() : m_settings.channel);
+    m_building = false;
+    m_channel->setEnabled(manual && !channelLearned);
     m_bankMap->setEnabled(manual);
 }
 
@@ -467,7 +542,7 @@ void SettingsDialog::fitToContent()
     const int limit = m_heightLimit > 0 ? m_heightLimit
                                         : static_cast<int>((screen ? screen->availableGeometry().height() : 1080) * 0.8);
     const int want = m_list->heightForWidth(kChecklistWidth);
-    const int fixedAbove = 460 + (m_note->isHidden() ? 0 : m_note->sizeHint().height() + Theme::s4);
+    const int fixedAbove = kHeightAboveChecklist + (m_note->isHidden() ? 0 : m_note->sizeHint().height() + Theme::s4);
     const int room = qMax(2 * 32 + 8, qMax(limit, kDialogMinHeight) - fixedAbove);
     m_scroll->setFixedHeight(qMin(want, room));
     // Not adjustSize(): it caps a window at two thirds of the screen.

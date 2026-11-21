@@ -233,7 +233,8 @@ private slots:
         QVERIFY(t.elapsed() >= 250);
         const X50Link::ProbeResult &p = link->lastProbe();
         QVERIFY(!p.x50Confirmed);
-        QVERIFY(find(p, QStringLiteral("No reply. Is the X50 on, the USB cable in, and GLOBAL 1: MIDI \"Exclusive\" ticked?")));
+        QVERIFY(find(p, QStringLiteral("No reply from the X50")));
+        QVERIFY(p.items.first().fix.contains(QStringLiteral("check Exclusive")));  // MIDI.md section 3
         QVERIFY(!link->bankMapKnown());
         fake->clearReceived();
         // Manual defaults: channel 1, GM. Mode unknown: Mode Change goes first.
@@ -262,9 +263,71 @@ private slots:
         fake->setMemberCode(0x02);
         link->start();
         QTRY_COMPARE_WITH_TIMEOUT(link->state(), X50Link::State::Manual, 3000);
-        const Item *i = find(link->lastProbe(), QStringLiteral("Could not confirm an X50"));
+        const Item *i = find(link->lastProbe(), QStringLiteral("A device answered but it is not an X50 (member code 02)"));
         QVERIFY(i);
         QCOMPARE(i->status, Item::Status::Failed);
+        QVERIFY(!i->raw.isEmpty());  // the reply's bytes (MIDI.md section 6)
+    }
+
+    // A channel learned from the Device Inquiry reply (MIDI.md section 6) survives a manual change
+    // when Mode and State then fails; the manual one applies again after the next disconnect.
+    void learnedChannelIsNotOverwrittenByManual() {
+        fake->setGlobalChannel(5);
+        fake->setDrop(FakeX50::Reply::ModeAndState, true);
+        link->start();
+        QTRY_COMPARE_WITH_TIMEOUT(link->state(), X50Link::State::Manual, 3000);
+        QCOMPARE(link->channel(), 5);
+        link->setManualChannel(9);
+        QCOMPARE(link->channel(), 5);
+        link->stop();
+        QCOMPARE(link->channel(), 9);
+    }
+
+    // stop() ends a running read and a pending send with their failure signals.
+    void stopFailsRunningReadAndPendingSend() {
+        connectLink();
+        fake->setDropReplies(true);
+        QSignalSpy readFailed(link, &X50Link::readFailed);
+        link->readNames();
+        QVERIFY(link->isBusy());
+        link->stop();
+        QCOMPARE(readFailed.count(), 1);
+        QVERIFY(!link->isBusy());
+
+        fake->setDropReplies(false);
+        connectLink();
+        const auto kind = link->believedMode() == X50Protocol::Mode::CombiPlay ? K::Prog : K::Combi;
+        QSignalSpy sendFailed(link, &X50Link::sendFailed);
+        link->send(A(kind, B::A, 0));
+        QVERIFY(link->isBusy());  // waiting on the Mode Change
+        link->stop();
+        QCOMPARE(sendFailed.count(), 1);
+    }
+
+    // A probe started while a Mode Change wait is pending fails that send.
+    void probeDuringModeWaitFailsPendingSend() {
+        connectLink();
+        const auto kind = link->believedMode() == X50Protocol::Mode::CombiPlay ? K::Prog : K::Combi;
+        QSignalSpy sendFailed(link, &X50Link::sendFailed);
+        link->send(A(kind, B::A, 0));
+        QVERIFY(link->isBusy());
+        link->probe();
+        QCOMPARE(sendFailed.count(), 1);
+        QTRY_COMPARE_WITH_TIMEOUT(link->state(), X50Link::State::Connected, 3000);
+    }
+
+    // The "reported once" memory of the connect poll is forgotten by stop(): a busy port that
+    // is reported, stopped and started again reports again.
+    void stopForgetsLastRaisedFailure() {
+        fake->setPortBusy(true);
+        QSignalSpy errors(link, &X50Link::errorOccurred);
+        link->start();
+        QTest::qWait(100);
+        QCOMPARE(errors.count(), 1);
+        link->stop();
+        link->start();
+        QCOMPARE(errors.count(), 2);
+        link->stop();
     }
 
     // Inquiry fine, Mode and State unanswered: manual, with a checklist line.

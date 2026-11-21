@@ -30,6 +30,11 @@ QString versionString(const DeviceInquiryReply &r)
 const QString kMicroXText = QStringLiteral(
     "This is a microX; X50 Patch Switcher supports the X50 only");
 
+// MIDI.md section 3 (gating settings): "MIDI Filter Exclusive checked, or every SysEx is ignored";
+// "No reply to any SysEx is the symptom", reported as "no SysEx reply: check Exclusive".
+const QString kExclusiveFix = QStringLiteral("No SysEx reply: check Exclusive. GLOBAL 1: MIDI, MIDI Filter \"Exclusive\" checked.");
+const QString kNoReplyExtra = QStringLiteral(" Also check that the X50 is on and the USB cable is in.");
+
 }  // namespace
 
 bool X50Link::ProbeResult::allOk() const
@@ -99,7 +104,7 @@ void X50Link::setManualChannel(int channel)
     if (channel < 1 || channel > 16)
         return;
     m_manualChannel = channel;
-    if (m_state != State::Connected)
+    if (!m_channelLearned)  // a channel the X50 reported is never overwritten
         m_channel = channel;
 }
 
@@ -126,6 +131,16 @@ void X50Link::setState(State s)
     emit stateChanged(s);
 }
 
+void X50Link::setActivity(Activity a)
+{
+    if (m_activity == a)
+        return;
+    const bool wasBusy = m_activity != Activity::Idle;
+    m_activity = a;
+    if (wasBusy != (a != Activity::Idle))
+        emit busyChanged();
+}
+
 void X50Link::setStatus(const QString &text)
 {
     if (m_status == text)
@@ -136,6 +151,8 @@ void X50Link::setStatus(const QString &text)
 
 void X50Link::raise(const QString &message, const QByteArray &raw)
 {
+    if (message != m_lastRaised)
+        m_lastRaised.clear();  // a different failure: the connect poll may report the old one again
     setStatus(message);
     emit errorOccurred(message, raw);
 }
@@ -152,6 +169,7 @@ bool X50Link::sendRaw(const QByteArray &bytes)
 void X50Link::clearLearned()
 {
     m_channel = m_manualChannel;
+    m_channelLearned = false;
     m_bankMap = m_manualBankMap;
     m_bankMapKnown = false;
     m_mode.reset();
@@ -188,7 +206,7 @@ void X50Link::disconnectWith(const QString &reason, const QByteArray &raw)
     m_timer.stop();
     const Activity was = m_activity;
     const std::optional<SoundAddress> pending = m_pendingSend;
-    m_activity = Activity::Idle;
+    setActivity(Activity::Idle);
     m_pendingSend.reset();
     m_inflightMode.reset();
     m_backend->closePorts();
@@ -231,15 +249,20 @@ void X50Link::start()
 void X50Link::stop()
 {
     m_started = false;
+    m_lastRaised.clear();
     m_poll.stop();
     m_timer.stop();
     const Activity was = m_activity;
     const std::optional<SoundAddress> pending = m_pendingSend;
-    m_activity = Activity::Idle;
+    const QString readBank = (was == Activity::Reading && m_stepIndex < m_steps.size())
+                                 ? m_steps.at(m_stepIndex).label : QString();
+    setActivity(Activity::Idle);
     m_pendingSend.reset();
     m_inflightMode.reset();
     m_backend->closePorts();
     clearLearned();
+    if (was == Activity::Reading)
+        emit readFailed(readBank, QStringLiteral("Disconnected from the X50"), QByteArray());
     if (was == Activity::ModeWait && pending)
         emit sendFailed(*pending, QStringLiteral("Disconnected from the X50"));
     setState(State::Disconnected);
@@ -329,11 +352,15 @@ void X50Link::probe()
 void X50Link::beginProbe()
 {
     m_timer.stop();
+    const std::optional<SoundAddress> pending = m_activity == Activity::ModeWait ? m_pendingSend
+                                                                                  : std::nullopt;
     m_pendingSend.reset();
     m_inflightMode.reset();
+    if (pending)
+        emit sendFailed(*pending, QStringLiteral("Interrupted: the X50 is being checked"));
     clearLearned();
     m_probe = ProbeResult();
-    m_activity = Activity::Probing;
+    setActivity(Activity::Probing);
     m_probeStage = ProbeStage::Inquiry;
     setState(State::Probing);
     m_timer.start(m_timing.requestMs);  // started first so a failed send cannot leave it running
@@ -355,7 +382,7 @@ void X50Link::probeModeAndStateOnly()
     clearLearned();  // the channel is the manual one again
     m_modeStateOnly = true;
     m_probe = ProbeResult();
-    m_activity = Activity::Probing;
+    setActivity(Activity::Probing);
     m_probeStage = ProbeStage::ModeState;
     setState(State::Probing);
     m_timer.start(m_timing.requestMs);
@@ -375,7 +402,7 @@ void X50Link::probeFailedStage(const QString &text, const QString &fix, const QB
 void X50Link::finishProbe(State finalState)
 {
     m_timer.stop();
-    m_activity = Activity::Idle;
+    setActivity(Activity::Idle);
     m_modeStateOnly = false;
     m_lastProbe = m_probe;
     setState(finalState);
@@ -419,12 +446,14 @@ void X50Link::onInquiryReply(const QByteArray &msg)
     }
     if (r.value.family != F::X50) {
         probeFailedStage(
-            QStringLiteral("Could not confirm an X50 (device code %1)").arg(r.value.memberCode, 2, 16, QLatin1Char('0')),
+            QStringLiteral("A device answered but it is not an X50 (member code %1)")
+                .arg(r.value.memberCode, 2, 16, QLatin1Char('0')),
             QStringLiteral("Working in manual mode: choose the channel and Bank Map yourself"),
             msg);
         finishProbe(State::Manual);
         return;
     }
+    m_channelLearned = true;
     m_probe.x50Confirmed = true;
     CheckItem ok;
     ok.text = QStringLiteral("X50 found (system %1, global channel %2)")
@@ -574,11 +603,10 @@ void X50Link::onTimeout()
         }
         if (m_probeStage == ProbeStage::Inquiry) {
             probeFailedStage(
-                QStringLiteral("No reply. Is the X50 on, the USB cable in, and GLOBAL 1: MIDI \"Exclusive\" ticked?"),
-                QStringLiteral("GLOBAL 1: MIDI, tick \"Exclusive\""), QByteArray());
+                QStringLiteral("No reply from the X50"), kExclusiveFix + kNoReplyExtra, QByteArray());
         } else {
             probeFailedStage(QStringLiteral("No reply to Mode and State: check Exclusive"),
-                             QStringLiteral("GLOBAL 1: MIDI, tick \"Exclusive\""), QByteArray());
+                             kExclusiveFix, QByteArray());
         }
         finishProbe(State::Manual);
         break;
@@ -647,7 +675,7 @@ void X50Link::send(const SoundAddress &address)
 void X50Link::startModeChange(Mode target, const SoundAddress &address)
 {
     const auto mc = modeChange(m_channel, target);
-    m_activity = Activity::ModeWait;
+    setActivity(Activity::ModeWait);
     m_pendingSend = address;
     m_inflightMode = target;
     m_timer.start(m_timing.modeChangeWaitMs);
@@ -659,7 +687,7 @@ void X50Link::finishModeWait(const QString &failure, const QByteArray &raw, bool
     m_timer.stop();
     const std::optional<SoundAddress> pending = m_pendingSend;
     const std::optional<Mode> inflight = m_inflightMode;
-    m_activity = Activity::Idle;
+    setActivity(Activity::Idle);
     m_pendingSend.reset();
     m_inflightMode.reset();
     if (!failure.isEmpty()) {
@@ -817,7 +845,7 @@ void X50Link::readNames(bool continueOnError)
     m_firstFailBank.clear();
     m_firstFailReason.clear();
     m_firstFailRaw.clear();
-    m_activity = Activity::Reading;
+    setActivity(Activity::Reading);
     emit readProgress(0, m_steps.size(), QString());
     if (m_activity == Activity::Reading)
         requestStep();
@@ -828,7 +856,7 @@ void X50Link::cancelRead()
     if (m_activity != Activity::Reading)
         return;
     m_timer.stop();
-    m_activity = Activity::Idle;
+    setActivity(Activity::Idle);
     emit readCancelled();
 }
 
@@ -970,7 +998,7 @@ void X50Link::onDump(const QByteArray &msg)
 void X50Link::finishRead(bool failedStop)
 {
     m_timer.stop();
-    m_activity = Activity::Idle;
+    setActivity(Activity::Idle);
     if (failedStop) {
         emit readFailed(m_firstFailBank, m_firstFailReason, m_firstFailRaw);
         return;

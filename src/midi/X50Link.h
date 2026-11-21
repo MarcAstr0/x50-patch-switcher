@@ -132,6 +132,8 @@ public:
 
     State state() const { return m_state; }
     QString statusText() const { return m_status; }
+    // True while a probe, a Mode Change wait or a names read is running.
+    bool isBusy() const { return m_activity != Activity::Idle; }
     bool isReading() const { return m_activity == Activity::Reading; }
     int channel() const { return m_channel; }
     BankMap bankMap() const { return m_bankMap; }
@@ -144,6 +146,8 @@ public:
 
 signals:
     void stateChanged(X50Link::State state);
+    // isBusy() changed (a Mode Change wait or a names read started or ended).
+    void busyChanged();
     void statusChanged(const QString &text);
     void probeFinished(const X50Link::ProbeResult &result);
     void sent(const SoundAddress &address);
@@ -176,6 +180,7 @@ private:
     void attemptConnect();
     int findPort(const QStringList &names, const QString &substring) const;
     void setState(State s);
+    void setActivity(Activity a);
     void setStatus(const QString &text);
     void raise(const QString &message, const QByteArray &raw = QByteArray());
     void disconnectWith(const QString &reason, const QByteArray &raw = QByteArray());
@@ -228,6 +233,7 @@ private:
     // Effective values: learned from the X50, or the manual ones when nothing is learned.
     int m_channel = 1;
     BankMap m_bankMap = BankMap::Gm;
+    bool m_channelLearned = false;  // m_channel came from a Device Inquiry reply
     int m_manualChannel = 1;
     BankMap m_manualBankMap = BankMap::Gm;
     bool m_bankMapKnown = false;

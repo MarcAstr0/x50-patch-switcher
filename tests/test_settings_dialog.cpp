@@ -17,9 +17,13 @@
 #include <QTemporaryDir>
 #include <QTest>
 
+#include <QTimer>
+
+#include "core/Library.h"
 #include "midi/FakeX50.h"
 #include "midi/X50Link.h"
 #include "ui/ConnectionSettings.h"
+#include "ui/MainWindow.h"
 #include "ui/ProbeChecklist.h"
 #include "ui/SettingsDialog.h"
 #include "ui/Theme.h"
@@ -200,8 +204,10 @@ private slots:
         QCOMPARE(d.checklist()->rows().size(), 1);
         const auto &row = d.checklist()->rows().first();
         QCOMPARE(row.state, S::Fail);
-        QVERIFY(row.text.startsWith(QStringLiteral("No reply. Is the X50 on")));
-        QCOMPARE(row.hint, QStringLiteral("GLOBAL 1: MIDI, tick \"Exclusive\""));
+        QCOMPARE(row.text, QStringLiteral("No reply from the X50"));
+        // MIDI.md section 3: "no SysEx reply: check Exclusive", MIDI Filter Exclusive checked.
+        QVERIFY(row.hint.contains(QStringLiteral("check Exclusive")));
+        QVERIFY(row.hint.contains(QStringLiteral("MIDI Filter \"Exclusive\" checked")));
         QVERIFY(d.manualEnabled());
 
         d.channelSpin()->setValue(3);
@@ -345,6 +351,126 @@ private slots:
         QVERIFY(l.heightForWidth(456) > 2 * 32 + 4);
         QVERIFY(l.rowGeometry(1).height > 32);
         QCOMPARE(l.rowGeometry(0).height, 32);
+    }
+
+    // Test and Check are off while the link waits on a Mode Change, with the reason in the note,
+    // and come back when it ends.
+    void testAndCheckDisabledWhileBusy()
+    {
+        connectLink();
+        SettingsDialog d(link, fake, dir->path());
+        QVERIFY(d.testButton()->isEnabled() && d.checkButton()->isEnabled());
+        const auto kind = link->believedMode() == X50Protocol::Mode::CombiPlay ? SoundAddress::Kind::Prog
+                                                                                : SoundAddress::Kind::Combi;
+        link->send(SoundAddress(kind, SoundAddress::Bank::A, 0));
+        QVERIFY(link->isBusy());
+        QVERIFY(!d.testButton()->isEnabled());
+        QVERIFY(!d.checkButton()->isEnabled());
+        QVERIFY2(d.note().contains(QStringLiteral("busy")), qPrintable(d.note()));
+        d.checkButton()->click();  // disabled: nothing happens
+        QVERIFY(link->isBusy());
+        QTRY_VERIFY_WITH_TIMEOUT(!link->isBusy(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(d.checkButton()->isEnabled() && d.testButton()->isEnabled(), 3000);
+        QVERIFY(d.note().isEmpty());
+    }
+
+    // MIDI.md section 6: a device with another member code answers: a Failed line with the raw
+    // reply, and the manual controls enable.
+    void nonX50DeviceShowsLineAndEnablesManual()
+    {
+        fake->setMemberCode(0x02);
+        connectLink(X50Link::State::Manual);
+        SettingsDialog d(link, fake, dir->path());
+        const auto *r = find(d.checklist(), QStringLiteral("A device answered but it is not an X50 (member code 02)"));
+        QVERIFY(r);
+        QCOMPARE(r->state, S::Fail);
+        QVERIFY(r->hint.contains(QStringLiteral("Raw bytes: F0 7E")));
+        QVERIFY(d.manualEnabled());
+        QVERIFY(d.channelSpin()->isEnabled());
+    }
+
+    // A channel learned from the inquiry reply is shown, and a manual change does not replace it.
+    void learnedChannelShownAndKept()
+    {
+        fake->setGlobalChannel(5);
+        fake->setDrop(FakeX50::Reply::ModeAndState, true);
+        connectLink(X50Link::State::Manual);
+        SettingsDialog d(link, fake, dir->path());
+        QCOMPARE(d.channelSpin()->value(), 5);
+        QVERIFY(!d.channelSpin()->isEnabled());
+        QVERIFY(d.bankMapCombo()->isEnabled());
+        d.channelSpin()->setValue(9);  // programmatic, as a test would
+        QCOMPARE(link->channel(), 5);
+        d.bankMapCombo()->setCurrentIndex(1);
+        QCOMPARE(link->channel(), 5);
+        d.closeButton()->click();
+        QCOMPARE(ConnectionSettings::load(dir->path()).channel, 1);  // the learned one is never stored as manual
+    }
+
+    // Settings are saved on Test, Check and close, not on every change; a failed save is told.
+    void savesOnCloseAndTellsFailure()
+    {
+        fake->setDropReplies(true);
+        connectLink(X50Link::State::Manual);
+        {
+            SettingsDialog d(link, fake, dir->path());
+            d.channelSpin()->setValue(4);
+            d.channelSpin()->setValue(6);
+            QVERIFY(!QFile::exists(dir->filePath(ConnectionSettings::fileName())));
+            QCOMPARE(link->channel(), 6);  // applied to the link at once
+            d.closeButton()->click();
+            QVERIFY(!d.saveFailed());
+        }
+        QCOMPARE(ConnectionSettings::load(dir->path()).channel, 6);
+
+        QFile blocker(dir->filePath(QStringLiteral("blocker")));
+        QVERIFY(blocker.open(QIODevice::WriteOnly));
+        blocker.close();
+        SettingsDialog bad(link, fake, dir->filePath(QStringLiteral("blocker/sub")));
+        bad.checkButton()->click();
+        QVERIFY(bad.saveFailed());
+        QCOMPARE(bad.note(), QStringLiteral("Settings could not be saved (folder is read-only?)"));
+    }
+
+    // "Last check" is the library's unit.lastSeen when a probe confirmed the X50 (MainWindow
+    // records it on each completed probe).
+    void lastCheckComesFromLibraryUnit()
+    {
+        Library lib;
+        MainWindow w(nullptr, &lib, link);
+        connectLink();
+        QVERIFY(lib.unit().has_value());
+        QCOMPARE(lib.unit()->memberCode, 1);
+        QCOMPARE(lib.unit()->version, QStringLiteral("1.05"));
+        const QDateTime seen = QDateTime(QDate(2026, 1, 2), QTime(3, 4), Qt::UTC);
+        Library::UnitInfo u = *lib.unit();
+        u.lastSeen = seen;
+        lib.setUnit(u);
+        SettingsDialog d(link, fake, dir->path());
+        d.setLibrary(&lib);
+        QCOMPARE(d.statusWord()->text(), QStringLiteral("Last check: %1").arg(seen.toLocalTime().toString(QStringLiteral("HH:mm"))));
+    }
+
+    // The guard keeps Settings from opening while the live view is active (M4 sets it).
+    void settingsBlockedWhileGuarded()
+    {
+        MainWindow w(nullptr, nullptr, link);
+        w.setSettingsAllowed(false);
+        QVERIFY(!w.openSettings());
+        w.setSettingsAllowed(true);
+        QTimer::singleShot(100, [] {
+            if (QWidget *m = QApplication::activeModalWidget())
+                m->close();
+        });
+        QVERIFY(w.openSettings());
+    }
+
+    // The shared "Bank Map: not reported" line.
+    void bankMapNotReportedRowText()
+    {
+        const auto r = SettingsDialog::bankMapNotReportedRow(BankMap::Korg);
+        QCOMPARE(r.text, QStringLiteral("Bank Map: not reported"));
+        QVERIFY(r.hint.contains(QStringLiteral("Sending as KORG")));
     }
 
     // Screenshot smoke: the dialog renders at the DESIGN width; the four glyph shapes are
