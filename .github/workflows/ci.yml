@@ -23,7 +23,7 @@ jobs:
             qt_arch: ""
             exe: build/x50-patch-switcher
           - name: macos
-            os: macos-14
+            os: macos-15
             qt_arch: ""
             exe: build/x50-patch-switcher
     defaults:
@@ -32,7 +32,7 @@ jobs:
     env:
       QT_QPA_PLATFORM: offscreen
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Qt 6.8
         uses: jurplel/install-qt-action@v4
@@ -126,7 +126,7 @@ jobs:
 
       - name: Upload Windows package
         if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.ZIP_NAME }}
           path: ${{ env.ZIP_NAME }}

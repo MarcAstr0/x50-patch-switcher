@@ -9,6 +9,7 @@
 #include <QTemporaryDir>
 #include <QTest>
 
+#include "midi/RtMidiBackend.h"
 #include "midi/X50Protocol.h"
 
 class TestCli : public QObject {
@@ -41,7 +42,14 @@ class TestCli : public QObject {
 private slots:
     void listPorts() {
         QString out;
-        QCOMPARE(run({QStringLiteral("--list-ports")}, &out), 0);
+        const int rc = run({QStringLiteral("--list-ports")}, &out);
+        if (rc == 1) {
+            // Documented: exit 1 when enumeration itself fails (e.g. no ALSA sequencer on
+            // a hosted CI runner). The error must be reported, not swallowed.
+            QVERIFY2(out.contains(QStringLiteral("MIDI error")), qPrintable(out));
+            return;
+        }
+        QCOMPARE(rc, 0);
         QVERIFY2(out.contains(QStringLiteral("Outputs:")), qPrintable(out));
         QVERIFY2(out.contains(QStringLiteral("Inputs:")), qPrintable(out));
     }
@@ -131,6 +139,14 @@ private slots:
     // The exit-1 path: a real port that no X50 answers (ALSA "Midi Through"). Skipped
     // where that port does not exist, so it never depends on the machine.
     void probeNoReplyExitsOne() {
+        const MidiBackend::Ports ports = RtMidiBackend::listPorts();
+        if (!ports.error.isEmpty())
+            QSKIP("MIDI enumeration fails on this machine (no ALSA sequencer?)");
+        bool haveThrough = false;
+        for (const auto &n : ports.outputs)
+            haveThrough = haveThrough || n.contains(QStringLiteral("Midi Through"));
+        if (!haveThrough)
+            QSKIP("no ALSA Midi Through port on this machine");
         QString out;
         const int rc = run({QStringLiteral("--probe"), QStringLiteral("--port"), QStringLiteral("Midi Through")}, &out);
         if (rc == 3 || rc == 4)
