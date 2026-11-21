@@ -223,3 +223,8 @@ fixes go back to the builder as T5.x tasks.
   the D-05 app kept its green-on-black). Browse strip is a full LCD panel; in live view
   only the current-sound readout is a dimmed LCD panel inside the dark top bar, so it
   does not glow on stage. Lit-button cyan unchanged. (owner; placement by foreman)
+- 2026-11-21 · R-T1.6: Codex asked to validate Mode and State bytes 19-21 / 23-25 and other
+  reserved bits. Declined: MIDI.md §5 says they are ignored, and the layout is unverified,
+  so extra strictness risks refusing a real unit's reply; revisit with G1 captures. Dump
+  kind now fixes the record count (kind 1 = 128, kind 2 = 1) and X50 program dumps cap
+  the bank at D; both done inside T1.7. (foreman)
