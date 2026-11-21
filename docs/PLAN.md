@@ -321,3 +321,6 @@ fixes go back to the builder as T5.x tasks.
   (deterministic) rather than probing the fake; GM or unlisted categories show
   "Category --:<name>" once unit categories are known. assets/theme/app.qss header still
   lists the retired lcd-bg/lcd-text tokens: designer to fix at D3. (foreman)
+- 2026-11-21 · Codex unavailable (ChatGPT usage limit) until 18:18 local. M3 tasks get the
+  reviewer agent now; Codex reviews owed for: T3.1 (f60fae9), and every M3 commit after
+  it until Codex is back. Run them then, before R3. (foreman)
