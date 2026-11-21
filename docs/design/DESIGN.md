@@ -806,13 +806,38 @@ default.
 ### 7.6 Category list
 
 Left column, background `panel`, radius 8, padding 8. Title row `CATEGORY` (`label` style,
-`text-dim`, height 24). Then a list: first row `All`, then the 16 categories of the
-kind shown (combination or program categories; when kinds mixed, the program list is
-shown and the title reads `CATEGORY (PROG)`; combos-only shows `CATEGORY (COMBI)`)
-[decided]. Row height 32, padding 12 horizontal, text `body` 15px `text`. Selected: fill
-`sel-row`, 4px `cyan` left bar, text `text` bold. Hover: fill `panel-raised`. Focus:
-2px `cyan` outline, inset. A count in `small` `text-dim` right-aligned on each row (the
-number of matches) is **not** shown, to keep the list calm.
+`text-dim`, height 24). Then a list, top to bottom [decided]:
+
+1. `Favourites` (row 32, star glyph).
+2. `Recent` (row 32, clock glyph).
+3. A separator row, 9 high, not selectable, not focusable: a 1px `line` rule across the
+   row (inset 12 each side) with 4px empty above and 4px below.
+4. `All`.
+5. The 16 categories of the kind shown (combination or program categories; when kinds
+   mixed, the program list is shown and the title reads `CATEGORY (PROG)`; combos-only
+   shows `CATEGORY (COMBI)`).
+
+The title never changes when Favourites or Recent is selected (it names the category
+list, which is unchanged); the result list has no title of its own. Initial selection on
+start stays `All`.
+
+Row height 32, padding 12 horizontal, text `body` 15px `text`, for every row including
+Favourites and Recent (no other text style). Favourites and Recent carry a painted glyph
+14 x 14 at x = 12, vertically centred, with the text starting at x = 34 (12 + 14 + 8);
+`All` and the categories keep the text at x = 12, so the two special rows are visibly
+set apart by the glyph as well as by the separator:
+
+- Star (Favourites): the same five-point star shape as the result list's, filled `amber`
+  in every state (unselected, hover, selected). It is the shape, not the colour, that
+  identifies the row.
+- Clock (Recent): a circle of 14 px outer diameter, 1.5px stroke `text-dim` (`text` when
+  selected), no fill, plus two 1.5px hands from the centre: one up 4px, one right 3px
+  (round caps). Painted with antialiasing; no animation.
+
+Selected: fill `sel-row`, 4px `cyan` left bar, text `text` bold (glyphs as above). Hover:
+fill `panel-raised`. Focus: 2px `cyan` outline, inset. Up/Down skip the separator. A
+count in `small` `text-dim` right-aligned on each row (the number of matches) is **not**
+shown, to keep the list calm.
 
 ### 7.7 Result list and row delegate
 
@@ -837,8 +862,39 @@ Selected row: fill `sel-row`, 4px `cyan` left accent, text `text`, address `text
 Hover: fill `panel-raised`. Focused list: 2px `cyan` outline inset around the list.
 The row that matches the X50's current sound gets a painted solid right-pointing
 triangle 8 x 10 `cyan` in the 8 px left of the star column [decided] (the browse echo of
-NOW). Highlight never sends. Result order is catalogue order, never by name: COMBI A, B, C, then PROG A, B, C, D, then G, then g(d) (only when GM is on), each bank by number. Empty results: centred text `No sounds match.` in `body`
-`text-dim`.
+NOW). Highlight never sends. Result order is catalogue order, never by name: COMBI A, B, C, then PROG A, B, C, D, then G, then g(d) (only when GM is on), each bank by number. Empty results: centred text in `body`
+`text-dim`, wrapped to the list width minus 48, see "Favourites and Recent views" below
+for the text.
+
+**Favourites and Recent views** (category rows `Favourites`, `Recent`, §7.6). They are a
+filter over the same list and the same row delegate; they combine (AND) with the search
+text and the Combis / Programs / GM toggles exactly like a category does.
+
+- Order: `Favourites` in catalogue order (the §7.7 order above, never by name or by when
+  starred). `Recent` most recent first (the order of the recents list, newest at the top),
+  **not** catalogue order. Prev/next and Enter step through the list in the order shown.
+- Columns unchanged: Star column, Address, Name, Edited, Category, and `USED` (`x12`
+  form, blank for 0; the count is the same whichever view the sound is shown in). In
+  Favourites every star is filled, in Recent a star is filled only when the sound is a
+  favourite. The current-sound triangle and the selected-row styling are unchanged.
+- Clicking a star in Favourites only toggles the star (outline, `text-dim`): the row
+  stays, keeping its position and the selection, so a second click restores it. Rows of
+  sounds that are no longer favourites drop out the next time the view is rebuilt
+  (another category or view selected, search text or kind toggles changed). The same
+  star click in Recent only toggles the star. (Foreman, 2026-11-21: no instant removal,
+  so an accidental click is undone in place.)
+- Empty text, centred horizontally and vertically in the list area, `body` 15px
+  `text-dim`. The "nothing at all" texts apply when the view has no entries before search
+  and kinds are applied; otherwise (search or kinds filtered everything out) the usual
+  text applies:
+
+| Case | Exact text |
+|---|---|
+| `Favourites`, no favourites exist | `No favourites yet. Star a sound with Ctrl+D or the star.` |
+| `Recent`, nothing sent yet | `Nothing played yet. Sounds you send appear here.` |
+| `Favourites` or `Recent` has entries but search or kinds hide them all | `No sounds match.` |
+| Any other category, no match | `No sounds match.` |
+
 
 Double-click and Enter send. Context menu (native style, themed by QSS in §10) offers
 Add to set > slot 1..N.
@@ -1125,6 +1181,11 @@ unless the owner objects):
   `Checking…` while the probe runs, placeholder port name `X50 MIDI 1` (the real Windows
   name is unknown, MIDI.md).
 - Settings dialog at this content is 709 high, under the 80% of 1080 cap (864).
+
+- 2026-11-21: browse category list gains `Favourites` and `Recent` above `All` (owner
+  decision, SPEC §4.1): §7.6 order, separator, star and clock glyphs, text indent; §7.7
+  ordering (Favourites catalogue order, Recent newest first), column behaviour, three
+  empty-state texts. Static mockup not updated.
 
 Change round G2 (2026-11-21, owner-approved changes):
 
