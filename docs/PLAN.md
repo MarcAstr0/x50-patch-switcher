@@ -351,3 +351,7 @@ fixes go back to the builder as T5.x tasks.
   Queued for the T3.4 fix round: shorten the "No reply" message to "No reply from the
   X50" (the hint carries the Exclusive instruction); "Last check" time from Library
   unit.lastSeen. (foreman)
+- 2026-11-21 · SPEC change (owner): browse gets "Favourites" and "Recent" entries at the
+  top of the category list (SPEC §4.1 updated); they combine with search and the kind
+  toggles; Recent is most recent first. Designer adds them to DESIGN §7.6 (T3.3b), then
+  the builder implements them. (owner)

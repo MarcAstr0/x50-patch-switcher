@@ -103,8 +103,10 @@ renamed `library.json.broken-<timestamp>` and the app starts empty, saying so on
   case-insensitive; an address token (§3.1) filters by address; `cat:<text>` filters by
   category prefix. Results update as you type.
 - **Kind filter**: three toggles, Combis / Programs / GM, all on by default.
-- **Category list** on the left: the 16 combination categories or the 16 program
-  categories (from VNL; from the unit once read), plus "All".
+- **Category list** on the left: "Favourites" and "Recent" at the top, then the 16
+  combination categories or the 16 program categories (from VNL; from the unit once
+  read), plus "All". Favourites lists the starred sounds, Recent the recents (most recent
+  first); both combine with the search text and the kind toggles.
 - **Result list**: address, name, category, star, *edited* marker, recents count.
   Highlight never sends. **Enter, double-click or the Play button sends.**
 - **Prev/next** (`Ctrl+Left/Right`, `PgUp/PgDn` when the list does not have focus) step
