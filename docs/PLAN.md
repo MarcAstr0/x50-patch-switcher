@@ -92,7 +92,7 @@ No GUI beyond the scaffold window. Everything testable headless.
   test, and on Windows `windeployqt` into a portable zip containing the exe, the Qt
   DLLs, the `.bat` and a short `LEEME.txt`/`README.txt`. Artifact downloadable from the
   run. Proof the exe starts: `--list-ports` and `--probe --fake-midi` on the runner.
-- ☐ **R1 Review** (reviewer + Codex, reconciled by the foreman per `docs/FOREMAN.md`).
+- ☑ **R1 Review** (reviewer + Codex, reconciled by the foreman per `docs/FOREMAN.md`).
 
 **Gate G1 (owner → keyboard player) · first contact with a real X50.** The foreman
 prepares the CI zip and a WhatsApp-ready message in Spanish (in
@@ -298,3 +298,9 @@ fixes go back to the builder as T5.x tasks.
   replies still lead to read-only dump requests, inquiry retried once, CI runs the
   extracted zip and the .bat itself, the queued Codex items and the MSVC warnings. Codex
   R1 hit the account usage limit; one retry after the fix round. (foreman)
+- 2026-11-21 · **R1 closed** on the reviewer agent alone: Codex hit the account usage
+  limit on the first run and on the one allowed retry (FOREMAN rule). Second fix round:
+  MSVC runtime copied from the toolset's own redist (14.52, asserted against
+  VCToolsVersion), no vc_redist/dxcompiler/dxil in the zip, exact-first port selection,
+  clearer refused-inquiry result. CI green, run 44935392424, artifact
+  X50-Patch-Switcher-windows-966817a.zip (13 MB). Ready for G1. (foreman)

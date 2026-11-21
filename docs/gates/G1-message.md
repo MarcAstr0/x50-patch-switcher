@@ -1,11 +1,12 @@
 # G1: message for the keyboard player
 
-For the owner to forward (WhatsApp or email) together with the zip from the latest green
-CI run (`X50-Patch-Switcher-windows-<sha>.zip`, artifact of the run named in the Decisions
-log). Nothing here is sent by Claude.
+For the owner to forward (WhatsApp or email) together with the zip. Nothing here is sent
+by Claude.
 
-How the owner gets the zip: `gh run download <run-id> -n X50-Patch-Switcher-windows-<sha>`
-or the run page on GitHub, "Artifacts". Send the zip as it is (do not unzip it).
+The zip: `X50-Patch-Switcher-windows-966817a.zip` from CI run 44935392424
+(https://github.com/MarcAstr0/x50-patch-switcher/actions/runs/44935392424, "Artifacts").
+GitHub downloads artifacts wrapped in an outer zip: unzip that once and send the inner
+`X50-Patch-Switcher-windows-966817a.zip` as it is. Artifacts expire after 30 days.
 
 ---
 
