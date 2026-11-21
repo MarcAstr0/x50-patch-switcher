@@ -156,7 +156,7 @@ fixes go back to the builder as T5.x tasks.
 
 - ☑ **T5.1 Windows polish** (builder): icon and version resources in the exe, portable
   mode, `Diagnose X50.bat` still included, SmartScreen note in the readme.
-- ☐ **T5.2 Linux AppImage and macOS dmg** (builder), as in the D-05 project.
+- ☑ **T5.2 Linux AppImage and macOS dmg** (builder), as in the D-05 project.
 - ☐ **T5.3 One-page guide for the keyboard player** (clerk drafts from SPEC §4 and the
   screenshots, in the G0 language; foreman checks every instruction against the built
   app). `docs/GUIDE.md` plus a PDF in the zip.
@@ -457,3 +457,9 @@ fixes go back to the builder as T5.x tasks.
   X50.bat uses `start "" /wait`; windeployqt skips tls, networkinformation and generic
   (the TUIO touch plugin was the only Qt6Network importer; Windows touch uses qwindows);
   CI asserts no binary imports Qt6Network; portable mode verified on the runner. (foreman)
+- 2026-11-21 · T5.2 done (CI run 44961716720): AppImage (30 MB) and macOS universal dmg
+  (23 MB, ad-hoc signed, not notarized: right-click Open the first time) beside the
+  Windows zip (12.5 MB). Follow-ups: make the Linux/macOS Qt-network checks fail the job;
+  a 1024 px icon master from the designer for a sharp .icns. T5.3 draft guide written
+  (docs/GUIDE.md, Spanish, every instruction checked by the foreman against SPEC, the
+  decisions and the screenshots); the PDF copy goes into the zip at release. (foreman)
