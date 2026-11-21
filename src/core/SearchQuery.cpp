@@ -17,31 +17,59 @@ QString SearchQuery::fold(const QString &s) {
 }
 
 namespace {
+struct Tok {
+    QString text;
+    bool quoted = false;       // a quote character appeared anywhere in the token
+    bool quotedStart = false;  // the token began with a quote
+};
+
 // Split on whitespace; a double-quoted run (as in cat:"complex & se") keeps its
-// spaces, the quotes are dropped.
-QStringList splitTokens(const QString &text) {
-    QStringList out;
-    QString cur;
-    bool inQuote = false, have = false;
+// spaces, the quotes are dropped. Tokens left empty by that (`"`, `""`) are
+// dropped.
+QVector<Tok> splitTokens(const QString &text) {
+    QVector<Tok> out;
+    Tok cur;
+    bool inQuote = false;
+    auto flush = [&]() {
+        if (!cur.text.isEmpty())
+            out.append(cur);
+        cur = Tok();
+    };
     for (const QChar c : text) {
         if (c == QLatin1Char('"')) {
+            if (cur.text.isEmpty() && !cur.quoted)
+                cur.quotedStart = true;
             inQuote = !inQuote;
-            have = true;
+            cur.quoted = true;
         } else if (c.isSpace() && !inQuote) {
-            if (have)
-                out << cur;
-            cur.clear();
-            have = false;
+            flush();
         } else {
-            cur += c;
-            have = true;
+            cur.text += c;
         }
     }
-    if (have)
-        out << cur;
+    flush();
     return out;
 }
 
+bool isKindPrefix(const QString &t) {
+    static const QRegularExpression re(QStringLiteral("^(combi|prog|p|c)$"),
+                                       QRegularExpression::CaseInsensitiveOption);
+    return re.match(t).hasMatch();
+}
+bool isBankOnly(const QString &t) {
+    static const QRegularExpression re(QStringLiteral("^(g\\(d\\)|gd|[a-eg])$"),
+                                       QRegularExpression::CaseInsensitiveOption);
+    return re.match(t).hasMatch();
+}
+bool isBankDigits(const QString &t) {
+    static const QRegularExpression re(QStringLiteral("^(g\\(d\\)|gd|[a-eg])\\d+$"),
+                                       QRegularExpression::CaseInsensitiveOption);
+    return re.match(t).hasMatch();
+}
+bool isDigits(const QString &t) {
+    static const QRegularExpression re(QStringLiteral("^\\d+$"));
+    return re.match(t).hasMatch();
+}
 bool looksLikeAddress(const QString &t) {
     static const QRegularExpression re(
         QStringLiteral("^(combi|prog|p|c)?(g\\(d\\)|gd|[a-eg])\\d+$"),
@@ -62,40 +90,65 @@ bool categoryMatches(const QString &foldedCat, const QString &prefix) {
 
 SearchQuery SearchQuery::parse(const QString &text) {
     SearchQuery q;
-    const QStringList toks = splitTokens(text);
+    const QVector<Tok> toks = splitTokens(text);
+    auto plain = [&](int k) { return k < toks.size() && !toks.at(k).quoted; };
     int i = 0;
     while (i < toks.size()) {
-        // Address, possibly split over up to three tokens, longest first.
-        bool done = false;
-        for (int n = qMin(3, toks.size() - i); n >= 1 && !done; --n) {
+        const Tok &t0 = toks.at(i);
+
+        // Split address: decide by shape alone; if the shape is an address but
+        // the joined text does not validate, nothing matches (never re-split).
+        int n = 0;
+        if (plain(i) && plain(i + 1)) {
+            const QString &a = t0.text, &b = toks.at(i + 1).text;
+            if (isKindPrefix(a) && plain(i + 2) && isBankOnly(b) && isDigits(toks.at(i + 2).text))
+                n = 3;
+            else if (isKindPrefix(a) && isBankDigits(b))
+                n = 2;
+            else if (isBankOnly(a) && isDigits(b))
+                n = 2;
+        }
+        if (n > 0) {
             QString joined;
             for (int k = 0; k < n; ++k)
-                joined += toks.at(i + k);
+                joined += toks.at(i + k).text;
+            i += n;
             const SoundAddress::ParseResult r = SoundAddress::parse(joined);
             if (r.ok()) {
                 Token t;
                 t.type = Token::Address;
                 t.addresses = r.matches;
                 q.m_tokens.append(t);
-                i += n;
-                done = true;
+            } else {
+                q.m_impossible = true;
+            }
+            continue;
+        }
+
+        ++i;
+        if (!t0.quoted) {
+            const SoundAddress::ParseResult r = SoundAddress::parse(t0.text);
+            if (r.ok()) {
+                Token t;
+                t.type = Token::Address;
+                t.addresses = r.matches;
+                q.m_tokens.append(t);
+                continue;
+            }
+            if (looksLikeAddress(t0.text)) {
+                q.m_impossible = true;  // out of range or bank E: matches nothing
+                continue;
             }
         }
-        if (done)
-            continue;
-
-        const QString &tok = toks.at(i++);
-        if (tok.startsWith(QLatin1String("cat:"), Qt::CaseInsensitive)) {
+        if (!t0.quotedStart && t0.text.startsWith(QLatin1String("cat:"), Qt::CaseInsensitive)) {
             Token t;
             t.type = Token::Category;
-            t.text = fold(tok.mid(4));
+            t.text = fold(t0.text.mid(4));
             q.m_tokens.append(t);
-        } else if (looksLikeAddress(tok)) {
-            q.m_impossible = true;  // out of range or bank E: matches nothing
         } else {
             Token t;
             t.type = Token::Text;
-            t.text = fold(tok);
+            t.text = fold(t0.text);
             q.m_tokens.append(t);
         }
     }

@@ -39,6 +39,10 @@ private slots:
         QString out;
         QCOMPARE(run({QStringLiteral("--help")}, &out), 0);
         QVERIFY(out.contains(QStringLiteral("--list-ports")));
+        QVERIFY2(out.contains(QStringLiteral("Usage: ")) &&
+                     out.contains(QStringLiteral("x50-patch-switcher")) &&
+                     !out.contains(QStringLiteral("executable_name")),
+                 qPrintable(out));
     }
     void helpAll() {
         QString out;

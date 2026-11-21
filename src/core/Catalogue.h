@@ -20,9 +20,12 @@
 //  - effectiveName()/effectiveCategory() are what the UI shows and search
 //    matches: the unit's value when an overlay exists (category falls back to
 //    the factory one when the overlay has none), else the factory value.
-//  - categories(kind) lists the factory categories only (distinct, sorted
-//    case-insensitively). Unit category names arrive with the global dump and
-//    are not stored per slot here.
+//  - categories(kind) lists, for a kind, the unit's 16 category names once
+//    setUnitCategories() has been called (in the unit's order, as read from the
+//    global dump, MIDI.md 7 TABLE 4), else the distinct factory categories
+//    sorted case-insensitively. The GM banks G and g(d) always keep their
+//    factory categories (they are not part of the unit's 16 names) and are
+//    not affected by the unit names. Parsing the dump is T1.6, not here.
 class Catalogue {
 public:
     struct Entry {
@@ -60,7 +63,15 @@ public:
     QString effectiveName(const SoundAddress &a) const;
     QString effectiveCategory(const SoundAddress &a) const;
 
-    // Distinct factory categories for a kind, sorted.
+    // The unit's 16 program and 16 combination category names. Returns false
+    // and fills *error (if given) unless both lists have exactly 16 entries;
+    // nothing is changed then.
+    bool setUnitCategories(const QStringList &program, const QStringList &combi,
+                           QString *error = nullptr);
+    void clearUnitCategories();
+    bool hasUnitCategories() const { return m_haveUnitCats; }
+
+    // Unit names for the kind once set, else the distinct factory categories, sorted.
     QStringList categories(SoundAddress::Kind kind) const;
 
 private:
@@ -69,4 +80,6 @@ private:
 
     QVector<Entry> m_entries;
     QHash<QString, UnitName> m_unit;
+    bool m_haveUnitCats = false;
+    QStringList m_unitProgCats, m_unitCombiCats;
 };

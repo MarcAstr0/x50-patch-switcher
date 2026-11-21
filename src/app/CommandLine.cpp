@@ -5,6 +5,7 @@
 
 #include <QCommandLineOption>
 #include <QCommandLineParser>
+#include <QFileInfo>
 #include <QTextStream>
 
 namespace {
@@ -40,7 +41,12 @@ CommandLine::Result CommandLine::process(const QStringList &arguments)
         return Result::Exit;
     }
     if (parser.isSet(helpOption) || parser.isSet(QStringLiteral("help-all"))) {
-        QTextStream(stdout) << parser.helpText();
+        // No application object exists yet, so Qt prints <executable_name>.
+        QString help = parser.helpText();
+        const QString exe = arguments.isEmpty() ? QString() : QFileInfo(arguments.first()).completeBaseName();
+        help.replace(QStringLiteral("<executable_name>"),
+                     exe.isEmpty() ? QStringLiteral("x50-patch-switcher") : exe);
+        QTextStream(stdout) << help;
         m_exitCode = 0;
         return Result::Exit;
     }

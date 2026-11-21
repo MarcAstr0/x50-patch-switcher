@@ -26,11 +26,23 @@
 //    "cat:mallet" match "Bell/Mallet/Perc", "cat:comp" matches "Complex & SE".
 //    A category with spaces is written in quotes: cat:"complex & se".
 //    An empty "cat:" matches everything (the user is still typing).
-//  - Address tokens may be split by spaces: up to three adjacent tokens are
-//    joined and tried ("P A012", "prog a 12", "c b100"), longest first, only
-//    when the joined text parses as an address. A single token that looks like
-//    an address but is out of range or bank E ("A200", "E5") is an address
-//    token that matches nothing (rejected, not clamped, not demoted to text).
+//  - Split addresses (exact rule). Tokens are joined into one address only in
+//    these shapes, tested longest first, on unquoted tokens:
+//      [kind] [bank] [digits]   "prog a 12", "c b 100"
+//      [kind] [bank+digits]     "P A012", "c b100"
+//      [bank] [digits]          "a 12", "g(d) 1"
+//    where kind is prog, p, combi or c and bank is a, b, c, d, e, g, g(d) or gd
+//    (case-insensitive). So "c 12" is bank C 012 (both kinds) and "piano c 12"
+//    is the text "piano" plus that address; "piano c" with no digits after the
+//    c stays text. The decision is made on shape alone and is atomic: if the
+//    joined text is not a valid address (out of range, bank E, kind/bank
+//    mismatch such as "C D000") the whole sequence is an address token that
+//    matches nothing; it is never re-split into text plus address.
+//    A single token that looks like an address but is out of range or bank E
+//    ("A200", "E5") likewise matches nothing (rejected, not clamped).
+//  - Quoted tokens (any token containing a double quote, except the cat: form
+//    cat:"...") are always text: "b3" searches names for b3, never address B003.
+//  - Empty tokens (`"`, `""`) are dropped, so a query of only `""` is empty.
 //  - Text matching is not applied to the address text; use an address token.
 class SearchQuery {
 public:

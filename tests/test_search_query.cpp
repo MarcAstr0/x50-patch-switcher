@@ -55,6 +55,17 @@ private slots:
         row("out of range rejected", QStringLiteral("a200"), 0);
         row("G000 rejected", QStringLiteral("g0"), 0);
         row("bank E rejected", QStringLiteral("e5"), 0);
+        // R-T1.4 fixes: atomic split rejection, tight joining
+        row("C D000 atomic reject", QStringLiteral("C D000"), 0);
+        row("c d 0 atomic reject", QStringLiteral("c d 0"), 0);
+        row("piano c 12 is text plus C012", QStringLiteral("piano c 12"), 0);
+        row("bell c 12 is text plus C012", QStringLiteral("bell c 12"), 1);  // COMBI C012 cat Bell/Mallet/Perc
+        row("piano c stays text", QStringLiteral("piano c"), 9);  // text AND text, counted with awk
+        row("e 5 bank E", QStringLiteral("e 5"), 0);
+        row("a 12 bank+digits", QStringLiteral("a 12"), 2);
+        row("prog a 12 three tokens", QStringLiteral("prog a 12"), 1);
+        row("quote only", QStringLiteral("\""), 1033);
+        row("empty quotes", QStringLiteral("\"\""), 1033);
         row("address AND text hit", QStringLiteral("a012 bell"), 1);   // COMBI A012 Bellagio
         row("address AND text other kind", QStringLiteral("a012 guitar"), 1);  // PROG A012
         row("address AND text miss", QStringLiteral("a012 piano"), 0);
@@ -145,6 +156,30 @@ private slots:
         QVERIFY(!SearchQuery::parse(QStringLiteral("nylon")).search(c).contains(a));
         // Category falls back to the factory one when the overlay has none.
         QVERIFY(SearchQuery::parse(QStringLiteral("cat:guitar")).search(c).contains(a));
+    }
+
+    // R-T1.4: quoted tokens are text, never an address.
+    void quotedIsText() {
+        Catalogue c;
+        QVERIFY(c.loadFromText(
+            "COMBI\tB\t003\tOrgan Zed\tKeyboard\t\n"
+            "PROG\tA\t001\tB3 Organ\tOrgan\td\n", nullptr));
+        const SoundAddress a(SoundAddress::Kind::Prog, SoundAddress::Bank::A, 1);
+        const SoundAddress b3(SoundAddress::Kind::Combi, SoundAddress::Bank::B, 3);
+        QCOMPARE(SearchQuery::parse(QStringLiteral("b3 organ")).search(c), QVector<SoundAddress>{b3});
+        QCOMPARE(SearchQuery::parse(QStringLiteral("\"b3\"")).search(c), QVector<SoundAddress>{a});
+        QCOMPARE(SearchQuery::parse(QStringLiteral("\"b3\" organ")).search(c), QVector<SoundAddress>{a});
+        // A quoted token is not joined into an address either.
+        QCOMPARE(SearchQuery::parse(QStringLiteral("\"b\" 3")).search(c), QVector<SoundAddress>{a});
+    }
+
+    void emptyTokensDropped() {
+        QVERIFY(SearchQuery::parse(QStringLiteral("\"\"")).isEmpty());
+        QVERIFY(SearchQuery::parse(QStringLiteral("\"")).isEmpty());
+        QVERIFY(SearchQuery::parse(QStringLiteral("\"\" \"\"")).isEmpty());
+        QVERIFY(!SearchQuery::parse(QStringLiteral("cat:")).isEmpty());
+        QVERIFY(!SearchQuery::parse(QStringLiteral("\"\" piano")).isEmpty());
+        QCOMPARE(SearchQuery::parse(QStringLiteral("\"\" piano")).search(m_cat).size(), 37);
     }
 
     void emptiness() {

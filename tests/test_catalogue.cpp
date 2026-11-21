@@ -170,6 +170,46 @@ private slots:
         QCOMPARE(c.size(), 0);
     }
 
+    // R-T1.4: unit category names (MIDI.md 7, TABLE 4); parsing is T1.6, so the
+    // lists here are arbitrary test strings.
+    void unitCategories() {
+        Catalogue c;
+        QVERIFY(c.loadFromFile(QStringLiteral(X50_FACTORY_TSV)));
+        const QStringList factoryP = c.categories(A::Kind::Prog);
+        const QStringList factoryC = c.categories(A::Kind::Combi);
+        QVERIFY(!c.hasUnitCategories());
+        QStringList p, k;
+        for (int i = 0; i < 16; ++i) {
+            p << QStringLiteral("UP%1").arg(i);
+            k << QStringLiteral("UC%1").arg(i);
+        }
+        QString err;
+        QVERIFY2(c.setUnitCategories(p, k, &err), qPrintable(err));
+        QVERIFY(c.hasUnitCategories());
+        QCOMPARE(c.categories(A::Kind::Prog), p);   // unit order, not sorted
+        QCOMPARE(c.categories(A::Kind::Combi), k);
+        // Per-slot categories (including GM banks G and g(d)) stay factory ones.
+        QCOMPARE(c.effectiveCategory(A(A::Kind::Prog, A::Bank::G, 1)),
+                 c.find(A(A::Kind::Prog, A::Bank::G, 1))->category);
+        c.clearUnitCategories();
+        QVERIFY(!c.hasUnitCategories());
+        QCOMPARE(c.categories(A::Kind::Prog), factoryP);
+        QCOMPARE(c.categories(A::Kind::Combi), factoryC);
+    }
+    void unitCategoriesWrongLength() {
+        Catalogue c;
+        QVERIFY(c.loadFromFile(QStringLiteral(X50_FACTORY_TSV)));
+        const QStringList sixteen(16, QStringLiteral("x"));
+        QString err;
+        QVERIFY(!c.setUnitCategories(QStringList(15, QStringLiteral("x")), sixteen, &err));
+        QVERIFY2(err.contains(QStringLiteral("16")), qPrintable(err));
+        QVERIFY(!c.setUnitCategories(sixteen, QStringList(17, QStringLiteral("x"))));
+        QVERIFY(!c.setUnitCategories(QStringList(), QStringList()));
+        QVERIFY(!c.hasUnitCategories());
+        QCOMPARE(c.categories(A::Kind::Prog).size(), 16);  // still factory
+        QVERIFY(c.categories(A::Kind::Prog) != sixteen);
+    }
+
     void acceptsCrlfAndUnsortedInput() {
         Catalogue c;
         QString err;

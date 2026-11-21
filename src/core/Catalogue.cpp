@@ -158,7 +158,30 @@ QString Catalogue::effectiveCategory(const SoundAddress &a) const {
     return e ? e->category : QString();
 }
 
+bool Catalogue::setUnitCategories(const QStringList &program, const QStringList &combi,
+                                  QString *error) {
+    if (program.size() != 16 || combi.size() != 16) {
+        if (error)
+            *error = QStringLiteral("expected 16 program and 16 combination category names, got %1 and %2")
+                         .arg(program.size())
+                         .arg(combi.size());
+        return false;
+    }
+    m_unitProgCats = program;
+    m_unitCombiCats = combi;
+    m_haveUnitCats = true;
+    return true;
+}
+
+void Catalogue::clearUnitCategories() {
+    m_unitProgCats.clear();
+    m_unitCombiCats.clear();
+    m_haveUnitCats = false;
+}
+
 QStringList Catalogue::categories(SoundAddress::Kind kind) const {
+    if (m_haveUnitCats)
+        return kind == SoundAddress::Kind::Prog ? m_unitProgCats : m_unitCombiCats;
     QSet<QString> set;
     for (const Entry &e : m_entries)
         if (e.address.kind() == kind)
