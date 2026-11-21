@@ -10,11 +10,11 @@ PROG_CATS = ['Keyboard', 'Organ', 'Bell/Mallet', 'Strings', 'Brass', 'Woodwind/R
              'Bass', 'SlowSynth', 'FastSynth', 'LeadSynth', 'MotionSynth', 'Vocal/Airy', 'Hit/Arpg',
              'Drums', 'SE']
 
-FAV = {('COMBI', 'B064'), ('PROG', 'B001'), ('PROG', 'D104')}
-USED = {('PROG', 'D104'): 12, ('COMBI', 'B064'): 3, ('PROG', 'B001'): 7, ('PROG', 'A081'): 2,
+FAV = {('COMBI', 'B064'), ('PROG', 'B001'), ('COMBI', 'C096')}
+USED = {('COMBI', 'C096'): 12, ('COMBI', 'B064'): 3, ('PROG', 'B001'): 7, ('PROG', 'A081'): 2,
         ('COMBI', 'C051'): 5}
-EDITED = {('PROG', 'D113'): 'Classic Piano LR'}
-CURRENT = ('PROG', 'D104')
+EDITED = {('PROG', 'A065'): 'M1 Piano Soft'}
+CURRENT = ('COMBI', 'C096')
 SELECTED = ('COMBI', 'B064')
 
 
@@ -31,7 +31,8 @@ def load_rows():
             addr = bank + num
             nm = EDITED.get((kind, addr), name)
             rows.append(dict(kind=kind, addr=addr, name=nm, factory=name, cat=cat))
-    rows.sort(key=lambda r_: r_['name'].lower())
+    # catalogue order: COMBI A-C, PROG A-D (G, g(d) hidden here), each by number
+    rows.sort(key=lambda r_: (r_['kind'] != 'COMBI', r_['addr'][0], int(r_['addr'][1:])))
     return rows
 
 
@@ -58,26 +59,27 @@ def build(outdir):
     log.append('browse: %d matching rows for "piano" (GM excluded), 16 visible' % len(rows))
 
     # display strip ------------------------------------------------------
-    s.rect(M, M, W - 2 * M, 64, fill=C['lcd_bg'], stroke=C['lcd_border'], sw=1, rx=8)
+    s.rect(M, M, W - 2 * M, 64, fill=C['lcd_bezel'], rx=8)
+    s.rect(M + 2, M + 2, W - 2 * M - 4, 60, fill=C['lcd_field'], rx=6)
     bx, by, bh = M + 12, M + 8, 48
-    mode, addr, name = 'PROG', 'D104', 'Classic E.Piano'
-    lab_w = adv(mode, 'bs', 12, 1.5) - 1.5
-    addr_w = adv(addr, 'bs', 15, 0.5) - 0.5
-    name_w = adv(name, 'ab', 24)
+    mode, addr, name = 'COMBI', 'C096', 'Piano &Strings'
+    lab_w = adv(mode, 'bs', 13, 1.5) - 1.5
+    addr_w = adv(addr, 'bs', 20, 0.5) - 0.5
+    name_w = adv(name, 'bs', 26)
     bw = 16 + lab_w + 12 + addr_w + 12 + name_w + 16
-    s.rect(bx, by, bw, bh, fill=C['cyan'], rx=4)
+    s.rect(bx, by, bw, bh, fill=C['lcd_ink'], rx=4)
     cy = by + bh / 2.0
     x = bx + 16
-    s.text(x, cy, mode, 'bs', 12, C['on_cyan'], trk=1.5)
+    s.text(x, cy, mode, 'bs', 13, C['lcd_field'], trk=1.5)
     x += lab_w + 12
-    s.text(x, cy, addr, 'bs', 15, C['on_cyan'], trk=0.5)
+    s.text(x, cy, addr, 'bs', 20, C['lcd_field'], trk=0.5)
     x += addr_w + 12
-    s.text(x, cy, name, 'ab', 24, C['on_cyan'])
+    s.text(x, cy, name, 'bs', 26, C['lcd_field'])
     label = 'X50 CONNECTED'
     right = W - M - 12
-    s.text(right, M + 32, label, 'bs', 15, C['lcd_text'], anchor='end', trk=1.5)
+    s.text(right, M + 32, label, 'bs', 15, C['lcd_ink'], anchor='end', trk=1.5)
     tw = adv(label, 'bs', 15, 1.5) - 1.5
-    led(s, right - tw - 12 - 8, M + 32, 16, True, 2, C['cyan'], C['red'])
+    led(s, right - tw - 12 - 8, M + 32, 16, True, 2, C['lcd_ink'], C['lcd_warn'])
 
     # toolbar ------------------------------------------------------------
     ty = M + 64 + 12
@@ -259,7 +261,7 @@ def build(outdir):
             s.poly([(cx_ + cw - 6 - 6, cy_ + 6), (cx_ + cw - 6, cy_ + 10), (cx_ + cw - 12, cy_ + 14)], fill=C['cyan'])
 
     # status line --------------------------------------------------------
-    s.text(M, H - M - 12, 'Sent PROG D104 Classic E.Piano', 'ar', 13, C['text_dim'])
+    s.text(M, H - M - 12, 'Sent COMBI C096 Piano &Strings', 'ar', 13, C['text_dim'])
     s.save(outdir + '/browse.svg')
     return log
 

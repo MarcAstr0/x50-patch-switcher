@@ -23,8 +23,9 @@ C = dict(
     text_empty='#7E8A94', strip='#B2BBCA', cyan='#5DB0D0', cyan_text='#7CC8E4',
     on_cyan='#04141B', red='#FF8080', on_red='#04141B', amber='#F0B65A', green='#7BD39A',
     bg_browse='#121518', panel='#1B2024', panel_raised='#232A30', field='#101417',
-    sel_row='#1E4A5C', border='#46525A', disabled_text='#6B7780', lcd_bg='#0F2B36',
-    lcd_text='#7CC8E4', placeholder='#8A97A2', lcd_border='#1D4C5E',
+    sel_row='#1E4A5C', border='#46525A', disabled_text='#6B7780', placeholder='#8A97A2',
+    lcd_field='#E6E8E1', lcd_field_dim='#BFC3BA', lcd_ink='#111411', lcd_bezel='#3A413B',
+    lcd_warn='#8A1414',
 )
 
 _fc = {}

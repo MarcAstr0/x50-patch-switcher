@@ -38,25 +38,54 @@ def wrap_any(text, k, s, wbox):
     return lines
 
 
+def balanced_break(text, s, k='ab'):
+    """Space whose split gives the smallest widest line (ties: the earlier space)."""
+    best = None
+    for i, ch in enumerate(text):
+        if ch != ' ':
+            continue
+        l1, l2 = text[:i], text[i + 1:]
+        if not l1 or not l2:
+            continue
+        m = max(adv(l1, k, s), adv(l2, k, s))
+        if best is None or m < best[0]:
+            best = (m, [l1, l2])
+    return best[1] if best else None
+
+
 def fit_name(text, wbox, hbox, slots):
-    """DESIGN 5.3 stages A, B, C. Returns (size_px, lines, stage, size_in_u)."""
+    """DESIGN 5.3 steps 1 to 5. Returns (size_px, lines, step, size_in_u)."""
     max1, max2 = (52, 44) if slots == 8 else (60, 52)
-    for d in range(max1, 35, -2):
-        s = L(d)
-        if adv(text, 'ab', s) <= wbox:
-            return s, [text], 'A', d
-    for d in range(max2, 27, -2):
-        s = L(d)
-        ls = wrap_words(text, 'ab', s, wbox)
-        if ls is None and d == 28:
-            ls = wrap_any(text, 'ab', s, wbox)
-        if ls and len(ls) <= 2 and len(ls) * 1.1 * s <= hbox:
-            return s, ls, 'B', d
+    has_space = ' ' in text
+    s1 = None
+    for d in range(max1, 35, -2):                     # step 1: one-line size
+        if adv(text, 'ab', L(d)) <= wbox:
+            s1 = d
+            break
+    if s1 is not None and (s1 >= max2 or not has_space):   # step 2
+        return L(s1), [text], '2', s1
+    if has_space:                                     # step 3: balanced two lines
+        for d in range(max2, 27, -2):
+            s = L(d)
+            ls = balanced_break(text, s)
+            if ls and 2 * 1.1 * s <= hbox and all(adv(x, 'ab', s) <= wbox for x in ls):
+                if s1 is not None and s1 > d:
+                    break
+                return s, ls, '3', d
+    if s1 is not None:
+        return L(s1), [text], '2', s1
+    for d in range(34, 27, -2):                       # step 4: one-line shrink
+        if adv(text, 'ab', L(d)) <= wbox:
+            return L(d), [text], '4', d
+    s = L(28)                                         # step 5: wrap anywhere
+    ls = wrap_any(text, 'ab', s, wbox)
+    if len(ls) <= 2 and len(ls) * 1.1 * s <= hbox:
+        return s, ls, '5', 28
     for d in range(26, 13, -2):
         s = L(d)
         ls = wrap_any(text, 'ab', s, wbox)
         if len(ls) <= 2 and len(ls) * 1.1 * s <= hbox:
-            return s, ls, 'C', d
+            return s, ls, '5', d
     raise RuntimeError('no fit')
 
 
@@ -69,10 +98,10 @@ def fit_sound(text, wbox):
 
 
 def button(s, x, y, w, h, slot, n, st, slots, log):
-    """st: normal | lit | next | empty. slot: dict(label, kind, addr, name) or None."""
+    """st: normal | lit | empty. slot: dict(label, kind, addr, name) or None."""
     rad = L(14)
     pad = L(16)
-    b_norm, b_lit, b_next, b_empty = L(2), L(6), L(3), L(2)
+    b_norm, b_lit, b_empty = L(2), L(6), L(2)
     badge = L(44)
     tagc = L(22)
     dash = (L(8), L(6))
@@ -80,9 +109,6 @@ def button(s, x, y, w, h, slot, n, st, slots, log):
     if st == 'lit':
         s.rect(x, y, w, h, fill=C['cyan'], rx=rad)
         s.rect(x, y, w, h, stroke=C['text'], sw=b_lit, rx=rad)
-    elif st == 'next':
-        s.rect(x, y, w, h, fill=C['surface'], rx=rad)
-        s.rect(x, y, w, h, stroke=C['strip'], sw=b_next, rx=rad)
     elif st == 'empty':
         s.rect(x, y, w, h, stroke=C['line'], sw=b_empty, rx=rad, dash=dash)
     else:
@@ -110,20 +136,14 @@ def button(s, x, y, w, h, slot, n, st, slots, log):
     # tag
     rowc = iy + badge / 2.0
     gap = L(8)
-    if st in ('lit', 'next'):
-        word = 'NOW' if st == 'lit' else 'NEXT'
-        col = C['on_cyan'] if st == 'lit' else C['cyan_text']
+    if st == 'lit':
+        col = C['on_cyan']
         right = ix + iw
-        s.text(right, rowc, word, 'bs', tagc, col, anchor='end', trk=L(2))
-        tw = adv(word, 'bs', tagc, L(2)) - L(2)
+        s.text(right, rowc, 'NOW', 'bs', tagc, col, anchor='end', trk=L(2))
+        tw = adv('NOW', 'bs', tagc, L(2)) - L(2)
         tx = right - tw - gap
-        if st == 'lit':
-            tw_, th_ = L(14), L(16)
-            s.poly([(tx - tw_, rowc - th_ / 2.0), (tx, rowc), (tx - tw_, rowc + th_ / 2.0)], fill=col)
-        else:
-            tw_, th_ = L(10), L(16)
-            s.poly([(tx - tw_, rowc - th_ / 2.0), (tx - 0.5, rowc), (tx - tw_, rowc + th_ / 2.0)],
-                   stroke=col, sw=L(3), close=False, round_=False)
+        tw_, th_ = L(14), L(16)
+        s.poly([(tx - tw_, rowc - th_ / 2.0), (tx, rowc), (tx - tw_, rowc + th_ / 2.0)], fill=col)
 
     # name box
     nby = iy + badge + L(8)
@@ -158,23 +178,39 @@ def top_bar(s, setname, mode, addr, name, notinset, connected, log):
     ssz = L(24)
     s.text(pad, cy, setname, 'ab', ssz, C['text'])
     x = pad + adv(setname, 'ab', ssz) + L(24)
-    # mode chip
+    # LCD readout panel (DESIGN 5.5): bezel 2u, field-dim, inverse mode segment, ink text
     stat = L(22)
-    chip_w = adv(mode, 'bs', stat, L(1)) - L(1) + 2 * L(10)
+    ph = L(40)
+    bz = L(2)
+    inset = L(4)
     chip_h = L(32)
-    s.rect(x, cy - chip_h / 2.0, chip_w, chip_h, stroke=C['text_dim'], sw=L(2), rx=L(6))
-    s.text(x + L(10), cy, mode, 'bs', stat, C['text_dim'], trk=L(1))
-    x += chip_w + L(12)
+    ctext = L(20)
+    chip_w = adv(mode, 'bs', ctext, L(1)) - L(1) + 2 * L(10)
+    nsz = L(26)
+    body_w = chip_w + L(12)
     if addr:
-        s.text(x, cy, addr, 'bs', L(22), C['text_dim'], trk=L(1))
-        x += adv(addr, 'bs', L(22), L(1)) + L(12)
-        s.text(x, cy, name, 'ab', ssz, C['text'])
-        x += adv(name, 'ab', ssz) + L(16)
-        if notinset:
-            tsz = L(18)
-            tw = adv('NOT IN SET', 'bs', tsz, L(2)) - L(2) + 2 * L(10)
-            s.rect(x, cy - chip_h / 2.0, tw, chip_h, stroke=C['cyan_text'], sw=L(2), rx=L(6))
-            s.text(x + L(10), cy, 'NOT IN SET', 'bs', tsz, C['cyan_text'], trk=L(2))
+        body_w += adv(addr, 'bs', stat, L(1)) - L(1) + L(12) + adv(name, 'bs', nsz)
+    else:
+        body_w += adv('--', 'bs', nsz)
+    pw = bz + inset + body_w + L(12) + bz
+    s.rect(x, cy - ph / 2.0, pw, ph, fill=C['lcd_bezel'], rx=L(6))
+    s.rect(x + bz, cy - ph / 2.0 + bz, pw - 2 * bz, ph - 2 * bz, fill=C['lcd_field_dim'], rx=L(4))
+    px = x + bz + inset
+    s.rect(px, cy - chip_h / 2.0, chip_w, chip_h, fill=C['lcd_ink'], rx=L(3))
+    s.text(px + L(10), cy, mode, 'bs', ctext, C['lcd_field_dim'], trk=L(1))
+    px += chip_w + L(12)
+    if addr:
+        s.text(px, cy, addr, 'bs', stat, C['lcd_ink'], trk=L(1))
+        px += adv(addr, 'bs', stat, L(1)) + L(12) - L(1)
+        s.text(px, cy, name, 'bs', nsz, C['lcd_ink'])
+    else:
+        s.text(px, cy, '--', 'bs', nsz, C['lcd_ink'])
+    x += pw + L(16)
+    if addr and notinset:
+        tsz = L(18)
+        tw = adv('NOT IN SET', 'bs', tsz, L(2)) - L(2) + 2 * L(10)
+        s.rect(x, cy - chip_h / 2.0, tw, chip_h, stroke=C['cyan_text'], sw=L(2), rx=L(6))
+        s.text(x + L(10), cy, 'NOT IN SET', 'bs', tsz, C['cyan_text'], trk=L(2))
     # right zone
     label = 'X50 CONNECTED' if connected else 'NO X50'
     col = C['text'] if connected else C['red']
@@ -227,16 +263,9 @@ def render(path, slots, lit, setname, mode, addr, name, notinset, connected, log
     s = Svg(W, H, C['bg_live'])
     top_bar(s, setname, mode, addr, name, notinset, connected, log)
     cols, xs, ws, ys, hs = grid(n)
-    # next-up: next non-empty slot after the lit one, no wrap
-    nxt = None
-    if lit is not None:
-        for j in range(lit + 1, n):
-            if slots[j]:
-                nxt = j
-                break
     for i, sl in enumerate(slots):
         c, rw = i % cols, i // cols
-        st = 'empty' if not sl else ('lit' if i == lit else ('next' if i == nxt else 'normal'))
+        st = 'empty' if not sl else ('lit' if i == lit else 'normal')
         button(s, xs[c], ys[rw], ws[c], hs[rw], sl, i + 1, st, n, log) if sl else \
             button(s, xs[c], ys[rw], ws[c], hs[rw], None, i + 1, 'empty', n, log)
     hint(s)

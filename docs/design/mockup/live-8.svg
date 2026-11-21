@@ -3,10 +3,12 @@
 <rect x="0" y="0" width="1920" height="84" fill="#12171B"/>
 <rect x="0" y="81" width="1920" height="3" fill="#2A3238"/>
 <text x="36" y="52.38" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:700;font-size:36px;fill:#F2F5F7;">Friday Set 2</text>
-<rect x="278.81" y="18" width="102.2" height="45" rx="7.5" fill="none" stroke="#AEB8C2" stroke-width="3"/>
-<text x="292.31" y="53.7" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:33px;fill:#AEB8C2;letter-spacing:2px;">PROG</text>
-<text x="400.51" y="53.7" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:33px;fill:#AEB8C2;letter-spacing:2px;">D104</text>
-<text x="487.49" y="52.38" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:700;font-size:36px;fill:#F2F5F7;">Classic E.Piano</text>
+<rect x="277.31" y="10.5" width="461.06" height="60" rx="9" fill="#3A413B"/>
+<rect x="280.31" y="13.5" width="455.06" height="54" rx="6" fill="#BFC3BA"/>
+<rect x="286.31" y="16.5" width="98.91" height="48" rx="5" fill="#111411"/>
+<text x="301.31" y="52.5" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:30px;fill:#BFC3BA;letter-spacing:2px;">PROG</text>
+<text x="403.22" y="53.7" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:33px;fill:#111411;letter-spacing:2px;">D104</text>
+<text x="488.2" y="56.1" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:39px;fill:#111411;">Classic E.Piano</text>
 <text x="1886" y="53.7" text-anchor="end" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:33px;fill:#F2F5F7;letter-spacing:2px;">X50 CONNECTED</text>
 <circle cx="1619.59" cy="40.5" r="12" fill="#5DB0D0"/>
 <rect x="36" y="114" width="440" height="429" rx="21" fill="#1A1F24"/>
@@ -26,12 +28,11 @@
 <text x="530" y="512.4" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:30px;fill:#04141B;">Classic E.Piano</text>
 <text x="530" y="482.7" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:33px;fill:#04141B;letter-spacing:2px;">PROG D104</text>
 <rect x="976" y="114" width="440" height="429" rx="21" fill="#1A1F24"/>
-<rect x="978.5" y="116.5" width="435" height="424" rx="18.5" fill="none" stroke="#B2BBCA" stroke-width="5"/>
+<rect x="977.5" y="115.5" width="437" height="426" rx="19.5" fill="none" stroke="#5F6C76" stroke-width="3"/>
 <rect x="1001.5" y="139.5" width="63" height="63" rx="10.5" fill="none" stroke="#5F6C76" stroke-width="3"/>
 <text x="1033" y="187.8" text-anchor="middle" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:42px;fill:#F2F5F7;">3</text>
-<text x="1395" y="184.2" text-anchor="end" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:33px;fill:#7CC8E4;letter-spacing:3px;">NEXT</text>
-<path d="M1287.76 159 L1302.26 171 L1287.76 183" fill="none" stroke="#7CC8E4" stroke-width="5"/>
-<text x="1196" y="343.32" text-anchor="middle" style="font-family:'Atkinson Hyperlegible';font-weight:700;font-size:54px;fill:#F2F5F7;">Piano &amp;Strings</text>
+<text x="1196" y="310.98" text-anchor="middle" style="font-family:'Atkinson Hyperlegible';font-weight:700;font-size:66px;fill:#F2F5F7;">Piano</text>
+<text x="1196" y="383.58" text-anchor="middle" style="font-family:'Atkinson Hyperlegible';font-weight:700;font-size:66px;fill:#F2F5F7;">&amp;Strings</text>
 <text x="1000" y="515.7" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:33px;fill:#AEB8C2;letter-spacing:2px;">COMBI C096</text>
 <rect x="1446" y="114" width="438" height="429" rx="21" fill="#1A1F24"/>
 <rect x="1447.5" y="115.5" width="435" height="426" rx="19.5" fill="none" stroke="#5F6C76" stroke-width="3"/>
@@ -43,7 +44,8 @@
 <rect x="37.5" y="574.5" width="437" height="426" rx="19.5" fill="none" stroke="#5F6C76" stroke-width="3"/>
 <rect x="61.5" y="598.5" width="63" height="63" rx="10.5" fill="none" stroke="#5F6C76" stroke-width="3"/>
 <text x="93" y="646.8" text-anchor="middle" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:42px;fill:#F2F5F7;">5</text>
-<text x="256" y="805.29" text-anchor="middle" style="font-family:'Atkinson Hyperlegible';font-weight:700;font-size:63px;fill:#F2F5F7;">Bridge organ</text>
+<text x="256" y="769.98" text-anchor="middle" style="font-family:'Atkinson Hyperlegible';font-weight:700;font-size:66px;fill:#F2F5F7;">Bridge</text>
+<text x="256" y="842.58" text-anchor="middle" style="font-family:'Atkinson Hyperlegible';font-weight:700;font-size:66px;fill:#F2F5F7;">organ</text>
 <text x="60" y="971.4" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:30px;fill:#AEB8C2;">Heavy Organ</text>
 <text x="60" y="941.7" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:33px;fill:#AEB8C2;letter-spacing:2px;">COMBI A015</text>
 <rect x="507.5" y="574.5" width="437" height="426" rx="19.5" fill="none" stroke="#2A3238" stroke-width="3" stroke-dasharray="12 9"/>

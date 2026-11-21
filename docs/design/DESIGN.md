@@ -36,7 +36,7 @@ Same names in both.
 | `text` | `#F2F5F7` | primary text |
 | `text-dim` | `#AEB8C2` | secondary text, addresses, hints |
 | `text-empty` | `#7E8A94` | empty-slot text only (not actionable) |
-| `strip` | `#B2BBCA` | panel-strip nod: thin rules and the NEXT border only |
+| `strip` | `#B2BBCA` | panel-strip nod: thin rules; scrollbar hover |
 | `cyan` | `#5DB0D0` | lit fill, primary button fill, LED connected (LCD backlight nod) |
 | `cyan-text` | `#7CC8E4` | cyan used as text or thin lines on dark; pressed-lit fill |
 | `on-cyan` | `#04141B` | text and glyphs on `cyan` / `cyan-text` fills |
@@ -51,8 +51,11 @@ Same names in both.
 | `sel-row` | `#1E4A5C` | selected result row, selected category |
 | `border` | `#46525A` | browse control borders (1px) |
 | `disabled-text` | `#6B7780` | disabled controls (exempt from contrast rules) |
-| `lcd-bg` | `#0F2B36` | display strip background (LCD echo) |
-| `lcd-text` | `#7CC8E4` | display strip text (same hex as `cyan-text`) |
+| `lcd-field` | `#E6E8E1` | browse display strip: backlit LCD field (pale, slightly warm grey) |
+| `lcd-field-dim` | `#BFC3BA` | live top bar readout panel: the same LCD, dimmed so it does not glow on a dark stage |
+| `lcd-ink` | `#111411` | LCD text, inverse (reversed) segment fill, LCD LED and borders |
+| `lcd-bezel` | `#3A413B` | the thin dark bezel round both LCD panels (2px browse, 2u live) |
+| `lcd-warn` | `#8A1414` | disconnected ring and text inside the browse LCD only (`red` is too light on a pale field) |
 | `placeholder` | `#8A97A2` | search placeholder text |
 
 ### 1.2 Contrast table (live view, target 7:1 for text)
@@ -65,8 +68,9 @@ Same names in both.
 | `text` | `#04141B` badge on lit | >17:1 | slot number on lit |
 | `on-cyan` | `cyan-text` `#7CC8E4` | 10.0:1 | lit button when pressed |
 | `text` | `surface-pressed` `#2A333A` | 11.7:1 | pressed normal button |
-| `cyan-text` | `bg-live` | 10.4:1 | NEXT tag text |
-| `strip` `#B2BBCA` | `bg-live` | 10.1:1 | NEXT border (also non-text) |
+| `lcd-ink` `#111411` | `lcd-field-dim` `#BFC3BA` | 10.4:1 | live top bar readout text (address, name) |
+| `lcd-field-dim` | `lcd-ink` | 10.4:1 | mode text in the inverse segment |
+| `lcd-bezel` `#3A413B` | `bar` `#12171B` | 1.7:1 | panel edge (decoration; the field edge against `bar` is the boundary) |
 | `text` | `bar` `#12171B` | 16.5:1 | top bar text |
 | `text-dim` | `bar` | 9.0:1 | top bar small text, set label |
 | `cyan` | `bar` | 7.4:1 | connected LED, "NOW" marks in bar |
@@ -80,8 +84,8 @@ Same names in both.
 
 Browse and settings (target 4.5:1, most exceed 7:1): `text` on `panel` 15.0; `text-dim`
 on `panel` 8.2; `text` on `field` 16.9; `text-dim` on `field` 9.2; `placeholder` on
-`field` 6.2; `text` on `sel-row` 8.8; `text-dim` on `sel-row` 4.8; `lcd-text` on
-`lcd-bg` 7.9; `on-cyan` on `cyan` 7.7; `green` on `panel` 9.1; `amber` on `panel` 9.0;
+`field` 6.2; `text` on `sel-row` 8.8; `text-dim` on `sel-row` 4.8; `lcd-ink` on
+`lcd-field` 15.0; `lcd-field` on `lcd-ink` 15.0; `lcd-warn` on `lcd-field` 7.8; `on-cyan` on `cyan` 7.7; `green` on `panel` 9.1; `amber` on `panel` 9.0;
 `red` on `panel` 6.8; `cyan` on `panel` 6.7. `disabled-text` is intentionally lower
 (3.6:1 on `panel`).
 
@@ -144,14 +148,14 @@ Line height is a multiple of the pixel size.
 | `live-sound` | Atkinson Regular | fitted 20u down to 14u | 0 | 1.1 | as typed |
 | `bar-set` | Atkinson Bold | 24u (shrinks to 18u, §6.2) | 0 | 1.1 | as typed |
 | `bar-status` | Barlow SemiBold | 22u | 1u | 1.0 | upper |
-| `bar-now` | Atkinson Bold | 24u | 0 | 1.1 | as typed |
+| `bar-now` | Barlow SemiBold | 26u (name), 22u `live-addr` style (address), 20u tracked 1u (mode, in the inverse segment) | 0 | 1.1 | as typed |
 | `hint` | Barlow Medium | 18u | 0.5u | 1.2 | sentence |
 | `body` | Atkinson Regular | 15px | 0 | 1.3 | as typed |
 | `body-strong` | Atkinson Bold | 15px | 0 | 1.3 | as typed |
 | `small` | Atkinson Regular | 13px | 0 | 1.3 | as typed |
 | `label` | Barlow SemiBold | 12px | 1.5px | 1.2 | upper |
 | `address` | Barlow SemiBold | 15px | 0.5px | 1.2 | as typed |
-| `strip-main` | Atkinson Bold | 24px | 0 | 1.1 | as typed |
+| `strip-main` | Barlow SemiBold | 26px (name), 20px tracked 0.5px (address), 13px tracked 1.5px (mode) | 0 | 1.1 | as typed |
 | `title` | Atkinson Bold | 20px | 0 | 1.2 | as typed |
 
 Floor: any live text other than `live-name` never renders under 11 logical px (so
@@ -190,7 +194,6 @@ Margin 24u, gap 20u, inner padding 16u, top bar 56u, hint strip 32u, badge 44u.
 |---|---|
 | Live button normal | 2u |
 | Live button lit | 6u, colour `text` |
-| Live button next-up | 3u, colour `strip` |
 | Live button empty | 2u dashed (dash 8u, gap 6u), colour `line` |
 | Live button pressed | 4u, colour `cyan-text` (normal) |
 | Bar bottom rule | 2u, colour `line` |
@@ -273,8 +276,8 @@ Top to bottom inside the inner box:
 
 1. **Top row**, height 44. Left: slot badge, a 44 x 44 rounded square (radius 8),
    containing the slot digit (`live-badge`, centred). Right-aligned: state tag
-   (`live-tag`, vertically centred on the row) when the slot is NOW or NEXT; the tag's
-   triangle or chevron sits 8u left of the tag text, the tag's right edge at the inner
+   (`live-tag`, vertically centred on the row) when the slot is NOW; the tag's
+   triangle sits 8u left of the tag text, the tag's right edge at the inner
    box's right edge.
 2. Gap 8.
 3. **Name box**: height = button height - 16 - 44 - 8 - 8 - 48 - 16 = **button height
@@ -294,47 +297,58 @@ or `u` changes; the result (pixel size, line breaks) is cached on the button. Pa
 never measures. Measure with `QFontMetricsF` at the candidate pixel size.
 `W_box` = name box width, `H_box` = name box height.
 
-Stage A, one line. For `s` from `max1` down to `36u` in steps of `2u` (round each
-candidate to whole px): if the one-line advance of the text is <= `W_box`, use `s`,
-one line. `max1` = 52u (8 slots) or 60u (6 slots).
+Constants. `max1` = 52u (8 slots) or 60u (6 slots): largest one-line size. `max2` =
+44u (8) or 52u (6): two-line start size, and the "large size" threshold below. One-line
+floor for spaced names 36u; two-line floor 28u; step always 2u (each candidate rounded to
+whole px). Text without a space has no two-line step.
 
-Stage B, two lines. For `s` from `max2` down to `28u` in steps of `2u`: break at
-spaces (greedy, first line as long as fits); if the text fits in 2 lines (each line <=
-`W_box`, height `2 * 1.1 * s` <= `H_box`), use it. `max2` = 44u (8) or 52u (6).
-Text with no space may not fit by word; for the 28u step only, allow breaking inside
-the word (`QTextOption::WrapAnywhere`) into 2 lines.
+1. **One-line size `s1`.** The largest `s` from `max1` down to `36u` for which the
+   one-line advance is <= `W_box`; none if even 36u does not fit.
+2. **Large one line.** If `s1` exists and (`s1` >= `max2`, or the text has no space):
+   use one line at `s1`. Done. (A name with a space is kept on one line only when that
+   line is at least as big as a two-line start size.)
+3. **Balanced two lines (text with a space).** Break at the space that best balances the
+   lines: for every space, split there and measure both halves at the candidate size;
+   choose the split with the smallest widest line, ties to the earlier space. One break
+   only (two lines at most), so "Lounge Orchestra" breaks after "Lounge" and "Piano
+   &Strings" after "Piano". For `s` from `max2` down to `28u`: if both halves are <=
+   `W_box` and `2 * 1.1 * s` <= `H_box`, use two lines at `s`. If `s1` exists and is
+   larger than that `s`, use one line at `s1` instead (type is never smaller than
+   necessary). If the balanced split fits at no step, go to 4.
+4. **One-line shrink.** If `s1` exists, use it (36u to `max2` - 2u). Otherwise for `s`
+   from 34u down to 28u use the first at which the one-line advance fits. A long single
+   word (`StereophonicKeys`) lands here: 30u one line in the 8-slot grid at 1920x1080.
+5. **Last resort.** At 28u break anywhere into 2 lines (`QTextOption::WrapAnywhere`);
+   if that does not fit, from `26u` down to `14u` the same until it does. Ellipsis is
+   never used on the big text. A 16-character name always fits here; the worst case
+   measured (16 x "W", 14.1 em in Atkinson Bold) fits in 2 lines at 28u in the narrowest
+   8-slot box (261u wide). This step is a safety net for fonts that fail to load, not a
+   normal path.
 
-Stage C, last resort. For `s` from `26u` down to `14u` in steps of `2u`, allow break
-anywhere into 2 lines, use the first that fits. Ellipsis is never used on the big text.
-A 16-character name always fits by Stage C; the worst case measured (16 x "W", 14.1 em
-in Atkinson Bold) fits in 2 lines at 28u in the narrowest 8-slot box (261u wide).
-Stage C is a safety net for fonts that fail to load, not a normal path.
-
-Resulting behaviour for common names (Atkinson Bold advance measured): "Lounge
-Orchestra" (8.35 em) is two lines at 44u in the 8-slot grid and one line at 42u in the
-6-slot grid; a 7-character name sets at 52u in one line.
+Resulting behaviour (Atkinson Bold advance measured, 1920x1080 at 100%): "Piano &Strings"
+is two lines at 44u (66 px) in the 8-slot grid (one line would be 36u, below 44u) and two
+lines at 52u (78 px) in the 6-slot grid; "Layered A.Piano" two lines at 52u in the 6-slot
+grid; "Bridge organ" two lines at 44u (8 slots); "Solo lead" and "Intro pad" one line at
+52u (fits at the large size); "Session Piano" one line at 54u in the 6-slot grid;
+`StereophonicKeys` one line at 30u and `Waiting4Sunrise` one line at 32u (8 slots, no
+space).
 
 **Bottom block fit.** `live-sound`: from 20u down to 14u in steps of 2u until the
 advance <= inner width; at 14u a 16-character name always fits, so there is no ellipsis.
 `live-addr` never needs fitting (longest is `PROG g(d)001`, 5.2 em at 22u = 114u).
-
-Stage B accepts a result of one line: a single long word (`StereophonicKeys`) that fails
-stage A at 36u is set on one line at the largest step of 44u down to 28u that fits (30u in
-the 8-slot grid at 1920x1080), which beats a mid-word break. Mockup `live-8` shows this.
 
 Text colours per state are in §5.4. The big text is always `text` on normal buttons
 and `on-cyan` on the lit button.
 
 ### 5.4 States of a live button
 
-State is derived, never stored on the widget by hand: (slot empty?, lit?, next?,
+State is derived, never stored on the widget by hand: (slot empty?, lit?,
 pressed?). Repaint a button only when one of those changes, or its content changes.
 
 | State | Fill | Border | Big text | Address / sound | Badge | Tag |
 |---|---|---|---|---|---|---|
 | **Normal** | `surface` | 2u `line-strong` | `text` | `text-dim` | outline 2u `line-strong`, no fill, digit `text` | none |
 | **Lit (current)** | `cyan` | **6u `text`** | `on-cyan` | `on-cyan` | fill `on-cyan`, digit `text` | **filled right-pointing triangle 14u wide x 16u high + "NOW"**, colour `on-cyan` |
-| **Next-up [decided]** | `surface` | 3u `strip` | `text` | `text-dim` | as normal | outlined chevron `>` (stroke 3u, 10u wide x 16u high) + "NEXT", colour `cyan-text` |
 | **Empty** | none (shows `bg-live`) | 2u dashed `line` | "EMPTY" in `live-tag` style, `text-empty`, centred in the whole button (no name box) | none | outline 2u dashed `line`, digit `text-empty` | none |
 | **Pressed** (mouse or touch down on a non-empty button) | `surface-pressed` | 4u `cyan-text` | `text` | `text-dim` | as normal | as before |
 | **Pressed, lit** | `cyan-text` | 6u `text` | `on-cyan` | `on-cyan` | as lit | as lit |
@@ -349,10 +363,6 @@ Notes.
   (4) the badge is solid dark instead of outlined. Any one of these is enough.
 - The lit button is the brightest object on screen, a fill of mid-luminance cyan
   (not white). Nothing else in live view is filled with a bright colour.
-- **Next-up** is SPEC-silent. The brief says the next sound must be readable in one
-  glance, and the pedal keys step to it. Rule: the next non-empty slot after the lit
-  slot, no wrap. None if nothing is lit or the lit slot is the last non-empty one.
-  Owner may veto; removing it only deletes one row of this table and the tag.
 - **Empty** never changes on press; click and keys do nothing, no pressed state.
 - **Focused.** Live buttons are `Qt::NoFocus`; the live view widget owns the keyboard
   and never moves focus. So no focus ring exists in live view. (Browse focus is §7.)
@@ -370,20 +380,33 @@ Three zones in one row, vertically centred:
    wider, shrink 24u down to 18u in steps of 2u; at 18u elide with `…`. Eliding is
    acceptable here because the set name is the player's own text, shown in full in
    browse. [decided]
-2. **Centre, now readout.** Starts after the set name zone with 24u gap; fills the
-   remaining width less the right zone. Contents, left to right, gap 12u:
-   - mode chip: `COMBI`, `PROG` or `--` (mode unknown), `bar-status` text, 2u
-     `text-dim` border, radius 6u, height 32u, padding 10u horizontal, text `text-dim`.
-   - address `live-addr` in `text-dim` (bank and number only, `D104`: the chip already
-     says the mode; the same applies to the browse display strip), then the sound name `bar-now` in `text`,
-     for example `COMBI A012  Lounge Orchestra`. Shrinks 24u to 16u in steps of 2u to
-     fit, then wraps nothing and elides with `…` (it is a duplicate of the button text,
-     which never truncates).
-   - When the X50 is on a sound **not in the set**: after the name (16u gap), a tag
-     `NOT IN SET` (`live-tag` style at 18u, `cyan-text` text, 2u `cyan-text` border, radius
-     6u, height 32u, padding 10u horizontal).
-   - When the current sound is unknown (nothing sent, nothing followed): the readout
-     is the single word `--`, `text-dim`.
+2. **Centre, now readout: an LCD panel.** The top bar stays dark; only this readout is
+   an LCD, a compact panel echoing the unit's black-on-pale display (owner direction,
+   2026-11-21). Starts after the set name zone with 24u gap; the panel is as wide as its
+   content, at most the remaining width less the right zone. Painted with rectangles
+   only, no gradient, no pixel grid:
+   - Panel: height 40u, vertically centred; outer rounded rect radius 6u fill
+     `lcd-bezel` (the 2u bezel), inside it a rect inset 2u, radius 4u, fill
+     `lcd-field-dim` (`#BFC3BA`, deliberately dimmer than the browse strip so it does not
+     glow on a dark stage). Inner padding: 4u left of the mode segment, 12u right of the
+     name.
+   - Mode segment (LCD inverse): rounded rect radius 3u, height 32u, fill `lcd-ink`,
+     padding 10u horizontal, text `COMBI`, `PROG` or `--` in Barlow SemiBold 20u tracked
+     1u, colour `lcd-field-dim`. Then 12u gap.
+   - Address `live-addr` style (Barlow SemiBold 22u, tracked 1u), `lcd-ink`, bank and
+     number only (`D104`: the segment already says the mode; the same applies to the
+     browse display strip), 12u gap, then the sound name in Barlow SemiBold 26u,
+     `lcd-ink`, for example `PROG D104  Classic E.Piano`. The name shrinks 26u to 18u in
+     steps of 2u to fit the panel's available width, then elides with `…` (it is a
+     duplicate of the button text, which never truncates).
+   - Contrast: `lcd-ink` on `lcd-field-dim` 10.4:1, `lcd-field-dim` on `lcd-ink` 10.4:1
+     (both >= 7:1).
+   - When the X50 is on a sound **not in the set**: after the panel (16u gap, so outside
+     it), a tag `NOT IN SET` (`live-tag` style at 18u, `cyan-text` text, 2u `cyan-text`
+     border, radius 6u, height 32u, padding 10u horizontal) on the dark bar.
+   - When the current sound is unknown (nothing sent, nothing followed): the panel
+     shows the segment `--` and then the single word `--` in Barlow SemiBold 26u
+     `lcd-ink`, no address.
 3. **Right, connection.** Right-aligned. LED 16u diameter, 12u gap, then `bar-status`
    text. States:
    - `X50 CONNECTED`: LED filled disc `cyan`; text `text`.
@@ -470,7 +493,7 @@ As §5.
 ### 6.2 No button lit
 
 When the unit is on a sound not in the set, or nothing is known, no button is lit and
-no button is next-up. Top bar readout per §5.5.
+Top bar readout per §5.5.
 
 ### 6.3 Disconnected
 
@@ -487,8 +510,7 @@ name. No extra message (the set editor is where that is fixed). [decided]
 
 ### 6.5 Repaint discipline
 
-Repaint triggers, and only these: lit slot change (repaint the old and new button, plus
-the next-up pair and the bar readout), connection state change (bar only), press and
+Repaint triggers, and only these: lit slot change (repaint the old and new button and the bar readout), connection state change (bar only), press and
 release (that button), Esc armed state (hint strip only), error text change (bar),
 resize, DPR change, set or label change. Use `update(rect)` for the affected button or
 zone, never `update()` on the whole view for a single change. No animation, no timer
@@ -522,23 +544,31 @@ slack. At the minimum window (700 high): 16 + 64 + 12 + 40 + 12 + [main] + 12 + 
 
 ### 7.2 Display strip (what the X50 is on, and the connection)
 
-Height 64, full width, radius 8, background `lcd-bg`, 1px border `#1D4C5E`
-[decided]. Padding 8 vertical, 12 horizontal. An echo of the backlit LCD (REFERENCES §1
-item 9), drawn with QPainter rectangles only; no logo.
+Height 64, full width. An LCD panel (owner direction, 2026-11-21: keep the look of the
+unit's black-on-pale backlit display; REFERENCES §1 is superseded where it said cyan).
+Painted with QPainter rectangles only; no gradient, no pixel grid, no logo.
+
+- Bezel: outer rounded rect radius 8, fill `lcd-bezel` (`#3A413B`), so a 2px dark frame.
+- Field: inside it, inset 2px, radius 6, fill `lcd-field` (`#E6E8E1`). Padding 6 vertical
+  from the field, 12 horizontal (the bar below is at 8 from the outer edge).
 
 Left to right:
 
-1. **Reversed bar** (the LCD selected-line look): rounded rect radius 4, fill `cyan`,
-   height 48, padding 16 horizontal, auto width, max 62% of strip width. Contents,
-   text `on-cyan`: mode chip text `COMBI` / `PROG` / `--` in `label` style (Barlow
-   SemiBold 12px upper, tracked 1.5px), 12 gap, address (`address` 15px), 12 gap,
-   sound name (`strip-main`, Atkinson Bold 24px, shrinks to 16px then elides `…`).
-2. Gap 12. If the sound is unknown (nothing sent or followed) the reversed bar is not
-   filled: it is drawn with `lcd-bg` fill and a 1px `lcd-text` border, and shows `--` in
-   `lcd-text`.
-3. Right aligned: connection LED and text as live bar (§5.5) but at 15px/`label`
-   style, same LED rules (16px diameter, hollow ring with bar when disconnected),
-   text `lcd-text` when connected, `red` when not.
+1. **Inverse segment** (the LCD reversed line): rounded rect radius 4, fill `lcd-ink`
+   (`#111411`), height 48, padding 16 horizontal, auto width, max 62% of strip width.
+   Contents, text `lcd-field`: mode `COMBI` / `PROG` / `--` in Barlow SemiBold 13px upper,
+   tracked 1.5px; 12 gap; address in Barlow SemiBold 20px tracked 0.5px; 12 gap; sound
+   name in Barlow SemiBold 26px (`strip-main`), shrinking to 16px then eliding `…`.
+2. Gap 12. If the sound is unknown (nothing sent or followed) the inverse segment is not
+   filled: it is drawn as a 1px `lcd-ink` outline on the field and shows `--` in
+   `lcd-ink`.
+3. Right aligned: connection LED and text as the live bar (§5.5) but Barlow SemiBold
+   15px tracked 1.5px (`label` style), LED 16px diameter. Connected: filled disc
+   `lcd-ink`, text `lcd-ink`. Disconnected: hollow ring 2px with a diagonal bar in
+   `lcd-warn`, text `NO X50` in `lcd-warn` (ring and bar make it not colour only).
+
+Contrast: `lcd-ink` on `lcd-field` 15.0:1; `lcd-field` on `lcd-ink` 15.0:1; `lcd-warn` on
+`lcd-field` 7.8:1.
 
 ### 7.3 Toolbar row (height 40)
 
@@ -608,7 +638,7 @@ Selected row: fill `sel-row`, 4px `cyan` left accent, text `text`, address `text
 Hover: fill `panel-raised`. Focused list: 2px `cyan` outline inset around the list.
 The row that matches the X50's current sound gets a painted solid right-pointing
 triangle 8 x 10 `cyan` in the 8 px left of the star column [decided] (the browse echo of
-NOW). Highlight never sends. Empty results: centred text `No sounds match.` in `body`
+NOW). Highlight never sends. Result order is catalogue order, never by name: COMBI A, B, C, then PROG A, B, C, D, then G, then g(d) (only when GM is on), each bank by number. Empty results: centred text `No sounds match.` in `body`
 `text-dim`.
 
 Double-click and Enter send. Context menu (native style, themed by QSS in §10) offers
@@ -792,7 +822,7 @@ Every value the builder needs and where it is. Nothing below is left to choose.
 - [x] Fit algorithm (max, min, step, wrap, last resort, no ellipsis), bottom-block fit,
       cache rule: §5.3.
 - [x] Every live state with fill, border, text, badge, tag; non-colour lit signals;
-      next-up, empty, pressed, focused, disconnected: §5.4, §6.
+      empty, pressed, focused, disconnected: §5.4, §6.
 - [x] Top bar zones, widths, shrink rules, error and flash behaviour: §5.5.
 - [x] Esc hint text, placement, armed text, when shown: §5.6.
 - [x] 1x, 1.25x, 1.5x, 2x on 1920x1080 and 1366x768, with button sizes: §5.7.
@@ -826,8 +856,7 @@ mockup and this text disagree, this text wins and the mockup is a bug.
 - Whether Barlow Semi Condensed registers under the family name `Barlow Semi Condensed`
   on Windows Qt: check at first run (§2); not verified.
 - The 1 m legibility claim is computed, not measured (§5.7). Owner to test on the real laptop.
-- The `next-up` state and the "lit button stays when disconnected" rule are my decisions
-  where SPEC is silent (§5.4, §6.3).
+- The "lit button stays when disconnected" rule is my decision where SPEC is silent (§6.3).
 
 ---
 
@@ -841,8 +870,8 @@ the committed files). Text is measured with the same font files, so the §5.3 fi
 
 | File | Canvas | Shows |
 |---|---|---|
-| `docs/design/mockup/live-8.svg`, `docs/design/mockup-live-8.png` | 1920x1080, `u` = 1.5 | 8 slots; slot 2 lit (NOW), slot 3 next-up, slot 6 empty, 16-character `StereophonicKeys` (one line at 30u), connected top bar |
-| `docs/design/mockup/live-6.svg`, `docs/design/mockup-live-6.png` | 1920x1080, `u` = 1.5 | 6 slots; X50 on a sound not in the set: `NOT IN SET` tag, no lit button, no next-up |
+| `docs/design/mockup/live-8.svg`, `docs/design/mockup-live-8.png` | 1920x1080, `u` = 1.5 | 8 slots; slot 2 lit (NOW), slot 3 `Piano &Strings` on two lines at 44u (balanced break), slot 6 empty, 16-character `StereophonicKeys` (one line at 30u), connected top bar with the LCD readout panel |
+| `docs/design/mockup/live-6.svg`, `docs/design/mockup-live-6.png` | 1920x1080, `u` = 1.5 | 6 slots; X50 on a sound not in the set: `NOT IN SET` tag beside the LCD readout panel, no lit button |
 | `docs/design/mockup/browse.svg`, `docs/design/mockup-browse.png` | 1920x1080 client area (maximised window) | search `piano`, Combis and Programs on, GM off, program category list, 16 of 32 result rows, favourite stars, `EDITED` pill, selected row, current-sound triangle, display strip, transport bar, 8-slot set editor |
 | `docs/design/mockup/settings.svg`, `docs/design/mockup-settings.png` | 520x709 (content height; minimum is 560) | ports, manual settings, check running: pass, fail with hint, pass, unknown with hint, running |
 
@@ -856,7 +885,7 @@ Values changed in this document while drawing (the text above already carries th
 Values that were implicit and are now fixed (also written into the sections above):
 
 4. §5.2: grid column widths are rounded, the last column takes the remainder (440, 440, 440, 438).
-5. §5.3: stage B may yield one line (`StereophonicKeys` sets at 30u on one line).
+5. §5.3: a long single word (`StereophonicKeys`) sets at 30u on one line (step 4).
 6. §5.3: tag triangle or chevron sits 8u left of the tag text.
 7. §5.5: address in the top bar and the display strip is bank and number only (`D104`);
    `NOT IN SET` tag 16u after the name, 32u high, 10u padding.
@@ -866,8 +895,7 @@ unless the owner objects):
 
 - Browse at 1920 wide: category column 200, then the 6 px splitter, then the right column
   (1682). The result list's vertical scrollbar takes 12 of its width; rows are 1668 wide
-  inside the 1 px border, and the `Name` column is 1252. Sorted by name for the mockup;
-  the doc and SPEC do not say how results are ordered.
+  inside the 1 px border, and the `Name` column is 1252.
 - Live bottom block (72 px at `u` 1.5): the lower line's box is bottom-aligned, the address
   line sits directly above it, any slack is at the top. Without a label the address line
   alone is bottom-aligned.
@@ -877,6 +905,28 @@ unless the owner objects):
   `Checking…` while the probe runs, placeholder port name `X50 MIDI 1` (the real Windows
   name is unknown, MIDI.md).
 - Settings dialog at this content is 709 high, under the 80% of 1080 cap (864).
+
+Change round G2 (2026-11-21, owner-approved changes):
+
+- 2026-11-21: NEXT state removed from live view (§5.3 tag, §5.4 table and note, §1.1 and
+  §1.2 `strip` uses, §3.4, §6.2, §6.5, checklist) and from `live.py`. Only the lit slot
+  stands out.
+- 2026-11-21: §5.3 fit rewritten: a name with a space breaks at the best-balanced space
+  onto two lines whenever its one-line size would be below the two-line start size
+  (44u at 8 slots, 52u at 6). `Piano &Strings` is two lines at 44u (66 px) in `live-8`
+  (slot 3), and would be two lines at 52u (78 px) in the 6-slot grid.
+- 2026-11-21: browse results are in catalogue order (§7.7). The mockup rows were
+  re-selected from `data/x50-factory.tsv`: 13 COMBI rows then PROG A001, A065, A081 are
+  the 16 visible of 32. To keep every row feature visible, the example's current sound
+  is now `COMBI C096 Piano &Strings` (triangle, set-editor slot 3 marker), the edited
+  example is `PROG A065` (`M1 Piano Soft`), favourites B064, C096 and B001.
+- 2026-11-21: LCD look (owner description wins over REFERENCES §1, no note there):
+  browse display strip is black-on-pale with a reversed segment (§7.2, tokens
+  `lcd-field`, `lcd-ink`, `lcd-bezel`, `lcd-warn`); in live view only the top bar's
+  current-sound readout is an LCD panel with a dimmed field `lcd-field-dim` (§5.5). Tokens
+  `lcd-bg` and `lcd-text` are gone. Readout fonts are Barlow Semi Condensed. The lit
+  button cyan is unchanged. Regenerated: `mockup-live-8.png`, `mockup-live-6.png`,
+  `mockup-browse.png`.
 
 Open question for the owner, not changed: at wide browse windows the `EDITED` pill sits at
 the right edge of the very wide `Name` column, far from the name it describes (§7.7 puts

@@ -1,13 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
 <defs><clipPath id="c1"><rect x="222" y="144" width="1682" height="604" rx="8"/></clipPath></defs>
 <rect x="0" y="0" width="1920" height="1080" fill="#121518"/>
-<rect x="16.5" y="16.5" width="1887" height="63" rx="7.5" fill="#0F2B36" stroke="#1D4C5E" stroke-width="1"/>
-<rect x="28" y="24" width="288.07" height="48" rx="4" fill="#5DB0D0"/>
-<text x="44" y="52.8" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:12px;fill:#04141B;letter-spacing:1.5px;">PROG</text>
-<text x="85.66" y="54" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#04141B;letter-spacing:0.5px;">D104</text>
-<text x="126.88" y="55.92" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:700;font-size:24px;fill:#04141B;">Classic E.Piano</text>
-<text x="1893.5" y="54" text-anchor="end" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#7CC8E4;letter-spacing:1.5px;">X50 CONNECTED</text>
-<circle cx="1758.36" cy="48" r="8" fill="#5DB0D0"/>
+<rect x="16" y="16" width="1888" height="64" rx="8" fill="#3A413B"/>
+<rect x="18" y="18" width="1884" height="60" rx="6" fill="#E6E8E1"/>
+<rect x="28" y="24" width="282.9" height="48" rx="4" fill="#111411"/>
+<text x="44" y="53.2" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:13px;fill:#E6E8E1;letter-spacing:1.5px;">COMBI</text>
+<text x="93.46" y="56" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:20px;fill:#E6E8E1;letter-spacing:0.5px;">C096</text>
+<text x="146.02" y="58.4" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:26px;fill:#E6E8E1;">Piano &amp;Strings</text>
+<text x="1893.5" y="54" text-anchor="end" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#111411;letter-spacing:1.5px;">X50 CONNECTED</text>
+<circle cx="1758.36" cy="48" r="8" fill="#111411"/>
 <rect x="17" y="93" width="1226" height="38" rx="5" fill="#101417" stroke="#5DB0D0" stroke-width="2"/>
 <circle cx="34.5" cy="110.5" r="5" fill="none" stroke="#AEB8C2" stroke-width="2"/>
 <line x1="38.1" y1="114.1" x2="43" y2="119" stroke="#AEB8C2" stroke-width="2" stroke-linecap="round"/>
@@ -61,91 +62,91 @@
 <text x="1880.5" y="162.8" text-anchor="end" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:12px;fill:#AEB8C2;letter-spacing:1.5px;">USED</text>
 <rect x="223" y="207" width="1668" height="1" fill="#2A3238"/>
 <path d="M253 181 L255.38 186.72 L261.56 187.22 L256.85 191.25 L258.29 197.28 L253 194.05 L247.71 197.28 L249.15 191.25 L244.44 187.22 L250.62 186.72 Z" fill="none" stroke="#AEB8C2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="271" y="196" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#AEB8C2;letter-spacing:0.5px;">PROG C065</text>
-<text x="383" y="194.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">90's Piano</text>
+<text x="271" y="196" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#AEB8C2;letter-spacing:0.5px;">COMBI A032</text>
+<text x="383" y="194.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">Icy River Piano</text>
 <text x="1695" y="194.29" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">Keyboard</text>
 <rect x="223" y="243" width="1668" height="1" fill="#2A3238"/>
-<path d="M253 217 L255.38 222.72 L261.56 223.22 L256.85 227.25 L258.29 233.28 L253 230.05 L247.71 233.28 L249.15 227.25 L244.44 223.22 L250.62 222.72 Z" fill="#F0B65A"/>
-<text x="271" y="232" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#AEB8C2;letter-spacing:0.5px;">PROG B001</text>
-<text x="383" y="230.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">Acoustic Piano</text>
+<path d="M253 217 L255.38 222.72 L261.56 223.22 L256.85 227.25 L258.29 233.28 L253 230.05 L247.71 233.28 L249.15 227.25 L244.44 223.22 L250.62 222.72 Z" fill="none" stroke="#AEB8C2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="271" y="232" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#AEB8C2;letter-spacing:0.5px;">COMBI A064</text>
+<text x="383" y="230.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">Piano/WideString</text>
 <text x="1695" y="230.29" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">Keyboard</text>
-<text x="1879" y="230.29" text-anchor="end" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">x7</text>
 <rect x="223" y="279" width="1668" height="1" fill="#2A3238"/>
 <path d="M253 253 L255.38 258.72 L261.56 259.22 L256.85 263.25 L258.29 269.28 L253 266.05 L247.71 269.28 L249.15 263.25 L244.44 259.22 L250.62 258.72 Z" fill="none" stroke="#AEB8C2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="271" y="268" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#AEB8C2;letter-spacing:0.5px;">PROG A081</text>
-<text x="383" y="266.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">Analog E.Piano</text>
-<text x="1695" y="266.29" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">Keyboard</text>
-<text x="1879" y="266.29" text-anchor="end" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">x2</text>
+<text x="271" y="268" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#AEB8C2;letter-spacing:0.5px;">COMBI A110</text>
+<text x="383" y="266.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">Bass &amp; PianoPad</text>
+<text x="1695" y="266.29" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">BassSplits</text>
 <rect x="223" y="315" width="1668" height="1" fill="#2A3238"/>
 <path d="M253 289 L255.38 294.72 L261.56 295.22 L256.85 299.25 L258.29 305.28 L253 302.05 L247.71 305.28 L249.15 299.25 L244.44 295.22 L250.62 294.72 Z" fill="none" stroke="#AEB8C2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="271" y="304" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#AEB8C2;letter-spacing:0.5px;">PROG C032</text>
-<text x="383" y="302.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">Analog Piano</text>
-<text x="1695" y="302.29" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">FastSynth</text>
+<text x="271" y="304" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#AEB8C2;letter-spacing:0.5px;">COMBI B019</text>
+<text x="383" y="302.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">E.Piano/Brass</text>
+<text x="1695" y="302.29" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">LeadSplits</text>
 <rect x="223" y="351" width="1668" height="1" fill="#2A3238"/>
 <path d="M253 325 L255.38 330.72 L261.56 331.22 L256.85 335.25 L258.29 341.28 L253 338.05 L247.71 341.28 L249.15 335.25 L244.44 331.22 L250.62 330.72 Z" fill="none" stroke="#AEB8C2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="271" y="340" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#AEB8C2;letter-spacing:0.5px;">PROG C001</text>
-<text x="383" y="338.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">Attack Piano</text>
+<text x="271" y="340" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#AEB8C2;letter-spacing:0.5px;">COMBI B032</text>
+<text x="383" y="338.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">Soft Piano Pad</text>
 <text x="1695" y="338.29" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">Keyboard</text>
 <rect x="223" y="387" width="1668" height="1" fill="#2A3238"/>
 <path d="M253 361 L255.38 366.72 L261.56 367.22 L256.85 371.25 L258.29 377.28 L253 374.05 L247.71 377.28 L249.15 371.25 L244.44 367.22 L250.62 366.72 Z" fill="none" stroke="#AEB8C2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="271" y="376" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#AEB8C2;letter-spacing:0.5px;">COMBI A110</text>
-<text x="383" y="374.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">Bass &amp; PianoPad</text>
-<text x="1695" y="374.29" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">BassSplits</text>
-<rect x="223" y="423" width="1668" height="1" fill="#2A3238"/>
-<path d="M227 401 L235 406 L227 411 Z" fill="#5DB0D0"/>
+<text x="271" y="376" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#AEB8C2;letter-spacing:0.5px;">COMBI B048</text>
+<text x="383" y="374.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">Stream E.Piano</text>
+<text x="1695" y="374.29" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">Keyboard</text>
+<rect x="223" y="388" width="1668" height="36" fill="#1E4A5C"/>
+<rect x="223" y="388" width="4" height="36" fill="#5DB0D0"/>
 <path d="M253 397 L255.38 402.72 L261.56 403.22 L256.85 407.25 L258.29 413.28 L253 410.05 L247.71 413.28 L249.15 407.25 L244.44 403.22 L250.62 402.72 Z" fill="#F0B65A"/>
-<text x="271" y="412" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#AEB8C2;letter-spacing:0.5px;">PROG D104</text>
-<text x="383" y="410.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">Classic E.Piano</text>
+<text x="271" y="412" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#F2F5F7;letter-spacing:0.5px;">COMBI B064</text>
+<text x="383" y="410.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">Layered A.Piano</text>
 <text x="1695" y="410.29" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">Keyboard</text>
-<text x="1879" y="410.29" text-anchor="end" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">x12</text>
+<text x="1879" y="410.29" text-anchor="end" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">x3</text>
 <rect x="223" y="459" width="1668" height="1" fill="#2A3238"/>
 <path d="M253 433 L255.38 438.72 L261.56 439.22 L256.85 443.25 L258.29 449.28 L253 446.05 L247.71 449.28 L249.15 443.25 L244.44 439.22 L250.62 438.72 Z" fill="none" stroke="#AEB8C2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="271" y="448" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#AEB8C2;letter-spacing:0.5px;">PROG D113</text>
-<text x="383" y="446.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">Classic Piano LR</text>
-<rect x="1635.5" y="432.5" width="49.18" height="19" rx="3.5" fill="none" stroke="#F0B65A" stroke-width="1"/>
-<text x="1641" y="446.4" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:11px;fill:#F0B65A;letter-spacing:1.5px;">EDITED</text>
+<text x="271" y="448" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#AEB8C2;letter-spacing:0.5px;">COMBI B070</text>
+<text x="383" y="446.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">Ethereal Piano</text>
 <text x="1695" y="446.29" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">Keyboard</text>
 <rect x="223" y="495" width="1668" height="1" fill="#2A3238"/>
 <path d="M253 469 L255.38 474.72 L261.56 475.22 L256.85 479.25 L258.29 485.28 L253 482.05 L247.71 485.28 L249.15 479.25 L244.44 475.22 L250.62 474.72 Z" fill="none" stroke="#AEB8C2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="271" y="484" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#AEB8C2;letter-spacing:0.5px;">COMBI B019</text>
-<text x="383" y="482.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">E.Piano/Brass</text>
-<text x="1695" y="482.29" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">LeadSplits</text>
+<text x="271" y="484" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#AEB8C2;letter-spacing:0.5px;">COMBI B096</text>
+<text x="383" y="482.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">Layered M1 Piano</text>
+<text x="1695" y="482.29" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">Keyboard</text>
 <rect x="223" y="531" width="1668" height="1" fill="#2A3238"/>
 <path d="M253 505 L255.38 510.72 L261.56 511.22 L256.85 515.25 L258.29 521.28 L253 518.05 L247.71 521.28 L249.15 515.25 L244.44 511.22 L250.62 510.72 Z" fill="none" stroke="#AEB8C2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="271" y="520" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#AEB8C2;letter-spacing:0.5px;">COMBI B070</text>
-<text x="383" y="518.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">Ethereal Piano</text>
+<text x="271" y="520" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#AEB8C2;letter-spacing:0.5px;">COMBI C051</text>
+<text x="383" y="518.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">Session Piano</text>
 <text x="1695" y="518.29" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">Keyboard</text>
+<text x="1879" y="518.29" text-anchor="end" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">x5</text>
 <rect x="223" y="567" width="1668" height="1" fill="#2A3238"/>
 <path d="M253 541 L255.38 546.72 L261.56 547.22 L256.85 551.25 L258.29 557.28 L253 554.05 L247.71 557.28 L249.15 551.25 L244.44 547.22 L250.62 546.72 Z" fill="none" stroke="#AEB8C2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="271" y="556" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#AEB8C2;letter-spacing:0.5px;">COMBI A032</text>
-<text x="383" y="554.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">Icy River Piano</text>
+<text x="271" y="556" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#AEB8C2;letter-spacing:0.5px;">COMBI C064</text>
+<text x="383" y="554.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">Modern Piano</text>
 <text x="1695" y="554.29" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">Keyboard</text>
 <rect x="223" y="603" width="1668" height="1" fill="#2A3238"/>
-<path d="M253 577 L255.38 582.72 L261.56 583.22 L256.85 587.25 L258.29 593.28 L253 590.05 L247.71 593.28 L249.15 587.25 L244.44 583.22 L250.62 582.72 Z" fill="none" stroke="#AEB8C2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="271" y="592" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#AEB8C2;letter-spacing:0.5px;">PROG D123</text>
-<text x="383" y="590.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">L/R Piano(Knob1)</text>
+<path d="M227 581 L235 586 L227 591 Z" fill="#5DB0D0"/>
+<path d="M253 577 L255.38 582.72 L261.56 583.22 L256.85 587.25 L258.29 593.28 L253 590.05 L247.71 593.28 L249.15 587.25 L244.44 583.22 L250.62 582.72 Z" fill="#F0B65A"/>
+<text x="271" y="592" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#AEB8C2;letter-spacing:0.5px;">COMBI C096</text>
+<text x="383" y="590.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">Piano &amp;Strings</text>
 <text x="1695" y="590.29" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">Keyboard</text>
-<rect x="223" y="604" width="1668" height="36" fill="#1E4A5C"/>
-<rect x="223" y="604" width="4" height="36" fill="#5DB0D0"/>
-<path d="M253 613 L255.38 618.72 L261.56 619.22 L256.85 623.25 L258.29 629.28 L253 626.05 L247.71 629.28 L249.15 623.25 L244.44 619.22 L250.62 618.72 Z" fill="#F0B65A"/>
-<text x="271" y="628" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#F2F5F7;letter-spacing:0.5px;">COMBI B064</text>
-<text x="383" y="626.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">Layered A.Piano</text>
+<text x="1879" y="590.29" text-anchor="end" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">x12</text>
+<rect x="223" y="639" width="1668" height="1" fill="#2A3238"/>
+<path d="M253 613 L255.38 618.72 L261.56 619.22 L256.85 623.25 L258.29 629.28 L253 626.05 L247.71 629.28 L249.15 623.25 L244.44 619.22 L250.62 618.72 Z" fill="none" stroke="#AEB8C2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="271" y="628" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#AEB8C2;letter-spacing:0.5px;">COMBI C112</text>
+<text x="383" y="626.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">Shiny DigiPiano</text>
 <text x="1695" y="626.29" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">Keyboard</text>
-<text x="1879" y="626.29" text-anchor="end" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">x3</text>
 <rect x="223" y="675" width="1668" height="1" fill="#2A3238"/>
 <path d="M253 649 L255.38 654.72 L261.56 655.22 L256.85 659.25 L258.29 665.28 L253 662.05 L247.71 665.28 L249.15 659.25 L244.44 655.22 L250.62 654.72 Z" fill="none" stroke="#AEB8C2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="271" y="664" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#AEB8C2;letter-spacing:0.5px;">COMBI B096</text>
-<text x="383" y="662.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">Layered M1 Piano</text>
+<text x="271" y="664" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#AEB8C2;letter-spacing:0.5px;">PROG A001</text>
+<text x="383" y="662.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">StereoPiano mf/f</text>
 <text x="1695" y="662.29" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">Keyboard</text>
 <rect x="223" y="711" width="1668" height="1" fill="#2A3238"/>
 <path d="M253 685 L255.38 690.72 L261.56 691.22 L256.85 695.25 L258.29 701.28 L253 698.05 L247.71 701.28 L249.15 695.25 L244.44 691.22 L250.62 690.72 Z" fill="none" stroke="#AEB8C2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
 <text x="271" y="700" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#AEB8C2;letter-spacing:0.5px;">PROG A065</text>
-<text x="383" y="698.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">M1 Piano</text>
+<text x="383" y="698.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">M1 Piano Soft</text>
+<rect x="1635.5" y="684.5" width="49.18" height="19" rx="3.5" fill="none" stroke="#F0B65A" stroke-width="1"/>
+<text x="1641" y="698.4" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:11px;fill:#F0B65A;letter-spacing:1.5px;">EDITED</text>
 <text x="1695" y="698.29" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">Keyboard</text>
 <path d="M253 721 L255.38 726.72 L261.56 727.22 L256.85 731.25 L258.29 737.28 L253 734.05 L247.71 737.28 L249.15 731.25 L244.44 727.22 L250.62 726.72 Z" fill="none" stroke="#AEB8C2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="271" y="736" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#AEB8C2;letter-spacing:0.5px;">COMBI C064</text>
-<text x="383" y="734.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">Modern Piano</text>
+<text x="271" y="736" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#AEB8C2;letter-spacing:0.5px;">PROG A081</text>
+<text x="383" y="734.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:15px;fill:#F2F5F7;">Analog E.Piano</text>
 <text x="1695" y="734.29" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">Keyboard</text>
+<text x="1879" y="734.29" text-anchor="end" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">x2</text>
 <rect x="1891" y="172" width="12" height="288" rx="6" fill="#46525A"/>
 </g>
 <rect x="222.5" y="144.5" width="1681" height="603" rx="7.5" fill="none" stroke="#46525A" stroke-width="1"/>
@@ -188,13 +189,13 @@
 <text x="670.75" y="921" text-anchor="middle" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#F2F5F7;letter-spacing:0.5px;">2</text>
 <text x="690.5" y="909.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:700;font-size:15px;fill:#F2F5F7;">Verse EP</text>
 <text x="690.5" y="930.29" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">PROG D104 - Classic E.Piano</text>
-<path d="M1047 890 L1053 894 L1047 898 Z" fill="#5DB0D0"/>
 <rect x="1067" y="884" width="408.5" height="62" rx="6" fill="#232A30"/>
 <rect x="1068" y="885" width="406.5" height="60" rx="5" fill="none" stroke="#5DB0D0" stroke-width="2"/>
 <rect x="1075.5" y="903.5" width="23" height="23" rx="3.5" fill="none" stroke="#AEB8C2" stroke-width="1"/>
 <text x="1087.25" y="921" text-anchor="middle" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#F2F5F7;letter-spacing:0.5px;">3</text>
 <text x="1107" y="909.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:700;font-size:15px;fill:#F2F5F7;">Piano &amp;Strings</text>
 <text x="1107" y="930.29" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">COMBI C096</text>
+<path d="M1463.5 890 L1469.5 894 L1463.5 898 Z" fill="#5DB0D0"/>
 <rect x="1483.5" y="884" width="408.5" height="62" rx="6" fill="#232A30"/>
 <rect x="1484" y="884.5" width="407.5" height="61" rx="5.5" fill="none" stroke="#46525A" stroke-width="1"/>
 <rect x="1492" y="903.5" width="23" height="23" rx="3.5" fill="none" stroke="#AEB8C2" stroke-width="1"/>
@@ -223,5 +224,5 @@
 <text x="1503.75" y="991" text-anchor="middle" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:15px;fill:#F2F5F7;letter-spacing:0.5px;">8</text>
 <text x="1523.5" y="979.95" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:700;font-size:15px;fill:#F2F5F7;">Waiting4Sunrise</text>
 <text x="1523.5" y="1000.29" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">COMBI A026</text>
-<text x="16" y="1056.29" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">Sent PROG D104 Classic E.Piano</text>
+<text x="16" y="1056.29" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:13px;fill:#AEB8C2;">Sent COMBI C096 Piano &amp;Strings</text>
 </svg>
