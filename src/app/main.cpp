@@ -17,6 +17,8 @@
 #include <QCoreApplication>
 #include <QStringList>
 
+#include <cstdio>
+
 #ifdef Q_OS_WIN
 #include <windows.h>
 #include <shellapi.h>
@@ -42,6 +44,26 @@ QStringList commandLineArguments(int argc, char *argv[])
         args << QString::fromLocal8Bit(argv[i]);
     return args;
 }
+
+#ifdef Q_OS_WIN
+// The exe is a GUI-subsystem program (no console window on a double-click). When it is run
+// with arguments from cmd or PowerShell, borrow the parent's console so --help, --list-ports,
+// --probe and friends print there. Redirected output (a pipe or a file) is left alone.
+void attachParentConsole()
+{
+    if (!AttachConsole(ATTACH_PARENT_PROCESS))
+        return;
+    auto unusable = [](DWORD which) {
+        const HANDLE h = GetStdHandle(which);
+        return h == nullptr || h == INVALID_HANDLE_VALUE;
+    };
+    FILE *f = nullptr;
+    if (unusable(STD_OUTPUT_HANDLE))
+        freopen_s(&f, "CONOUT$", "w", stdout);
+    if (unusable(STD_ERROR_HANDLE))
+        freopen_s(&f, "CONOUT$", "w", stderr);
+}
+#endif
 } // namespace
 
 int main(int argc, char *argv[])
@@ -50,6 +72,10 @@ int main(int argc, char *argv[])
     // flags (--list-ports, --help, errors) work with no display. Qt allows one
     // application object per process, so it is chosen afterwards.
     const QStringList args = commandLineArguments(argc, argv);
+#ifdef Q_OS_WIN
+    if (args.size() > 1)  // a plain double-click has no arguments and must not touch a console
+        attachParentConsole();
+#endif
     QCoreApplication::setApplicationName(Version::appName());
     QCoreApplication::setApplicationVersion(Version::appVersion());
 

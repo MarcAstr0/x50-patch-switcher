@@ -12,3 +12,7 @@ Pulsa "Mas informacion" y luego "Ejecutar de todas formas".
 
 No se instala nada en el computador y no se escribe nada en el X50.
 El programa solo le pregunta al X50 que es y que sonido tiene seleccionado.
+
+Modo portatil (opcional): para guardar la configuracion y tus sets en un
+pendrive, crea un archivo vacio llamado "portable" (sin extension) junto al
+exe. El programa guardara todo en su propia carpeta y no en el perfil de usuario.

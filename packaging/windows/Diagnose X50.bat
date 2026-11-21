@@ -33,7 +33,8 @@ echo Diagnostico del X50.
 echo Enciende el X50 y conecta el cable USB. Esto tarda uno o dos minutos.
 echo No cierres esta ventana.
 echo.
-"%~dp0x50-patch-switcher.exe" --diagnose "%OUT%"
+rem The exe has no console of its own; "start /wait" makes cmd wait for it and keep its exit code.
+start "" /wait "%~dp0x50-patch-switcher.exe" --diagnose "%OUT%"
 set "RC=%ERRORLEVEL%"
 echo.
 rem Exit code 0 = every bank read; anything else still leaves a useful report.txt.

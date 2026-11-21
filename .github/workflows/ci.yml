@@ -116,7 +116,36 @@ jobs:
           # Copies the Qt DLLs and platform plugins next to the exe. The VC runtime is copied
           # below from the toolset's own redist folder, so windeployqt must not add vc_redist.
           windeployqt --release --no-translations --no-system-d3d-compiler \
-            --no-opengl-sw --no-compiler-runtime "$stage/x50-patch-switcher.exe"
+            --no-opengl-sw --no-compiler-runtime \
+            --skip-plugin-types tls,networkinformation "$stage/x50-patch-switcher.exe"
+
+          # The app links no network module (CLAUDE.md: no network code). Log which binaries
+          # import Qt6Network.dll (to learn what pulls it in), then drop it and its plugins and
+          # fail if anything still imports it. dumpbin comes from the msvc-dev-cmd step.
+          imports_network() { dumpbin -nologo -dependents "$1" | grep -qi 'Qt6Network\.dll'; }
+          echo "--- before removal: Qt6Network.dll present: $(test -f "$stage/Qt6Network.dll" && echo yes || echo no)"
+          if [ -f "$stage/Qt6Network.dll" ]; then
+            while IFS= read -r f; do
+              if [ "$f" != "$stage/Qt6Network.dll" ] && imports_network "$f"; then
+                echo "imports Qt6Network.dll: $f"
+              fi
+            done < <(find "$stage" -type f \( -name '*.dll' -o -name '*.exe' \))
+          fi
+          rm -f "$stage/Qt6Network.dll"
+          rm -rf "$stage/tls" "$stage/networkinformation"
+          bad=0
+          while IFS= read -r f; do
+            if imports_network "$f"; then
+              echo "STILL imports Qt6Network.dll after removal: $f"
+              bad=1
+            fi
+          done < <(find "$stage" -type f \( -name '*.dll' -o -name '*.exe' \))
+          if [ "$bad" != 0 ]; then
+            echo "something genuinely needs Qt6Network.dll; do not drop it, find out why"; exit 1
+          fi
+          echo "no binary in the package imports Qt6Network.dll"
+          # The exe must carry the icon and version resources.
+          dumpbin -nologo -headers "$stage/x50-patch-switcher.exe" | grep -i 'subsystem'
           # Widgets app: the DirectX shader compiler DLLs are not needed.
           rm -f "$stage/dxcompiler.dll" "$stage/dxil.dll" "$stage/vc_redist.x64.exe"
 
@@ -151,7 +180,7 @@ jobs:
           foreach ($f in 'vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll', 'msvcp140_1.dll', 'msvcp140_2.dll') {
             if (Test-Path (Join-Path $dir $f)) { Write-Host "present: $f" } else { Write-Host "MISSING from ${dir}: $f"; $bad = $true }
           }
-          foreach ($f in 'vc_redist.x64.exe', 'dxcompiler.dll', 'dxil.dll') {
+          foreach ($f in 'vc_redist.x64.exe', 'dxcompiler.dll', 'dxil.dll', 'Qt6Network.dll') {
             if (Test-Path (Join-Path $dir $f)) { Write-Host "must be absent: $f"; $bad = $true }
           }
           $tool = [version]$env:VCToolsVersion
@@ -178,7 +207,13 @@ jobs:
         run: |
           set "PATH=%SystemRoot%\system32;%SystemRoot%"
           cd X50-Patch-Switcher
-          x50-patch-switcher.exe --probe --fake-midi
+          rem GUI-subsystem exe: cmd does not wait for it, so start /wait (which keeps its exit code).
+          start "" /wait x50-patch-switcher.exe --probe --fake-midi
+          if errorlevel 1 (echo --probe --fake-midi exited with %ERRORLEVEL% & exit /b 1)
+          rem A bad flag must fail with a non-zero code, proving the exit code propagates.
+          start "" /wait x50-patch-switcher.exe --no-such-flag
+          if %ERRORLEVEL%==0 (echo exit code did not propagate for a bad flag & exit /b 1)
+          exit /b 0
 
       - name: Footprint (staged package)
         if: runner.os == 'Windows'
@@ -234,13 +269,41 @@ jobs:
           set "PATH=%SystemRoot%\system32;%SystemRoot%;%SystemRoot%\System32\WindowsPowerShell\v1.0"
           cd /d "%RUNNER_TEMP%\zipcheck\X50-Patch-Switcher" || exit /b 1
           if exist "%RUNNER_TEMP%\zipdiag" rmdir /s /q "%RUNNER_TEMP%\zipdiag"
-          x50-patch-switcher.exe --diagnose "%RUNNER_TEMP%\zipdiag" --fake-midi
+          start "" /wait x50-patch-switcher.exe --diagnose "%RUNNER_TEMP%\zipdiag" --fake-midi
           if errorlevel 1 (echo --diagnose --fake-midi exited with %ERRORLEVEL% & exit /b 1)
           if not exist "%RUNNER_TEMP%\zipdiag\report.txt" (echo report.txt missing & exit /b 1)
           echo --- the .bat, against the runner's real WinMM ports (no X50 here) ---
           call "Diagnose X50.bat" < NUL
           echo the .bat finished
           exit /b 0
+
+      - name: Portable mode (extracted zip)
+        if: runner.os == 'Windows'
+        # SPEC 7.2: a file named "portable" next to the exe keeps config next to the exe.
+        # Starts the GUI on the real Windows platform (not offscreen) against the simulated X50,
+        # then closes the main window, which saves window.ini into the config directory.
+        shell: pwsh
+        run: |
+          $dir = (Resolve-Path (Join-Path $env:RUNNER_TEMP 'zipcheck\X50-Patch-Switcher')).Path
+          $exe = Join-Path $dir 'x50-patch-switcher.exe'
+          $roots = @($env:LOCALAPPDATA, $env:APPDATA) | Where-Object { $_ }
+          function Find-Ini { $roots | ForEach-Object { Get-ChildItem $_ -Recurse -Filter window.ini -ErrorAction SilentlyContinue } }
+          if (Find-Ini) { Write-Host "window.ini already under AppData before the test"; Find-Ini | Format-List FullName }
+          $before = @(Find-Ini).Count
+          New-Item -ItemType File -Path (Join-Path $dir 'portable') -Force | Out-Null
+          Remove-Item (Join-Path $dir 'window.ini') -ErrorAction SilentlyContinue
+          $env:QT_QPA_PLATFORM = 'windows'
+          $p = Start-Process -FilePath $exe -ArgumentList '--fake-midi' -PassThru
+          Start-Sleep -Seconds 6
+          if ($p.HasExited) { Write-Host "app exited early with $($p.ExitCode)"; exit 1 }
+          $null = $p.CloseMainWindow()
+          if (-not $p.WaitForExit(15000)) { Write-Host "the main window did not close"; Stop-Process -Id $p.Id -Force; exit 1 }
+          Write-Host "exit code $($p.ExitCode)"
+          Get-ChildItem $dir | Where-Object { $_.Extension -in '.ini', '.json' -or $_.Name -eq 'portable' } | Format-Table Name, Length
+          if (-not (Test-Path (Join-Path $dir 'window.ini'))) { Write-Host "window.ini did not appear next to the exe"; exit 1 }
+          if (@(Find-Ini).Count -ne $before) { Write-Host "a window.ini was written under AppData in portable mode"; exit 1 }
+          Remove-Item (Join-Path $dir 'portable')
+          Write-Host "portable mode: settings landed next to the exe, not in AppData"
 
       - name: Check what Diagnose X50.bat left on the Desktop
         if: runner.os == 'Windows'

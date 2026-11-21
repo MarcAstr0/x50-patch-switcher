@@ -87,8 +87,21 @@ add_executable(x50-patch-switcher
 target_link_libraries(x50-patch-switcher PRIVATE x50ui x50midi x50core Qt6::Widgets)
 x50_target_options(x50-patch-switcher)
 if(WIN32)
-  set_target_properties(x50-patch-switcher PROPERTIES WIN32_EXECUTABLE OFF)
+  # GUI subsystem: a double-click opens no console window. main() attaches to the parent
+  # console for the CLI flags (src/app/main.cpp), so cmd.exe output and exit codes still work.
+  set_target_properties(x50-patch-switcher PROPERTIES WIN32_EXECUTABLE ON)
+  if(MSVC)
+    # Keep main() as the entry point under /SUBSYSTEM:WINDOWS.
+    target_link_options(x50-patch-switcher PRIVATE /ENTRY:mainCRTStartup)
+  endif()
   target_link_libraries(x50-patch-switcher PRIVATE Shell32)
+  # Icon and VERSIONINFO from the project version (0.9.0 -> 0,9,0,0).
+  set(X50_ICON_PATH "${CMAKE_CURRENT_SOURCE_DIR}/assets/icons/app.ico")
+  set(X50_VERSION_DOTS "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}.0")
+  set(X50_VERSION_COMMA "${PROJECT_VERSION_MAJOR},${PROJECT_VERSION_MINOR},${PROJECT_VERSION_PATCH},0")
+  configure_file(packaging/windows/x50-patch-switcher.rc.in
+                 "${CMAKE_CURRENT_BINARY_DIR}/x50-patch-switcher.rc" @ONLY)
+  target_sources(x50-patch-switcher PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/x50-patch-switcher.rc")
 endif()
 
 if(X50_BUILD_TESTS)

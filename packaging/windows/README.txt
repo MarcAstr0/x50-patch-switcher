@@ -12,3 +12,7 @@ then "Run anyway".
 
 Nothing is installed on your computer, and nothing is written to the X50.
 The program only asks the X50 what it is and which sound is selected.
+
+Portable mode (optional): to keep the settings and your sets on a USB stick,
+create an empty file named "portable" (no extension) next to the exe. The
+program then saves everything in its own folder instead of the user profile.
