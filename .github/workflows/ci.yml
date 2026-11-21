@@ -109,40 +109,62 @@ jobs:
           cp build/Release/x50-patch-switcher.exe "$stage/"
           cp "packaging/windows/Diagnose X50.bat" packaging/windows/LEEME.txt \
              packaging/windows/README.txt "$stage/"
-          # Copies the Qt DLLs and platform plugins next to the exe.
+          # Copies the Qt DLLs and platform plugins next to the exe. The VC runtime is copied
+          # below from the toolset's own redist folder, so windeployqt must not add vc_redist.
           windeployqt --release --no-translations --no-system-d3d-compiler \
-            --no-opengl-sw "$stage/x50-patch-switcher.exe"
+            --no-opengl-sw --no-compiler-runtime "$stage/x50-patch-switcher.exe"
+          # Widgets app: the DirectX shader compiler DLLs are not needed.
+          rm -f "$stage/dxcompiler.dll" "$stage/dxil.dll" "$stage/vc_redist.x64.exe"
 
-          # Belt and braces: if windeployqt still did not bundle the VC runtime, copy it
-          # from the Visual Studio redistributable. The assertion below is what decides.
-          if [ ! -f "$stage/vcruntime140_1.dll" ] || [ ! -f "$stage/msvcp140.dll" ] || [ ! -f "$stage/vcruntime140.dll" ]; then
-            echo "windeployqt did not bundle the VC runtime; VCINSTALLDIR=${VCINSTALLDIR:-<unset>}"
-            if [ -n "${VCINSTALLDIR:-}" ]; then
-              for crt in "$(cygpath -u "$VCINSTALLDIR")"Redist/MSVC/*/x64/Microsoft.VC*.CRT; do
-                if [ -d "$crt" ]; then
-                  echo "copying the runtime from $crt"
-                  cp "$crt"/*.dll "$stage/"
-                  break
-                fi
-              done
-            fi
+          # The runtime of the toolset that built the exe (VCToolsRedistDir is set by msvc-dev-cmd),
+          # not a glob over every installed version.
+          echo "VCToolsRedistDir=${VCToolsRedistDir:-<unset>} VCToolsVersion=${VCToolsVersion:-<unset>}"
+          if [ -z "${VCToolsRedistDir:-}" ]; then
+            echo "VCToolsRedistDir is not set"; exit 1
           fi
-          ls -R "$stage"
+          copied=0
+          for crt in "$(cygpath -u "$VCToolsRedistDir")"x64/Microsoft.VC*.CRT; do
+            if [ -d "$crt" ]; then
+              echo "copying the runtime from $crt"
+              cp "$crt"/*.dll "$stage/"
+              copied=1
+              break
+            fi
+          done
+          if [ "$copied" != 1 ]; then
+            echo "no Microsoft.VC*.CRT folder under $VCToolsRedistDir"; exit 1
+          fi
+          ls -l "$stage"
 
       - name: Assert the VC runtime is in the package
         if: runner.os == 'Windows'
-        # The player's laptop may lack the Visual C++ runtime: the exe must carry it.
+        # The player's laptop may lack the Visual C++ runtime: the exe must carry it, at least as
+        # new as the toolset that built the exe.
+        shell: pwsh
         run: |
-          missing=0
-          for f in vcruntime140.dll vcruntime140_1.dll msvcp140.dll; do
-            if [ -f "X50-Patch-Switcher/$f" ]; then
-              echo "present: $f"
-            else
-              echo "MISSING from X50-Patch-Switcher: $f"
-              missing=1
-            fi
-          done
-          exit $missing
+          $dir = 'X50-Patch-Switcher'
+          $bad = $false
+          foreach ($f in 'vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll', 'msvcp140_1.dll', 'msvcp140_2.dll') {
+            if (Test-Path (Join-Path $dir $f)) { Write-Host "present: $f" } else { Write-Host "MISSING from ${dir}: $f"; $bad = $true }
+          }
+          foreach ($f in 'vc_redist.x64.exe', 'dxcompiler.dll', 'dxil.dll') {
+            if (Test-Path (Join-Path $dir $f)) { Write-Host "must be absent: $f"; $bad = $true }
+          }
+          $tool = [version]$env:VCToolsVersion
+          Write-Host "VCToolsVersion: $($env:VCToolsVersion) (major.minor $($tool.Major).$($tool.Minor))"
+          foreach ($f in 'msvcp140.dll', 'vcruntime140.dll') {
+            $path = Join-Path $dir $f
+            if (-not (Test-Path $path)) { continue }
+            $v = (Get-Item $path).VersionInfo
+            $have = [version]('{0}.{1}' -f $v.FileMajorPart, $v.FileMinorPart)
+            Write-Host "$f FileVersion $($v.FileVersion) (major.minor $have)"
+            if ($have -lt [version]('{0}.{1}' -f $tool.Major, $tool.Minor)) {
+              Write-Host "$f is older than the toolset $($env:VCToolsVersion)"; $bad = $true
+            }
+          }
+          Write-Host '--- package files ---'
+          Get-ChildItem $dir -Recurse -File | ForEach-Object { '{0,12}  {1}' -f $_.Length, $_.FullName.Substring((Resolve-Path $dir).Path.Length + 1) }
+          if ($bad) { exit 1 }
 
       - name: Smoke (staged package)
         if: runner.os == 'Windows'
@@ -180,6 +202,7 @@ jobs:
 
       - name: Smoke (extracted zip, as the player runs it)
         if: runner.os == 'Windows'
+        # M3: its --screenshot smoke must run from this extracted zip so qwindows.dll is exercised.
         # Reduced PATH: Windows system folders and Windows PowerShell (the .bat calls powershell),
         # no Qt, no Visual Studio. Diagnose X50.bat is run with NUL as stdin so "pause" returns.
         shell: cmd

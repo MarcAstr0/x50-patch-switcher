@@ -83,6 +83,18 @@ private slots:
         QVERIFY(DiagnoseRunner::planPortPairs(L({"USB MIDI Device 1"}), QStringList()).isEmpty());
     }
 
+    // 4x4 with no X50 name and no equal stripped names: the right pair shares the most words but
+    // is last in plain cross-product order.
+    void thirdTierOrderedBySharedWords() {
+        const auto p = DiagnoseRunner::planPortPairs(
+            L({"Alpha Box 0", "Beta Box 1", "Gamma Box 2", "Delta Pad Mk2 3"}),
+            L({"One Two 0", "Three Four 1", "Five Six 2", "Delta Pad 3"}));
+        QVERIFY(p.size() == 16);
+        QCOMPARE(outs(p).at(0), QStringLiteral("Delta Pad Mk2 3 -> Delta Pad 3"));
+        // Ties keep plain order: Alpha Box 0 -> One Two 0 comes first among the zero-share pairs.
+        QCOMPARE(outs(p).at(1), QStringLiteral("Alpha Box 0 -> One Two 0"));
+    }
+
     void attemptsAreCapped() {
         QStringList o, i;
         for (int n = 0; n < 6; ++n) {

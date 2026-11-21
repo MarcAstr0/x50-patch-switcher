@@ -120,6 +120,9 @@ public:
     // Case-insensitive: `name` contains `sub`, comparing without the trailing " <digits>" on either
     // side, or `name` contains `sub` as given.
     static bool portNameMatches(const QString &name, const QString &sub);
+    // Index of the port `sub` selects, or -1. Three passes in order: exact name (case-insensitive),
+    // raw substring over all names, then the index-stripped comparison.
+    static int findPortIndex(const QStringList &names, const QString &sub);
     // SPEC 4.3. Result arrives as sent() or errorOccurred()/sendFailed().
     void send(const SoundAddress &address);
     // SPEC 4.6. With continueOnError a failed bank is recorded and the next is tried

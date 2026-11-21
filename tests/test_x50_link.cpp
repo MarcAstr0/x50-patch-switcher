@@ -1029,6 +1029,19 @@ private slots:
         QVERIFY(!X50Link::portNameMatches(QStringLiteral("KORG X50 3"), QString()));
     }
 
+    // Three passes: exact, raw substring over all names, then index-stripped. With two identical
+    // devices "Device 1" must pick "USB MIDI Device 1", not the first stripped match.
+    void findPortIndexPrefersExactThenRawSubstring() {
+        const QStringList two{QStringLiteral("USB MIDI Device 0"), QStringLiteral("USB MIDI Device 1")};
+        QCOMPARE(X50Link::findPortIndex(two, QStringLiteral("Device 1")), 1);
+        QCOMPARE(X50Link::findPortIndex(two, QStringLiteral("usb midi device 1")), 1);  // exact, any case
+        QCOMPARE(X50Link::findPortIndex(two, QStringLiteral("Device 0")), 0);
+        const QStringList other{QStringLiteral("USB MIDI Device 4"), QStringLiteral("Other 5")};
+        QCOMPARE(X50Link::findPortIndex(other, QStringLiteral("usb midi device 0")), 0);  // pass 3
+        QCOMPARE(X50Link::findPortIndex(two, QStringLiteral("microX")), -1);
+        QCOMPARE(X50Link::findPortIndex(two, QString()), -1);
+    }
+
     void connectsWhenTheSubstringCarriesAnotherIndex() {
         fake->setPortName(QStringLiteral("USB MIDI Device 1"));
         link->setPortNames(QStringLiteral("usb midi device 0"));  // the input list's spelling

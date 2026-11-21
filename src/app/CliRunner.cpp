@@ -18,13 +18,14 @@ std::unique_ptr<MidiBackend> makeBackend(bool fake)
         // Hidden test hook (tests/test_cli.cpp): the simulated device answers as a microX.
         if (qEnvironmentVariableIsSet("X50_FAKE_MICROX"))
             f->setMicroX(true);
-        // Hidden test hook: the Device Inquiry reply is these bytes (hex), e.g. a malformed one.
+        // Hidden test hook: the simulated device never replies.
         if (qEnvironmentVariableIsSet("X50_FAKE_DROP_REPLIES"))
             f->setDropReplies(true);
         bool chOk = false;
         const int ch = qEnvironmentVariableIntValue("X50_FAKE_CHANNEL", &chOk);
         if (chOk && ch >= 1 && ch <= 16)
             f->setGlobalChannel(ch);
+        // Hidden test hook: the Device Inquiry reply is these bytes (hex), e.g. a malformed one.
         const QByteArray bad = qgetenv("X50_FAKE_INQUIRY_REPLY");
         if (!bad.isEmpty())
             f->setInquiryReplyOverride(QByteArray::fromHex(bad));

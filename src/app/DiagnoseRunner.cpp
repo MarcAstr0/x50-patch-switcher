@@ -6,6 +6,7 @@
 
 #include <RtMidi.h>
 
+#include <algorithm>
 #include <string>
 #include <utility>
 #include <vector>
@@ -133,7 +134,13 @@ QVector<DiagnoseRunner::PortPair> DiagnoseRunner::planPortPairs(const QStringLis
     // device never match as written: compare without that suffix.
     const QString x50 = CliCommon::defaultPortSubstring();
     const QString gs = QStringLiteral("Microsoft GS Wavetable Synth");
-    QVector<PortPair> tier1, tier2, tier3;
+    struct Scored { PortPair pair; int shared; };
+    QVector<PortPair> tier1, tier2;
+    QVector<Scored> tier3;
+    auto words = [](const QString &n) {
+        QStringList w = n.toLower().split(QLatin1Char(' '), Qt::SkipEmptyParts);
+        return w;
+    };
     for (const QString &out : outputs) {
         const QString so = X50Link::stripPortIndex(out);
         if (so.compare(gs, Qt::CaseInsensitive) == 0)
@@ -145,7 +152,15 @@ QVector<DiagnoseRunner::PortPair> DiagnoseRunner::planPortPairs(const QStringLis
             else if (so.compare(si, Qt::CaseInsensitive) == 0)
                 tier2.append({out, in, QStringLiteral("output and input have the same name")});
             else
-                tier3.append({out, in, QStringLiteral("any other pair")});
+            {
+                // Third tier: the more words the stripped names share, the likelier the pair.
+                int shared = 0;
+                const QStringList wi = words(si);
+                for (const QString &w : words(so))
+                    if (wi.contains(w))
+                        ++shared;
+                tier3.append({{out, in, QStringLiteral("any other pair")}, shared});
+            }
         }
     }
     if (singleX50Pair)
@@ -154,7 +169,10 @@ QVector<DiagnoseRunner::PortPair> DiagnoseRunner::planPortPairs(const QStringLis
         return tier1;
     QVector<PortPair> all = tier1;
     all += tier2;
-    all += tier3;
+    std::stable_sort(tier3.begin(), tier3.end(),
+                     [](const Scored &a, const Scored &b) { return a.shared > b.shared; });
+    for (const Scored &sc : std::as_const(tier3))
+        all.append(sc.pair);
     if (all.size() > kMaxAttempts)
         all.resize(kMaxAttempts);
     return all;
@@ -478,6 +496,14 @@ QString DiagnoseRunner::buildReport() const
     default:
         result = m_microX ? QStringLiteral("A microX answered; this app supports the X50 only.")
                           : QStringLiteral("INCOMPLETE: see Probe and Banks below.");
+        bool anyRefused = false;
+        for (const Attempt &a : m_attempts)
+            anyRefused = anyRefused || a.refused;
+        if (anyRefused && !m_microX) {
+            const int banks = static_cast<int>(m_dumps.size());  // 7 banks and Global: 8 dumps in all
+            result = QStringLiteral("INCOMPLETE: the device answered the Device Inquiry in an unexpected form "
+                                    "(raw bytes in Probe); banks were read anyway: %1 of 8 saved.").arg(banks);
+        }
         break;
     }
     L << QStringLiteral("X50 Patch Switcher diagnostic report")

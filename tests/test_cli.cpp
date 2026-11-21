@@ -266,6 +266,8 @@ private slots:
         QVERIFY(report.open(QIODevice::ReadOnly));
         const QString text = QString::fromUtf8(report.readAll());
         QVERIFY2(text.contains(QStringLiteral("reply refused, raw bytes in report")), qPrintable(text));
+        QVERIFY2(text.contains(QStringLiteral("Result: INCOMPLETE: the device answered the Device Inquiry in an unexpected form "
+                                              "(raw bytes in Probe); banks were read anyway: 8 of 8 saved.")), qPrintable(text));
         QVERIFY2(!text.contains(QStringLiteral("no reply to the Device Inquiry")), qPrintable(text));
         QVERIFY2(text.contains(QStringLiteral("F0 7E 02 06 02 42 7B 00 01 00 01 05 00 00 F7")), qPrintable(text));
         QVERIFY2(text.contains(QStringLiteral("OUT 6 bytes: F0 42 32 7A 12 F7")), qPrintable(text));  // MIDI.md section 5, channel 3

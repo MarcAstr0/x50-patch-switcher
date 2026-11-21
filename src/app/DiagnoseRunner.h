@@ -54,7 +54,7 @@ public:
     // `singleX50Pair` is set when exactly one pair has X50 in both names (then it is the only one).
     static QVector<PortPair> planPortPairs(const QStringList &outputs, const QStringList &inputs,
                                            bool *singleX50Pair = nullptr);
-    static constexpr int kMaxAttempts = 12;
+    static constexpr int kMaxAttempts = 32;
 
     explicit DiagnoseRunner(const CliOptions &options, QObject *parent = nullptr);
     // Needs a QCoreApplication. Returns the process exit code (ExitCode::*).

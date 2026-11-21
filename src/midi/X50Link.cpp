@@ -253,13 +253,27 @@ void X50Link::onPoll()
 
 int X50Link::findPort(const QStringList &names, const QString &sub) const
 {
+    return findPortIndex(names, sub);
+}
+
+int X50Link::findPortIndex(const QStringList &names, const QString &sub)
+{
     if (sub.isEmpty())
         return -1;
-    for (int i = 0; i < names.size(); ++i)  // an exact name (diagnose pairs) wins over a substring
-        if (names.at(i) == sub)
-            return i;
+    // Pass 1: the exact name, case-insensitive (diagnose pairs pass full names).
     for (int i = 0; i < names.size(); ++i)
-        if (portNameMatches(names.at(i), sub))
+        if (names.at(i).compare(sub, Qt::CaseInsensitive) == 0)
+            return i;
+    // Pass 2: the raw substring over all names, so "Device 1" picks "USB MIDI Device 1".
+    for (int i = 0; i < names.size(); ++i)
+        if (names.at(i).contains(sub, Qt::CaseInsensitive))
+            return i;
+    // Pass 3: the index-stripped comparison (WinMM numbers differ between lists).
+    const QString strippedSub = stripPortIndex(sub);
+    if (strippedSub.isEmpty())
+        return -1;
+    for (int i = 0; i < names.size(); ++i)
+        if (stripPortIndex(names.at(i)).contains(strippedSub, Qt::CaseInsensitive))
             return i;
     return -1;
 }
