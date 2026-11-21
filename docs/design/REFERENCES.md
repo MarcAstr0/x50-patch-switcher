@@ -155,6 +155,8 @@ end, so its terms are unverified.
 7. Live-view button names in Atkinson Hyperlegible Bold, sized to fit a 16-character
    name by shrinking, with a stated minimum size and wrap rule; labels and browse UI in
    Barlow or Source Sans 3. Decide at T2.3 whether two families are worth the bytes.
+   (Superseded at G2 approved, 2026-11-21: the owner chose Pixel Operator X50 Bold for
+   the big button names; see DESIGN.md §5.3.)
 8. Round shapes: soft-edged rounded rectangles (small radius) echo the X50 buttons;
    do not imitate the ribbed knobs or the metallic gradient strips.
 9. No animation anywhere at idle, no glow effects that need repaint, no gradients that

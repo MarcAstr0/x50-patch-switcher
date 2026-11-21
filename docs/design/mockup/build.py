@@ -34,6 +34,6 @@ if __name__ == '__main__':
         pass
     print('\n'.join(log))
     if '--no-render' not in sys.argv:
-        for n in ('live-8', 'live-8-pixelfont', 'live-6', 'browse', 'settings'):
+        for n in ('live-8', 'live-6', 'browse', 'settings'):
             if os.path.exists(os.path.join(HERE, n + '.svg')):
                 render(n)

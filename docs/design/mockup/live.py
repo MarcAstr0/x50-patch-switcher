@@ -54,52 +54,41 @@ def balanced_break(text, s, k='ab'):
     return best[1] if best else None
 
 
-def fit_name(text, wbox, hbox, slots):
-    """DESIGN 5.3 steps 1 to 5. Returns (size_px, lines, step, size_in_u)."""
-    max1, max2 = (52, 44) if slots == 8 else (60, 52)
-    has_space = ' ' in text
-    s1 = None
-    for d in range(max1, 35, -2):                     # step 1: one-line size
-        if adv(text, 'ab', L(d)) <= wbox:
-            s1 = d
-            break
-    if s1 is not None and (s1 >= max2 or not has_space):   # step 2
-        return L(s1), [text], '2', s1
-    if has_space:                                     # step 3: balanced two lines
-        for d in range(max2, 27, -2):
-            s = L(d)
-            ls = balanced_break(text, s)
-            if ls and 2 * 1.1 * s <= hbox and all(adv(x, 'ab', s) <= wbox for x in ls):
-                if s1 is not None and s1 > d:
-                    break
-                return s, ls, '3', d
+PX_PITCH = 14   # line pitch in font pixels (12 ink rows + 2)
+PX_FLOOR = 2    # legibility floor for k before words are broken anywhere
+
+
+def px_cap(U, slots=8):
+    """Largest k: round(4.5 * U), at least PX_FLOOR (DESIGN 5.3)."""
+    return max(PX_FLOOR, r(4.5 * U))
+
+
+def wrap_any_px(text, k, wbox):
+    return wrap_any(text, 'pb', 16 * k, wbox)
+
+
+def fit_pixel(text, wbox, hbox, U=U):
+    """DESIGN 5.3 for Pixel Operator X50 Bold. All values device px. Returns (k, lines, rule).
+    Rule A: one line, largest k. Rule B: balanced two lines when strictly larger k than
+    the one-line k. Rule C: no fit at k >= 2, break anywhere at k = 2, then 1."""
+    cap = px_cap(U)
+    s1 = s2 = None
+    two = None
+    for k in range(cap, PX_FLOOR - 1, -1):
+        if s1 is None and 12 * k <= hbox and adv(text, 'pb', 16 * k) <= wbox:
+            s1 = k
+        if s2 is None and ' ' in text and (PX_PITCH + 12) * k <= hbox:
+            ls = balanced_break(text, 16 * k, 'pb')
+            if ls and all(adv(x, 'pb', 16 * k) <= wbox for x in ls):
+                s2, two = k, ls
+    if s2 is not None and (s1 is None or s2 > s1):
+        return s2, two, 'B'
     if s1 is not None:
-        return L(s1), [text], '2', s1
-    for d in range(34, 27, -2):                       # step 4: one-line shrink
-        if adv(text, 'ab', L(d)) <= wbox:
-            return L(d), [text], '4', d
-    s = L(28)                                         # step 5: wrap anywhere
-    ls = wrap_any(text, 'ab', s, wbox)
-    if len(ls) <= 2 and len(ls) * 1.1 * s <= hbox:
-        return s, ls, '5', 28
-    for d in range(26, 13, -2):
-        s = L(d)
-        ls = wrap_any(text, 'ab', s, wbox)
-        if len(ls) <= 2 and len(ls) * 1.1 * s <= hbox:
-            return s, ls, '5', d
-    raise RuntimeError('no fit')
-
-
-def fit_pixel(text, wbox, hbox):
-    """Largest integer k (font px 16k, Pixel Operator Bold) that fits: one line, or the
-    balanced two-line break (line pitch 14k). Ties go to fewer lines."""
-    for k in range(12, 0, -1):
-        if adv(text, 'pb', 16 * k) <= wbox:
-            return k, [text]
-        ls = balanced_break(text, 16 * k, 'pb')
-        if ls and 2 * 14 * k <= hbox and all(adv(x, 'pb', 16 * k) <= wbox for x in ls):
-            return k, ls
-    return 1, [text]
+        return s1, [text], 'A'
+    for k in range(PX_FLOOR, 0, -1):
+        ls = wrap_any_px(text, k, wbox)
+        if k == 1 or 12 * k + PX_PITCH * k * (len(ls) - 1) <= hbox:
+            return k, ls, 'C'
 
 
 def fit_sound(text, wbox):
@@ -110,7 +99,7 @@ def fit_sound(text, wbox):
     return L(14)
 
 
-def button(s, x, y, w, h, slot, n, st, slots, log, pix=False):
+def button(s, x, y, w, h, slot, n, st, slots, log):
     """st: normal | lit | empty. slot: dict(label, kind, addr, name) or None."""
     rad = L(14)
     pad = L(16)
@@ -162,24 +151,14 @@ def button(s, x, y, w, h, slot, n, st, slots, log, pix=False):
     nby = iy + badge + L(8)
     nbh = h - 2 * pad - badge - L(8) - L(8) - L(48)
     big = slot['label'] or slot['name']
-    if pix:
-        k, lines = fit_pixel(big, iw, nbh)
-        log.append('pix slot %d %-18s k=%d (%dpx) %d line(s)' % (n, big, k, 16 * k, len(lines)))
-        cy = nby + nbh / 2.0
-        pitch = 14 * k
-        for i, ln in enumerate(lines):
-            yb = cy + (i - (len(lines) - 1) / 2.0) * pitch
-            base = int(round(yb - 6 * k)) + 9 * k  # centre cap-top..descender box on yb
-            s.text(ix + iw / 2.0, base, ln, 'pb', 16 * k, fg, anchor='middle', base=True)
-        size = None
-    else:
-        size, lines, stage, d = fit_name(big, iw, nbh, slots)
-        log.append('slot %d %-18s stage %s %2du = %2dpx, %d line(s), box %dx%d'
-                   % (n, big, stage, d, size, len(lines), iw, nbh))
-        cy = nby + nbh / 2.0
-        lh = 1.1 * size
-        for i, ln in enumerate(lines):
-            s.text(ix + iw / 2.0, cy + (i - (len(lines) - 1) / 2.0) * lh, ln, 'ab', size, fg, anchor='middle')
+    k, lines, rule = fit_pixel(big, iw, nbh)
+    log.append('slot %d %-18s rule %s k=%d (%dpx) %d line(s), box %dx%d'
+               % (n, big, rule, k, 16 * k, len(lines), iw, nbh))
+    th = 12 * k + PX_PITCH * k * (len(lines) - 1)
+    top = int(round(nby + (nbh - th) / 2.0))
+    for i, ln in enumerate(lines):
+        base = top + 9 * k + PX_PITCH * k * i
+        s.text(ix + iw / 2.0, base, ln, 'pb', 16 * k, fg, anchor='middle', base=True)
 
     # bottom block (48u high, bottom aligned)
     bot = y + h - pad
@@ -260,7 +239,7 @@ def grid(slots_n):
     return cols, xs, ws, ys, hs
 
 
-def render(path, slots, lit, setname, mode, addr, name, notinset, connected, log, pix=False):
+def render(path, slots, lit, setname, mode, addr, name, notinset, connected, log):
     n = len(slots)
     s = Svg(W, H, C['bg_live'])
     top_bar(s, setname, mode, addr, name, notinset, connected, log)
@@ -268,7 +247,7 @@ def render(path, slots, lit, setname, mode, addr, name, notinset, connected, log
     for i, sl in enumerate(slots):
         c, rw = i % cols, i // cols
         st = 'empty' if not sl else ('lit' if i == lit else 'normal')
-        button(s, xs[c], ys[rw], ws[c], hs[rw], sl, i + 1, st, n, log, pix) if sl else \
+        button(s, xs[c], ys[rw], ws[c], hs[rw], sl, i + 1, st, n, log) if sl else \
             button(s, xs[c], ys[rw], ws[c], hs[rw], None, i + 1, 'empty', n, log)
     hint(s)
     s.save(path)
@@ -303,10 +282,6 @@ def build(outdir):
     log = []
     render(outdir + '/live-8.svg', SET8, 1, 'Friday Set 2', 'PROG', 'D104', 'Classic E.Piano',
            False, True, log)
-    log.append('--- pixel-font comparison')
-    render(outdir + '/live-8-pixelfont.svg', SET8, 1, 'Friday Set 2', 'PROG', 'D104', 'Classic E.Piano',
-           False, True, log, pix=True)
-    log.append('---')
     render(outdir + '/live-6.svg', SET6, None, 'Acoustic Night', 'PROG', 'D001', 'PianoMezzoDark',
            True, True, log)
     return log

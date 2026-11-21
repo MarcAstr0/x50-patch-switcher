@@ -17,42 +17,44 @@
 <rect x="37.5" y="115.5" width="593" height="426" rx="19.5" fill="none" stroke="#5F6C76" stroke-width="3"/>
 <rect x="61.5" y="139.5" width="63" height="63" rx="10.5" fill="none" stroke="#5F6C76" stroke-width="3"/>
 <text x="93" y="187.8" text-anchor="middle" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:42px;fill:#F2F5F7;">1</text>
-<text x="334" y="308.34" text-anchor="middle" style="font-family:'Atkinson Hyperlegible';font-weight:700;font-size:78px;fill:#F2F5F7;">Layered</text>
-<text x="334" y="394.14" text-anchor="middle" style="font-family:'Atkinson Hyperlegible';font-weight:700;font-size:78px;fill:#F2F5F7;">A.Piano</text>
+<text x="334" y="297" text-anchor="middle" style="font-family:'Pixel Operator X50';font-weight:700;font-size:112px;fill:#F2F5F7;">Layered</text>
+<text x="334" y="395" text-anchor="middle" style="font-family:'Pixel Operator X50';font-weight:700;font-size:112px;fill:#F2F5F7;">A.Piano</text>
 <text x="60" y="515.7" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:33px;fill:#AEB8C2;letter-spacing:2px;">COMBI B064</text>
 <rect x="662" y="114" width="596" height="429" rx="21" fill="#1A1F24"/>
 <rect x="663.5" y="115.5" width="593" height="426" rx="19.5" fill="none" stroke="#5F6C76" stroke-width="3"/>
 <rect x="687.5" y="139.5" width="63" height="63" rx="10.5" fill="none" stroke="#5F6C76" stroke-width="3"/>
 <text x="719" y="187.8" text-anchor="middle" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:42px;fill:#F2F5F7;">2</text>
-<text x="960" y="355.2" text-anchor="middle" style="font-family:'Atkinson Hyperlegible';font-weight:700;font-size:90px;fill:#F2F5F7;">Warm pad</text>
+<text x="960" y="347" text-anchor="middle" style="font-family:'Pixel Operator X50';font-weight:700;font-size:112px;fill:#F2F5F7;">Warm pad</text>
 <text x="686" y="512.4" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:30px;fill:#AEB8C2;">Overture Pad</text>
 <text x="686" y="482.7" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:33px;fill:#AEB8C2;letter-spacing:2px;">PROG A025</text>
 <rect x="1288" y="114" width="596" height="429" rx="21" fill="#1A1F24"/>
 <rect x="1289.5" y="115.5" width="593" height="426" rx="19.5" fill="none" stroke="#5F6C76" stroke-width="3"/>
 <rect x="1313.5" y="139.5" width="63" height="63" rx="10.5" fill="none" stroke="#5F6C76" stroke-width="3"/>
 <text x="1345" y="187.8" text-anchor="middle" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:42px;fill:#F2F5F7;">3</text>
-<text x="1586" y="355.2" text-anchor="middle" style="font-family:'Atkinson Hyperlegible';font-weight:700;font-size:90px;fill:#F2F5F7;">Ballad piano</text>
+<text x="1586" y="297" text-anchor="middle" style="font-family:'Pixel Operator X50';font-weight:700;font-size:112px;fill:#F2F5F7;">Ballad</text>
+<text x="1586" y="395" text-anchor="middle" style="font-family:'Pixel Operator X50';font-weight:700;font-size:112px;fill:#F2F5F7;">piano</text>
 <text x="1312" y="512.4" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:30px;fill:#AEB8C2;">Acoustic Piano</text>
 <text x="1312" y="482.7" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:33px;fill:#AEB8C2;letter-spacing:2px;">PROG B001</text>
 <rect x="36" y="573" width="596" height="429" rx="21" fill="#1A1F24"/>
 <rect x="37.5" y="574.5" width="593" height="426" rx="19.5" fill="none" stroke="#5F6C76" stroke-width="3"/>
 <rect x="61.5" y="598.5" width="63" height="63" rx="10.5" fill="none" stroke="#5F6C76" stroke-width="3"/>
 <text x="93" y="646.8" text-anchor="middle" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:42px;fill:#F2F5F7;">4</text>
-<text x="334" y="767.34" text-anchor="middle" style="font-family:'Atkinson Hyperlegible';font-weight:700;font-size:78px;fill:#F2F5F7;">Detailed</text>
-<text x="334" y="853.14" text-anchor="middle" style="font-family:'Atkinson Hyperlegible';font-weight:700;font-size:78px;fill:#F2F5F7;">Strings</text>
+<text x="334" y="757" text-anchor="middle" style="font-family:'Pixel Operator X50';font-weight:700;font-size:112px;fill:#F2F5F7;">Detailed</text>
+<text x="334" y="855" text-anchor="middle" style="font-family:'Pixel Operator X50';font-weight:700;font-size:112px;fill:#F2F5F7;">Strings</text>
 <text x="60" y="974.7" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:33px;fill:#AEB8C2;letter-spacing:2px;">COMBI A017</text>
 <rect x="662" y="573" width="596" height="429" rx="21" fill="#1A1F24"/>
 <rect x="663.5" y="574.5" width="593" height="426" rx="19.5" fill="none" stroke="#5F6C76" stroke-width="3"/>
 <rect x="687.5" y="598.5" width="63" height="63" rx="10.5" fill="none" stroke="#5F6C76" stroke-width="3"/>
 <text x="719" y="646.8" text-anchor="middle" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:42px;fill:#F2F5F7;">5</text>
-<text x="960" y="814.2" text-anchor="middle" style="font-family:'Atkinson Hyperlegible';font-weight:700;font-size:90px;fill:#F2F5F7;">Harp intro</text>
+<text x="960" y="805" text-anchor="middle" style="font-family:'Pixel Operator X50';font-weight:700;font-size:112px;fill:#F2F5F7;">Harp intro</text>
 <text x="686" y="971.4" text-anchor="start" style="font-family:'Atkinson Hyperlegible';font-weight:400;font-size:30px;fill:#AEB8C2;">Harp</text>
 <text x="686" y="941.7" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:33px;fill:#AEB8C2;letter-spacing:2px;">PROG A092</text>
 <rect x="1288" y="573" width="596" height="429" rx="21" fill="#1A1F24"/>
 <rect x="1289.5" y="574.5" width="593" height="426" rx="19.5" fill="none" stroke="#5F6C76" stroke-width="3"/>
 <rect x="1313.5" y="598.5" width="63" height="63" rx="10.5" fill="none" stroke="#5F6C76" stroke-width="3"/>
 <text x="1345" y="646.8" text-anchor="middle" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:42px;fill:#F2F5F7;">6</text>
-<text x="1586" y="811.23" text-anchor="middle" style="font-family:'Atkinson Hyperlegible';font-weight:700;font-size:81px;fill:#F2F5F7;">Session Piano</text>
+<text x="1586" y="757" text-anchor="middle" style="font-family:'Pixel Operator X50';font-weight:700;font-size:112px;fill:#F2F5F7;">Session</text>
+<text x="1586" y="855" text-anchor="middle" style="font-family:'Pixel Operator X50';font-weight:700;font-size:112px;fill:#F2F5F7;">Piano</text>
 <text x="1312" y="974.7" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:600;font-size:33px;fill:#AEB8C2;letter-spacing:2px;">COMBI C051</text>
 <text x="618.95" y="1066.8" text-anchor="start" style="font-family:'Barlow Semi Condensed';font-weight:500;font-size:27px;fill:#AEB8C2;letter-spacing:1px;">Hold</text>
 <rect x="677.26" y="1039.5" width="53.94" height="33" rx="4.5" fill="none" stroke="#AEB8C2" stroke-width="3"/>

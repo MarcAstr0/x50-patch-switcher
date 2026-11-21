@@ -96,9 +96,13 @@ Rule: never put `text-dim` on `sel-row` in anything smaller than 14px; use `text
 ## 2. Fonts
 
 Three families, six files, committed under `assets/fonts/` with their licence files:
-Atkinson and Barlow are OFL 1.1, Pixel Operator is CC0 1.0 (§2.2). Justification: Atkinson Hyperlegible keeps I/l/1 and O/0 distinct in
-sound names read at a distance; Barlow Semi Condensed gives the tracked, uppercase,
-hardware-silkscreen feel for labels, addresses and numerals in a narrow width.
+Atkinson and Barlow are OFL 1.1, Pixel Operator is CC0 1.0 (§2.2). Justification: Pixel
+Operator X50 Bold sets the big names on the live buttons (owner choice at G2, 2026-11-21:
+dot-matrix, in the spirit of the X50's LCD; its dotted zero and distinct `I`, `l`, `1`
+keep names readable); Atkinson Hyperlegible keeps I/l/1 and O/0 distinct in the live top
+bar set name, the small sound-name line on buttons, browse and settings text; Barlow Semi
+Condensed gives the tracked, uppercase, hardware-silkscreen feel for labels, addresses
+and numerals in a narrow width.
 
 | File | Family (Qt) | Weight | Source |
 |---|---|---|---|
@@ -147,11 +151,11 @@ Line height is a multiple of the pixel size.
 
 | Role | Family, weight | Size | Tracking | Line height | Case |
 |---|---|---|---|---|---|
-| `live-name` | Atkinson Bold | fitted 28u to 52u (8 slots) or 60u (6 slots), §5.3 | 0 | 1.1 | as typed |
+| `live-name` | Pixel Operator X50 Bold | `16k` device px, `k` whole, fitted by §5.3 (start `round(4.5 * U)`, floor 2, last resort 1) | 0 | cell grid, pitch `14k` (§5.3) | as typed |
 | `live-badge` | Barlow SemiBold | 28u | 0 | 1.0 | digit |
 | `live-tag` | Barlow SemiBold | 22u | 2u | 1.0 | upper |
 | `live-addr` | Barlow SemiBold | 22u | 1u | 1.0 | as typed (`COMBI A012`) |
-| `live-sound` | Atkinson Regular | fitted 20u down to 14u | 0 | 1.1 | as typed |
+| `live-sound` | Atkinson Regular (kept, §5.3 note) | fitted 20u down to 14u | 0 | 1.1 | as typed |
 | `bar-set` | Atkinson Bold | 24u (shrinks to 18u, §6.2) | 0 | 1.1 | as typed |
 | `bar-status` | Barlow SemiBold | 22u | 1u | 1.0 | upper |
 | `bar-now` | superseded by the `lcd-*` roles below (Pixel Operator) | | | | |
@@ -171,7 +175,8 @@ Line height is a multiple of the pixel size.
 `k`, `kb`, `km` are whole numbers of device pixels per font pixel (§2.2).
 
 Floor: any live text other than `live-name` never renders under 11 logical px (so
-`max(11, round(size*u))`). `live-name` has no floor, it shrinks by the §5.3 rule.
+`max(11, round(size*u))`). `live-name` has no px floor, it is fitted by the §5.3 rule in
+whole `k` (floor `k` = 2, then 1 only as a last resort).
 
 Text rendering: `QFont::PreferDefaultHinting`, antialiasing on for text and shapes, for
 every face except Pixel Operator (§2.2 has its own rules).
@@ -179,8 +184,9 @@ Sound names are never uppercased.
 
 ### 2.2 Pixel Operator (LCD panels only)
 
-Used in exactly two places: the browse display strip (§7.2) and the live top-bar readout
-(§5.5). It is never used for buttons, lists, labels, dialogs or the connection status.
+Used in exactly three places: the browse display strip (§7.2), the live top-bar readout
+(§5.5) and the big name on each live button (§5.3, Bold only, owner choice at G2). It is
+never used for lists, labels, dialogs or the connection status.
 
 Why this face (research, 2026-11-21, against the Operation Guide screenshots, "PROG
 0:Play" printed p.2 and "COMBI 0:Play" p.4): the X50 LCD has a chunky proportional bitmap face in
@@ -248,6 +254,7 @@ Sizes in use (device px per font pixel `k`; the font px size is `16k`):
 | Browse strip, sound bar | `2k` | `32k` | `18k` | |
 | Live readout, sound bar | `kb = max(1, round(1.8 * U))` | `16*kb` | `9*kb` | `U = u * devicePixelRatio` |
 | Live readout, mode segment | `km = min(kb, max(1, round(1.2 * U)))` | `16*km` | `9*km` | |
+| Live button name (Bold) | `k`, fitted per name by §5.3, from `round(4.5 * U)` down to 2 (1 last resort) | `16k` | `9k` | name box in device px |
 
 At 1x, 1.25x, 1.5x, 2x on a 1080p screen: browse `k` = 1, 1, 2, 2 (font 16 and 32, 16 and
 32, 32 and 64, 32 and 64 px); the live `U` is 1.5 in every row of §5.7 for 1920x1080, so
@@ -382,46 +389,88 @@ Top to bottom inside the inner box:
 What is shown in the big text: the slot's `label` if set, else the sound's current
 name (unit name if read, else factory name).
 
-**Fit-to-width algorithm for the big text.** Runs when the label/name, the button size
-or `u` changes; the result (pixel size, line breaks) is cached on the button. Paint
-never measures. Measure with `QFontMetricsF` at the candidate pixel size.
-`W_box` = name box width, `H_box` = name box height.
+**Font of the big text.** `Pixel Operator X50` **Bold** (`PixelOperatorX50-Bold.ttf`),
+always, on normal and lit buttons alike. Size is `16k` device px with `k` a whole number
+of device pixels per font pixel (§2.2), never a fractional or `u`-multiplied size.
+Metrics in font pixels: cap height 9, x-height 7, ink 12 rows (9 above the baseline, 3
+below), advances whole multiples of `k` (§2.2). **Line pitch is `14k`** (12 ink rows plus
+2 rows of air). Case as typed, no tracking, kerning off.
 
-Constants. `max1` = 52u (8 slots) or 60u (6 slots): largest one-line size. `max2` =
-44u (8) or 52u (6): two-line start size, and the "large size" threshold below. One-line
-floor for spaced names 36u; two-line floor 28u; step always 2u (each candidate rounded to
-whole px). Text without a space has no two-line step.
+**Fit-to-width algorithm for the big text.** Runs when the label/name, the button size,
+`u` or the screen's device pixel ratio changes; the result (`k`, lines, line pitch,
+origin) is cached on the button. Paint never measures. All numbers are device pixels:
+`W_box = round(logical name box width * dpr)`, `H_box = round(logical name box height *
+dpr)` (logical box from this section, `dpr` = `devicePixelRatio`). Measure with
+`QFontMetrics` on the device-space font (§2.2 rule 3), so a width is exactly `k` times
+the font-pixel advance. `U = u * dpr`.
 
-1. **One-line size `s1`.** The largest `s` from `max1` down to `36u` for which the
-   one-line advance is <= `W_box`; none if even 36u does not fit.
-2. **Large one line.** If `s1` exists and (`s1` >= `max2`, or the text has no space):
-   use one line at `s1`. Done. (A name with a space is kept on one line only when that
-   line is at least as big as a two-line start size.)
-3. **Balanced two lines (text with a space).** Break at the space that best balances the
-   lines: for every space, split there and measure both halves at the candidate size;
-   choose the split with the smallest widest line, ties to the earlier space. One break
-   only (two lines at most), so "Lounge Orchestra" breaks after "Lounge" and "Piano
-   &Strings" after "Piano". For `s` from `max2` down to `28u`: if both halves are <=
-   `W_box` and `2 * 1.1 * s` <= `H_box`, use two lines at `s`. If `s1` exists and is
-   larger than that `s`, use one line at `s1` instead (type is never smaller than
-   necessary). If the balanced split fits at no step, go to 4.
-4. **One-line shrink.** If `s1` exists, use it (36u to `max2` - 2u). Otherwise for `s`
-   from 34u down to 28u use the first at which the one-line advance fits. A long single
-   word (`StereophonicKeys`) lands here: 30u one line in the 8-slot grid at 1920x1080.
-5. **Last resort.** At 28u break anywhere into 2 lines (`QTextOption::WrapAnywhere`);
-   if that does not fit, from `26u` down to `14u` the same until it does. Ellipsis is
-   never used on the big text. A 16-character name always fits here; the worst case
-   measured (16 x "W", 14.1 em in Atkinson Bold) fits in 2 lines at 28u in the narrowest
-   8-slot box (261u wide). This step is a safety net for fonts that fail to load, not a
-   normal path.
+Constants. `kcap = max(2, round(4.5 * U))`, the largest `k`, same for 6 and 8 slots (so
+the larger 6-slot buttons gain by fitting more on one line, not by bigger type).
+`kfloor = 2` (32 px font, cap height 18 px). One line needs `12k <= H_box`; two lines need
+`26k <= H_box` (12k ink plus one pitch of 14k).
 
-Resulting behaviour (Atkinson Bold advance measured, 1920x1080 at 100%): "Piano &Strings"
-is two lines at 44u (66 px) in the 8-slot grid (one line would be 36u, below 44u) and two
-lines at 52u (78 px) in the 6-slot grid; "Layered A.Piano" two lines at 52u in the 6-slot
-grid; "Bridge organ" two lines at 44u (8 slots); "Solo lead" and "Intro pad" one line at
-52u (fits at the large size); "Session Piano" one line at 54u in the 6-slot grid;
-`StereophonicKeys` one line at 30u and `Waiting4Sunrise` one line at 32u (8 slots, no
-space).
+1. **One-line `s1`.** The largest `k` from `kcap` down to `kfloor` such that the whole
+   text on one line has advance <= `W_box` (and `12k <= H_box`); none if no `k` fits.
+2. **Balanced two lines `s2` (text with at least one space only).** For each candidate
+   `k` from `kcap` down to `kfloor`, split at the space that gives the smallest widest
+   line (measure both halves at `k`; ties go to the earlier space). One break only, never
+   three lines, so "Piano &Strings" breaks after "Piano" and "Lounge Orchestra" after
+   "Lounge". `s2` is the largest `k` for which both halves have advance <= `W_box` and
+   `26k <= H_box`; none if no `k` fits.
+3. **Choose.** If `s2` exists and (`s1` is none or `s2 > s1`): two lines at `s2`. Else if
+   `s1` exists: one line at `s1`. A spaced name therefore breaks onto two larger lines
+   before it is shrunk onto one line, and on a tie (`s2 == s1`) the single line wins.
+4. **No fit at `kfloor` (a long word, or a tiny window).** Never an ellipsis, never
+   mid-word breaks while `kfloor` fits. Otherwise break anywhere
+   (`QTextOption::WrapAnywhere`, as many lines as needed) at `k = 2` if the lines fit
+   `H_box` (n lines need `12k + 14k * (n - 1)`), then at `k = 1` with whatever line count
+   results (clip at the box if it overflows). This is a safety net: the worst 16-character
+   name ("WWWWWWWWWWWWWWWW") needs it only at the smallest windows (table below).
+5. **No space (`StereophonicKeys`, `Waiting4Sunrise`).** Step 2 is skipped, so the result
+   is step 1 (one line, largest `k` that fits) or step 4.
+
+**Placement (device px, integers only).** Let `n` = number of lines, `h = 12k + 14k *
+(n - 1)`. Paint in device-pixel space like the LCD panels (§2.2 rule 1: map the name box
+origin with the painter transform, round, `resetTransform`). `top = box_top +
+round((H_box - h) / 2)`. Line `i` (0-based) has `baseline = top + 9k + 14k * i` and
+`x = box_left + round((W_box - line_advance) / 2)`, both integers (lines are centred
+individually). Font settings exactly as §2.2 rule 2 (`PreferNoHinting`, no subpixel
+antialiasing, kerning off). Colour per §5.4 (`text`, or `on-cyan` when lit).
+
+Resulting sizes at 1920x1080 (all four scale factors, `U = 1.5`, `kcap = 7`, box 392 x
+219 in the first 8-slot column, 548 x 219 for 6 slots) and 1366x768 (`U = 1.067`,
+`kcap = 5`, box about 279 x 155 for 8 slots, 390 x 155 for 6; the box differs by 1 to 5
+device px between scale factors because logical sizes round first). Cells show `k`
+(font px = `16k`), with `/2` for two lines:
+
+| Screen, scale | Slots | `StereophonicKeys` | `Waiting4Sunrise` | `Piano &Strings` | `Solo lead` | `Layered A.Piano` | 16 x `W` |
+|---|---|---|---|---|---|---|---|
+| 1920x1080 at 1x, 1.25x, 1.5x, 2x | 8 | 3 (48 px) | 3 (48 px) | 6/2 (96 px) | 7/2 (112 px) | 7/2 (112 px) | 2 (32 px) |
+| 1920x1080 at 1x, 1.25x, 1.5x, 2x | 6 | 4 (64 px) | 4 (64 px) | 7/2 (112 px) | 7 (112 px, one line, ties go to one line) | 7/2 (112 px) | 3 (48 px) |
+| 1366x768 at 1x, 1.25x, 2x | 8 | 2 (32 px) | 2 (32 px) | 4/2 (64 px) | 5/2 (80 px) | 4/2 (64 px) | 2/2 lines (32 px) |
+| 1366x768 at 1.5x | 8 | 2 (32 px) | 2 (32 px) | 4/2 (64 px) | 5/2 (80 px) | 5/2 (80 px) | 2/2 lines (32 px) |
+| 1366x768 at 1x, 1.25x, 1.5x, 2x | 6 | 3 (48 px) | 3 (48 px) | 5/2 (80 px) | 5 (80 px, one line) | 5/2 (80 px) | 2 (32 px) |
+
+(Computed with `docs/design/mockup/fit_table.py`, which runs this algorithm on the real
+font file. At 1920x1080 the last 8-slot column is 2 px narrower than the first; no listed
+name changes. `Layered A.Piano` at 1366x768, 1.5x differs from the other scales because
+`Layered` is 280 px wide at `k` = 5 and the box is 276 to 281 px: only the 281 px box fits.
+A 1 px difference in the box can move `k` by 1, which is correct behaviour, not a bug.) The mockups are 1920x1080 at 1x and show
+`Verse EP`, `Intro pad`, `Bridge organ` and `Solo lead` on two lines at `k` = 7, `Piano
+&Strings` on two lines at `k` = 6, `StereophonicKeys` and `Waiting4Sunrise` on one line at
+`k` = 3. In the 6-slot mockup `Warm pad` and `Harp intro` are one line at `k` = 7 (tie).
+
+Choice for the owner, not implemented: at 1366x768 the 16-character no-space names fall
+to `k` = 2 (cap height 18 px). Breaking them in the middle of the word onto two lines
+would give `k` = 4 but reads worse, so the rule above refuses mid-word breaks while
+`k` = 2 fits.
+
+Mixed faces on a button: the address line is Barlow SemiBold (as before) and the sound
+name line below a label stays Atkinson Regular (as before, not Barlow: sound names keep
+their distinct `I`, `l`, `1`, and a smaller proportional text under the dot-matrix name
+separates "what it is called" from "what it is"). I looked at both mockups for a clash
+and found none (the pixel face is much larger and the small lines are clearly
+secondary), so both are unchanged.
 
 **Bottom block fit.** `live-sound`: from 20u down to 14u in steps of 2u until the
 advance <= inner width; at 14u a 16-character name always fits, so there is no ellipsis.
@@ -551,22 +600,21 @@ Bottom rule: 2u `line` along the bottom of the bar.
 
 Full-screen windows. Native screen size, scale factor, logical window, `u`, button
 size (8 slots and 6 slots), top bar height, and physical pixel size of the largest and
-smallest big-text step (max1 for 8 slots, 28u):
+smallest big-text step (the Pixel Operator name sizes are in §5.3, not here):
 
-| Screen | Scale | Logical W x H | `u` | 8-slot button | 6-slot button | Top bar | Name max 8 / 6 (physical px) | Name min (physical px) |
+| Screen | Scale | Logical W x H | `u` | 8-slot button | 6-slot button | Top bar | `U = u * scale` | Name `kcap` (largest font px) / floor 2 (32 px) |
 |---|---|---|---|---|---|---|---|---|
-| 1920x1080 | 100% | 1920x1080 | 1.500 | 440x429 | 596x429 | 84 | 78 / 90 | 42 |
-| 1920x1080 | 125% | 1536x864 | 1.200 | 352x343 | 477x343 | 67 | 78 / 90 | 42 |
-| 1920x1080 | 150% | 1280x720 | 1.000 | 293x286 | 397x286 | 56 | 78 / 90 | 42 |
-| 1920x1080 | 200% | 960x540 | 0.750 | 220x214 | 298x214 | 42 | 78 / 90 | 42 |
-| 1366x768 | 100% | 1366x768 | 1.067 | 313x305 | 424x305 | 60 | 55 / 64 | 30 |
-| 1366x768 | 125% | 1092x614 | 0.853 | 250x244 | 339x244 | 48 | 55 / 64 | 30 |
-| 1366x768 | 150% | 910x512 | 0.711 | 208x203 | 282x203 | 40 | 55 / 64 | 30 |
-| 1366x768 | 200% | 683x384 | 0.533 | 156x153 | 212x153 | 30 | 55 / 64 | 30 |
+| 1920x1080 | 100% | 1920x1080 | 1.500 | 440x429 | 596x429 | 84 | 1.500 | 7 (112 px) |
+| 1920x1080 | 125% | 1536x864 | 1.200 | 352x343 | 477x343 | 67 | 1.500 | 7 (112 px) |
+| 1920x1080 | 150% | 1280x720 | 1.000 | 293x286 | 397x286 | 56 | 1.500 | 7 (112 px) |
+| 1920x1080 | 200% | 960x540 | 0.750 | 220x214 | 298x214 | 42 | 1.500 | 7 (112 px) |
+| 1366x768 | 100% | 1366x768 | 1.067 | 313x305 | 424x305 | 60 | 1.067 | 5 (80 px) |
+| 1366x768 | 125% | 1092x614 | 0.853 | 250x244 | 339x244 | 48 | 1.066 | 5 (80 px) |
+| 1366x768 | 150% | 910x512 | 0.711 | 208x203 | 282x203 | 40 | 1.067 | 5 (80 px) |
+| 1366x768 | 200% | 683x384 | 0.533 | 156x153 | 212x153 | 30 | 1.066 | 5 (80 px) |
 
-(Name max is 52u (8 slots) or 60u (6 slots) times `u` times the scale factor; name min
-is 28u times the same. Check any cell with §5.1 to §5.3; the screenshot tests use these
-cells.)
+(Name `kcap = max(2, round(4.5 * U))`, §5.3; the sizes actually chosen per name are in the
+§5.3 table. Check any cell with §5.1 to §5.3; the screenshot tests use these cells.)
 
 LCD readout pixel sizes (§2.2, §5.5) on these cells: 1920x1080 at every scale has
 `U = u * scale = 1.5`, so `kb = 3` (48 px font, 27 px caps) and `km = 2` (32 px); the
@@ -580,8 +628,9 @@ get smaller type automatically.
 Legibility reasoning (stated because no published figure was found, REFERENCES §2):
 15.6 in 1080p laptop, pixel pitch about 0.18 mm, 100% scale gives `u = 1.5`; a 52u
 name is 78 px, about 14 mm em height, about 10 mm cap height, which at 1 m subtends
-about 34 arcminutes. The fitted two-line 44u names are 66 px, about 8.5 mm cap height,
-about 29 arcminutes at 1 m. Owner should confirm on the real laptop at stage distance.
+about 34 arcminutes for Atkinson at that size (superseded face). The dot-matrix names have
+cap height `9k` px: at `k` = 7 (112 px font) 63 px, about 11 mm, about 38 arcminutes at 1
+m; at `k` = 3 (the 16-character names) 27 px, about 4.9 mm, about 17 arcminutes. Owner should confirm on the real laptop at stage distance.
 
 Resize while live (window not full screen, only in testing and screenshots): recompute
 `u`, geometry and fit caches, repaint everything once. No resize animation.
@@ -591,8 +640,9 @@ wider (21:9); type size follows `u` and the fit uses the real name box.
 
 ### 5.8 Six versus eight slots
 
-Same anatomy. Only differences: 3 columns instead of 4, `max1` 60u (not 52u), `max2`
-52u (not 44u). The set editor in browse uses the same column counts (§7.8).
+Same anatomy. Only difference: 3 columns instead of 4, so the name box is wider (548 vs
+392 device px at 1920x1080) and more names fit on one line or at a larger `k` (§5.3
+table). `kcap` is the same. The set editor in browse uses the same column counts (§7.8).
 
 ---
 
@@ -962,13 +1012,15 @@ checklist, delegate): colours and sizes come from `Theme`, which mirrors the tok
 Every value the builder needs and where it is. Nothing below is left to choose.
 
 - [x] Palette hex, names, ratios: §1.
-- [x] Four font files, sources, licences, load and fallback: §2. Type roles with sizes,
+- [x] Six font files (Pixel Operator X50 included, which now also sets the live button
+      names), sources, licences, load and fallback: §2. Type roles with sizes,
       tracking, case, line height: §2.1.
 - [x] Spacing scale, live spacing, radii, border widths, pixel snapping: §3.
 - [x] High-DPI policy, minimum window size, default size: §4.
 - [x] Live unit formula and clamp: §5.1. Live stack, grid, gaps, margins, column and row
       maths: §5.2. Button anatomy with every vertical measurement: §5.3.
-- [x] Fit algorithm (max, min, step, wrap, last resort, no ellipsis), bottom-block fit,
+- [x] Fit algorithm for the dot-matrix names (whole `k`, `kcap`, floor, two-line rule,
+      long-word fallback, placement, per-scale table, no ellipsis), bottom-block fit,
       cache rule: §5.3.
 - [x] Every live state with fill, border, text, badge, tag; non-colour lit signals;
       empty, pressed, focused, disconnected: §5.4, §6.
@@ -981,6 +1033,7 @@ Every value the builder needs and where it is. Nothing below is left to choose.
       Toolbar, search, toggles: §7.3 to §7.5. Category list: §7.6. Result row delegate
       with exact row height and columns, edited and favourite markers: §7.7. Transport,
       Play: §7.8. Set editor grid and cell: §7.9. Status line: §7.10.
+- [x] Live button names in Pixel Operator X50 Bold: §2.1, §2.2, §5.3.
 - [x] LCD font (Pixel Operator), grid sizes, Qt rendering settings, baseline formula:
       §2.2. LCD readout in live top bar, exact strings, colours, padding, fit: §5.5.
       Browse display strip with exact boxes, offsets, strings, unknown state: §7.2.
@@ -997,6 +1050,11 @@ mockup and this text disagree, this text wins and the mockup is a bug.
 0. (G2 typography) Pixel size at each scale and how it snaps (§2.2); the category index
    rule and its unverified order (§7.2); GM number format (§5.5, §7.2); unknown-sound
    look of both panels; what is outside the panels (connection, NOT IN SET).
+
+0b. (G2 approved) Live button names use Pixel Operator X50 Bold; sizes in whole `k`,
+   fit by §5.3, painted in device-pixel space like the LCD panels; address stays Barlow,
+   sound-name line stays Atkinson Regular. Atkinson Hyperlegible is still used by
+   `bar-set`, `live-sound`, `body`, `body-strong`, `small`, `title`, so it is not removable.
 
 1. Name box height formula and what happens to leftover height: §5.3 (button height - 140).
 2. The inset rule for borders so thick borders do not shift content: §3.5.
@@ -1025,15 +1083,14 @@ mockup and this text disagree, this text wins and the mockup is a bug.
 
 Sources are generated SVG in `docs/design/mockup/` (`lib.py`, `live.py`, `browse.py`,
 `settings.py`; `python3 build.py` rewrites the SVGs and renders the PNGs with Inkscape
-using a throwaway fontconfig that points at `assets/fonts/`, so Atkinson and Barlow are
-the committed files). Text is measured with the same font files, so the §5.3 fit rule in
+using a throwaway fontconfig that points at `assets/fonts/`, so Atkinson, Barlow and Pixel
+Operator X50 are the committed files). `fit_table.py` prints the §5.3 size table. Text is measured with the same font files, so the §5.3 fit rule in
 `live-8` and `live-6` is the real algorithm's output. All at 100% scale, 1x, no OS title bar.
 
 | File | Canvas | Shows |
 |---|---|---|
-| `docs/design/mockup/live-8.svg`, `docs/design/mockup-live-8.png` | 1920x1080, `u` = 1.5 | 8 slots; slot 2 lit (NOW), slot 3 `Piano &Strings` on two lines at 44u (balanced break), slot 6 empty, 16-character `StereophonicKeys` (one line at 30u), connected top bar with the LCD readout panel |
-| `docs/design/mockup/live-6.svg`, `docs/design/mockup-live-6.png` | 1920x1080, `u` = 1.5 | 6 slots; X50 on a sound not in the set: `NOT IN SET` tag beside the LCD readout panel, no lit button |
-| `docs/design/mockup/live-8-pixelfont.svg`, `docs/design/mockup-live-8-pixelfont.png` | 1920x1080, `u` = 1.5 | comparison only, not for the builder: `live-8` with the button names in Pixel Operator Bold at the largest whole-`k` size that fits (`k` 3 to 7, 48 to 112 px; two lines at 14k pitch) |
+| `docs/design/mockup/live-8.svg`, `docs/design/mockup-live-8.png` | 1920x1080, `u` = 1.5 | 8 slots; slot 2 lit (NOW), button names in Pixel Operator X50 Bold: slot 3 `Piano &Strings` on two lines at `k` = 6 (96 px, balanced break), slots 1, 2, 5, 7 two lines at `k` = 7 (112 px), slot 6 empty, 16-character `StereophonicKeys` and `Waiting4Sunrise` one line at `k` = 3 (48 px), connected top bar with the LCD readout panel |
+| `docs/design/mockup/live-6.svg`, `docs/design/mockup-live-6.png` | 1920x1080, `u` = 1.5 | 6 slots, names in Pixel Operator X50 Bold (`k` = 7, 112 px, one or two lines); X50 on a sound not in the set: `NOT IN SET` tag beside the LCD readout panel, no lit button |
 | `docs/design/mockup/browse.svg`, `docs/design/mockup-browse.png` | 1920x1080 client area (maximised window) | search `piano`, Combis and Programs on, GM off, program category list, 16 of 32 result rows, favourite stars, `EDITED` pill, selected row, current-sound triangle, display strip, transport bar, 8-slot set editor |
 | `docs/design/mockup/settings.svg`, `docs/design/mockup-settings.png` | 520x709 (content height; minimum is 560) | ports, manual settings, check running: pass, fail with hint, pass, unknown with hint, running |
 
@@ -1047,7 +1104,8 @@ Values changed in this document while drawing (the text above already carries th
 Values that were implicit and are now fixed (also written into the sections above):
 
 4. §5.2: grid column widths are rounded, the last column takes the remainder (440, 440, 440, 438).
-5. §5.3: a long single word (`StereophonicKeys`) sets at 30u on one line (step 4).
+5. §5.3: a long single word (`StereophonicKeys`) sets on one line at `k` = 3 (superseded
+   by the G2 approved change: the Atkinson 30u figure no longer applies).
 6. §5.3: tag triangle or chevron sits 8u left of the tag text.
 7. §5.5: address in the top bar and the display strip is bank and number only (`D104`);
    `NOT IN SET` tag 16u after the name, 32u high, 10u padding.
@@ -1094,7 +1152,7 @@ Change round G2b (2026-11-21, owner follow-up on typography):
 
 - New font Pixel Operator (CC0), Regular and Bold, for the two LCD panels only (§2.2);
   files and licence in `assets/fonts/`, listed in `assets/README.md`. Live buttons stay
-  Atkinson Hyperlegible.
+  Atkinson Hyperlegible (superseded at G2 approved, below).
 - §7.2 rewritten: the strip is an LCD panel `480k x 74k` echoing the X50 display (inverse
   mode and page segments, `Bank` and `Category` row, inverse sound bar). Strip height 64 ->
   `74k` (§7.1 arithmetic updated: result list floor 214, 5 rows). Connection status moved
@@ -1105,7 +1163,8 @@ Change round G2b (2026-11-21, owner follow-up on typography):
 - §2.1: roles `bar-now` and `strip-main` superseded by `lcd-*` roles; token `lcd-warn`
   unused. The display strip shows `Category 00:Keyboard` using the manual's zero-based
   index (the brief said 01; the manual says 00).
-- `mockup-live-8-pixelfont.png` added for the owner to compare names in Pixel Operator.
+- `mockup-live-8-pixelfont.png` added for the owner to compare names in Pixel Operator
+  (since merged into `mockup-live-8.png` and deleted, see G2 approved below).
   Regenerated: `mockup-live-8.png`, `mockup-live-6.png`, `mockup-browse.png`.
 
 Change round G2c (2026-11-21, glyph defects):
@@ -1117,6 +1176,21 @@ Change round G2c (2026-11-21, glyph defects):
   `docs/design/mockup/patch_font.py`; test strip `docs/design/mockup/glyph-test.png`
   (`glyph_test.py`). Builder: load the new file names and use family `Pixel Operator X50`.
   Regenerated all mockup PNGs.
+
+G2 approved (2026-11-21). The owner approved round G2 with these choices:
+
+- No NEXT state in live view (only the lit slot stands out).
+- Two-line names: a name with a space breaks onto two larger lines before shrinking.
+- Browse results in catalogue order.
+- LCD look with Pixel Operator X50 (browse strip and live top-bar readout).
+- Dot-matrix button names (option B): live-view big names use Pixel Operator X50 Bold,
+  not Atkinson Hyperlegible. §2.1, §2.2, §5.3 (algorithm rewritten for whole-`k` sizes,
+  table per screen and scale), §5.7 and §5.8 updated. The small address line (Barlow
+  SemiBold) and the label's sound-name line (Atkinson Regular) are unchanged.
+  `mockup-live-8.png` and `mockup-live-6.png` regenerated with it;
+  `mockup-live-8-pixelfont.png` and its SVG deleted; `build.py` no longer builds them;
+  `mockup/fit_table.py` added. Atkinson Hyperlegible is still used by `bar-set`,
+  `live-sound`, `body`, `body-strong`, `small` and `title`, so no font file is removable.
 
 Open question for the owner, not changed: at wide browse windows the `EDITED` pill sits at
 the right edge of the very wide `Name` column, far from the name it describes (§7.7 puts
