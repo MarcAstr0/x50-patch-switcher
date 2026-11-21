@@ -274,3 +274,8 @@ fixes go back to the builder as T5.x tasks.
   `CommandLineToArgvW` (non-ANSI user names); tests for diagnose exit codes 1, 3, 4;
   explicit restrict flag in LoggingBackend. Reviewer's "no diagnose test" claim was wrong
   (`diagnoseFake` exists). (foreman)
+- 2026-11-21 · R-T1.8 additions from Codex: `--in-port` alone must be honoured by
+  diagnose; port-enumeration failure exits 1, not 3; a microX answer exits 5 for
+  `--probe` and `--diagnose` too; check report.txt write/flush and exit 4 on a short
+  write; diagnose folder name collision-safe (seconds plus a -N suffix if it exists).
+  (foreman)
