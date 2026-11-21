@@ -291,3 +291,10 @@ fixes go back to the builder as T5.x tasks.
   unexpired echo tuples (overlapping sends); parse a dump of an unexpected kind and fail
   the step with raw bytes if malformed (ignore only well-formed late dumps); remember the
   exact port names opened and check those on timeout, not the substring. (foreman)
+- 2026-11-21 · R1 (reviewer, both high findings verified by the foreman): "do not ship to
+  G1". The Windows zip lacked the MSVC runtime (windeployqt: VCINSTALLDIR not set; CI
+  stayed green because the runner has the redistributable) and diagnose port pairing
+  failed on WinMM names (RtMidi appends " <index>"). Fix round also: refused inquiry
+  replies still lead to read-only dump requests, inquiry retried once, CI runs the
+  extracted zip and the .bat itself, the queued Codex items and the MSVC warnings. Codex
+  R1 hit the account usage limit; one retry after the fix round. (foreman)
