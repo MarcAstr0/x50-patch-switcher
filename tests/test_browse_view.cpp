@@ -195,9 +195,10 @@ private slots:
         key(search(), Qt::Key_Down);
         key(search(), Qt::Key_Down);
         QVERIFY(view().highlighted().has_value());
-        QCOMPARE(view().highlighted().value(), view().results().at(1));
+        // The query already highlighted row 0 (R-T3.2); two Downs move to row 2.
+        QCOMPARE(view().highlighted().value(), view().results().at(2));
         key(search(), Qt::Key_Up);
-        QCOMPARE(view().highlighted().value(), view().results().at(0));
+        QCOMPARE(view().highlighted().value(), view().results().at(1));
         QTest::mouseClick(table()->viewport(), Qt::LeftButton, Qt::NoModifier, cellCenter(3));
         QCOMPARE(view().highlighted().value(), view().results().at(3));
         key(table(), Qt::Key_Down);
@@ -627,7 +628,176 @@ private slots:
         QCOMPARE(w.size(), w.minimumSize());
         const int viewport = w.browseView()->resultTable()->viewport()->height();
         QVERIFY2(viewport >= 5 * Theme::resultRowHeight, qPrintable(QString::number(viewport)));
-        QCOMPARE(w.browseView()->resultTable()->horizontalHeader()->height(), Theme::resultHeaderHeight);
+        // DESIGN 7.7 and the mockup: the list's 1 px top border plus the header are 28 high.
+        QCOMPARE(w.browseView()->resultTable()->horizontalHeader()->height() + Theme::borderControl, Theme::resultHeaderHeight);
+    }
+
+    // R-T3.2 decision: a changed result set highlights its first row; the highlight never
+    // sends, Enter does, once. Typing alone sends nothing.
+    void typingHighlightsFirstRowAndSendsNothing()
+    {
+        connectLink();
+        QSignalSpy sent(m_link.get(), &X50Link::sent);
+        QTest::keyClicks(search(), QStringLiteral("piano"));
+        QTest::qWait(60);
+        QVERIFY(view().resultCount() > 0);
+        QCOMPARE(view().highlighted().value(), view().results().first());
+        QVERIFY(m_fake->received().isEmpty());
+        QCOMPARE(sent.count(), 0);
+    }
+    void typeThenEnterSendsFirstRowOnce()
+    {
+        connectLink();
+        QSignalSpy sent(m_link.get(), &X50Link::sent);
+        QTest::keyClicks(search(), QStringLiteral("piano"));
+        const SoundAddress first = view().results().first();
+        key(search(), Qt::Key_Return);
+        QTRY_COMPARE(sent.count(), 1);
+        QTest::qWait(60);
+        QCOMPARE(sent.count(), 1);
+        QCOMPARE(sent.first().first().value<SoundAddress>(), first);
+        QCOMPARE(programChanges(*m_fake), 1);
+    }
+    void kindsAndCategoryAlsoHighlightFirstRow()
+    {
+        view().setKinds(true, false, false);
+        QCOMPARE(view().highlighted().value(), view().results().first());
+        view().clearHighlight();
+        QVERIFY(view().setCategory(QStringLiteral("Keyboard")));
+        QVERIFY(view().resultCount() > 0);
+        QCOMPARE(view().highlighted().value(), view().results().first());
+    }
+    // A highlighted sound that is still in the new results stays highlighted.
+    void stillPresentHighlightStays()
+    {
+        searchPiano();
+        const SoundAddress third = view().results().at(2);
+        view().highlight(third);
+        view().setSearchText(QStringLiteral("pian"));
+        QCOMPARE(view().highlighted().value(), third);
+    }
+    // No results: nothing highlighted, nothing sent.
+    void emptyResultsHighlightNothing()
+    {
+        searchPiano();
+        QVERIFY(view().highlighted().has_value());
+        view().setSearchText(QStringLiteral("zzqq"));
+        QCOMPARE(view().resultCount(), 0);
+        QVERIFY(!view().highlighted().has_value());
+    }
+
+    // R-T3.2 review: PgDn with the focus in a list pages natively and never steps (SPEC 4.1).
+    void pageDownInCategoryListAtLastRowSendsNothing()
+    {
+        connectLink();
+        QListWidget *cats = view().categoryList();
+        cats->setFocus();
+        cats->setCurrentRow(cats->count() - 1);
+        QSignalSpy sent(m_link.get(), &X50Link::sent);
+        m_fake->clearReceived();
+        key(cats, Qt::Key_PageDown);
+        QTest::qWait(60);
+        QVERIFY(m_fake->received().isEmpty());
+        QCOMPARE(sent.count(), 0);
+        QCOMPARE(cats->currentRow(), cats->count() - 1);
+    }
+    void pageDownInTableAfterEndSendsNothing()
+    {
+        connectLink();
+        searchPiano();
+        table()->setFocus();
+        key(table(), Qt::Key_End);
+        QSignalSpy sent(m_link.get(), &X50Link::sent);
+        m_fake->clearReceived();
+        key(table(), Qt::Key_PageDown);
+        QTest::qWait(60);
+        QVERIFY(m_fake->received().isEmpty());
+        QCOMPARE(sent.count(), 0);
+    }
+
+    // DESIGN 7.3, 7.5, 7.7 against docs/design/mockup-browse.png: sizes of the toolbar controls
+    // and the result columns.
+    void toolbarAndColumnGeometry()
+    {
+        for (QToolButton *t : {view().combisToggle(), view().programsToggle(), view().gmToggle()}) {
+            QCOMPARE(t->width(), Theme::kindToggleWidth);
+            QCOMPARE(t->height(), Theme::browseToolbarHeight);
+        }
+        view().combisToggle()->setChecked(false);  // the unchecked state has a thinner border
+        QCOMPARE(view().combisToggle()->width(), Theme::kindToggleWidth);
+        QCOMPARE(view().combisToggle()->height(), Theme::browseToolbarHeight);
+        view().combisToggle()->setChecked(true);
+        QCOMPARE(search()->height(), Theme::browseToolbarHeight);
+        QCOMPARE(view().liveButton()->height(), Theme::browseToolbarHeight);
+        QCOMPARE(view().settingsButton()->height(), Theme::browseToolbarHeight);
+        QCOMPARE(view().readNamesButton()->height(), Theme::browseToolbarHeight);
+        QHeaderView *h = table()->horizontalHeader();
+        QCOMPARE(h->sectionSize(ResultModel::ColStar), Theme::resultCellPadding + 36);  // DESIGN 7.7: Star 36
+        QCOMPARE(h->sectionSize(ResultModel::ColAddress), 112);
+        QCOMPARE(h->sectionSize(ResultModel::ColEdited), 60);
+        QCOMPARE(h->sectionSize(ResultModel::ColCategory), 140);
+        QCOMPARE(h->sectionSize(ResultModel::ColUsed), 44 + Theme::resultCellPadding);
+        // The toolbar sits 12 px above the main area; the list starts right under it.
+        QCOMPARE(table()->mapTo(&view(), QPoint(0, 0)).y(), Theme::browseToolbarHeight + Theme::browseGap);
+    }
+
+    // The window geometry and the category splitter are remembered between runs
+    // (QSettings file in the config dir, never the registry).
+    void layoutRoundTripInConfigDir()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        {
+            MainWindow w(&m_catalogue, m_library.get(), nullptr);
+            w.restoreLayout(dir.path(), QRect(0, 0, 3000, 2000));  // nothing saved yet: defaults
+            QCOMPARE(w.size(), QSize(Theme::browseDefaultWidth, Theme::browseDefaultHeight));
+            w.resize(1234, 777);
+            w.move(40, 50);
+            w.show();
+            QVERIFY(QTest::qWaitForWindowExposed(&w));
+            w.browseView()->setCategoryWidth(230);
+            QTest::qWait(30);
+            w.close();  // saves
+        }
+        QVERIFY(QFile::exists(dir.filePath(MainWindow::layoutFileName())));
+        MainWindow w2(&m_catalogue, m_library.get(), nullptr);
+        w2.restoreLayout(dir.path(), QRect(0, 0, 3000, 2000));  // the offscreen screen is only 800x600
+        QCOMPARE(w2.size(), QSize(1234, 777));
+        QCOMPARE(w2.pos(), QPoint(40, 50));
+        w2.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w2));
+        QTest::qWait(30);
+        QCOMPARE(w2.size(), QSize(1234, 777));
+        QCOMPARE(w2.browseView()->categoryWidth(), 230);
+    }
+    void layoutIgnoresGarbageFile()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        QFile f(dir.filePath(MainWindow::layoutFileName()));
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write("[window]\nwidth=abc\nheight=-5\nx=1\n[browse]\ncategoryWidth=99999\n");
+        f.close();
+        MainWindow w(&m_catalogue, m_library.get(), nullptr);
+        w.restoreLayout(dir.path());
+        QCOMPARE(w.size(), QSize(Theme::browseDefaultWidth, Theme::browseDefaultHeight));
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(w.browseView()->categoryWidth() <= Theme::browseCategoryMaxWidth);
+    }
+    // Pure clamp (DESIGN 7.1 minimum wins; the window stays on the screen).
+    void clampToScreen()
+    {
+        const QRect avail(0, 0, 1366, 728);
+        const QSize min(1000, 700);
+        QCOMPARE(MainWindow::clampToScreen(QRect(100, 50, 1180, 760), avail, min), QRect(100, 0, 1180, 728));
+        QCOMPARE(MainWindow::clampToScreen(QRect(1000, 600, 800, 500), avail, min), QRect(366, 28, 1000, 700));
+        QCOMPARE(MainWindow::clampToScreen(QRect(-500, -90, 1100, 710), avail, min), QRect(0, 0, 1100, 710));
+        // A screen smaller than the minimum: the minimum wins, the origin stays at the corner.
+        QCOMPARE(MainWindow::clampToScreen(QRect(10, 10, 1500, 900), QRect(0, 0, 800, 600), min), QRect(0, 0, 1000, 700));
+        // A secondary screen with a non-zero origin.
+        QCOMPARE(MainWindow::clampToScreen(QRect(2000, 100, 1100, 710), QRect(1920, 0, 1920, 1040), min),
+                 QRect(2000, 100, 1100, 710));
     }
 };
 

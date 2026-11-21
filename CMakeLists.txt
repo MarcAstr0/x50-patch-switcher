@@ -61,6 +61,9 @@ add_library(x50ui STATIC src/ui/MainWindow.cpp src/ui/MainWindow.h
   src/ui/BrowseView.cpp src/ui/BrowseView.h src/ui/Glyphs.cpp src/ui/Glyphs.h
   src/ui/PanelFrame.cpp src/ui/PanelFrame.h src/ui/ResultModel.cpp src/ui/ResultModel.h
   src/ui/ResultDelegate.cpp src/ui/ResultDelegate.h
+  src/ui/SearchField.cpp src/ui/SearchField.h src/ui/KindToggle.cpp src/ui/KindToggle.h
+  src/ui/ResultTable.cpp src/ui/ResultTable.h src/ui/ResultHeader.cpp src/ui/ResultHeader.h
+  src/ui/CategoryDelegate.cpp src/ui/CategoryDelegate.h
   src/ui/x50ui.qrc)
 set_target_properties(x50ui PROPERTIES AUTORCC ON)
 target_include_directories(x50ui PUBLIC src)

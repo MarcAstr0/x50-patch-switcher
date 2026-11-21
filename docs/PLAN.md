@@ -336,3 +336,11 @@ fixes go back to the builder as T5.x tasks.
   when the query changes, the first result is highlighted (highlight never sends; Enter
   sends) so type-then-Enter works; with both kinds on, the category list shows program
   categories; window geometry to be remembered (next fix round). (foreman)
+- 2026-11-21 · For D3 (designer), DESIGN gaps found by the builder in R-T3.1/T3.2 fixes:
+  toolbar button widths/padding ("Read names" needs 126, DESIGN says 120); app.qss
+  min-height/min-width are content-box (+2 px border), kind toggle rule still 88 (DESIGN
+  100); result header "28 high" means border + 27; cell padding only on outer edges and
+  EDITED pill left-aligned in its column (not written); pixel-font rule 2 should say
+  glyphs are placed per character at integer advances (Qt 6.4 FreeType drifts);
+  Prev/Next chevron spacing unspecified; Programs toggle check-mark inset. Window layout
+  is stored in <configDir>/window.ini. (foreman)

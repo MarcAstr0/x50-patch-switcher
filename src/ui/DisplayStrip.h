@@ -2,16 +2,20 @@
 
 #include <optional>
 
+#include <QBrush>
 #include <QFont>
+#include <QPen>
 #include <QRect>
 #include <QRectF>
 #include <QStaticText>
 #include <QString>
+#include <QVector>
 #include <QWidget>
 
 #include "core/SoundAddress.h"
 
 class Catalogue;
+class QPainter;
 
 // Browse view display strip (DESIGN 7.2): an LCD panel echoing the X50's display on the
 // left, the connection LED and status on the dark background to its right (outside the
@@ -80,22 +84,35 @@ protected:
     bool event(QEvent *event) override;
 
 private:
+    // One character at an integer device position. Qt 6.4's FreeType engine keeps unrounded
+    // advances, so a whole string drifts off the pixel grid after a few glyphs and grey
+    // fringes appear; placing every glyph at the sum of whole-pixel advances keeps the face
+    // crisp (DESIGN 2.2 rule 2 asks for integer positions).
+    struct Glyph
+    {
+        QPoint pos;
+        QString text;
+    };
+    using Run = QVector<Glyph>;
+
     struct Layout
     {
         // Device pixels, relative to the widget's top-left device pixel.
         QRect panel;          // bezel box
         QRect field;
         QRect modeSeg, pageSeg, bar;
-        QPoint modeText, pageBoldText, pageRegText, bankText, categoryText, barText;
-        QString barElided;
+        Run modeText, pageBoldText, pageRegText, bankText, categoryText, barText;
         bool clipped = false;
         // Logical px.
-        QRectF led;
         QPointF connTextPos;
+        // Device px (DESIGN 3.5: ring and LED snapped to whole device pixels).
+        QRect ledDev;
     };
 
+    static void drawRun(QPainter &p, const Run &run);
     void setTexts(const Texts &t);
     void relayout();
+    // Re-lays out when the device pixel ratio changed; queued from paintEvent, never run there.
     void syncScale();
 
     const Catalogue *m_catalogue = nullptr;
@@ -108,6 +125,11 @@ private:
     qreal m_dpr = 0;
     int m_k = 0;
     int m_lastHeight = -1;
+    bool m_syncQueued = false;
+    // Pens and brushes built in relayout(), so paintEvent constructs none.
+    QPen m_penPaper, m_penInk, m_penStatus, m_penRing, m_penNone;
+    QBrush m_brushBezel, m_brushField, m_brushCyan, m_brushNone;
+    qreal m_ringW = 3;  // device px
     QFont m_regular16, m_bold16, m_regular32, m_label;
     QStaticText m_connStatic;
     Layout m_l;

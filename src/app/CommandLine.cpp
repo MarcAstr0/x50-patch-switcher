@@ -101,7 +101,8 @@ CommandLine::Result CommandLine::process(const QStringList &arguments)
             "  2  bad address, bad option value or unknown option\n"
             "  3  no MIDI port matched\n"
             "  4  --send: port busy or lost, or the X50 refused (NAK); --diagnose: could not write files\n"
-            "  5  a microX answered (this app supports the X50 only); nothing was sent\n");
+            "  5  a microX answered (this app supports the X50 only); nothing was sent\n"
+            "  6  --screenshot: the PNG could not be written\n");
         QTextStream(stdout) << help;
         m_exitCode = 0;
         return Result::Exit;

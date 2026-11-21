@@ -7,7 +7,12 @@
 #include "ui/DisplayStrip.h"
 #include "ui/Theme.h"
 
+#include <QCloseEvent>
 #include <QColor>
+#include <QDir>
+#include <QGuiApplication>
+#include <QScreen>
+#include <QSettings>
 #include <QIcon>
 #include <QLabel>
 #include <QLineEdit>
@@ -134,4 +139,62 @@ void MainWindow::syncFromLink()
         m_strip->setConnection(false, m_linkError);
         break;
     }
+}
+
+QRect MainWindow::clampToScreen(const QRect &saved, const QRect &available, const QSize &minimum)
+{
+    const int w = qMax(minimum.width(), qMin(saved.width(), available.width()));
+    const int h = qMax(minimum.height(), qMin(saved.height(), available.height()));
+    const int x = qBound(available.left(), saved.x(), qMax(available.left(), available.right() + 1 - w));
+    const int y = qBound(available.top(), saved.y(), qMax(available.top(), available.bottom() + 1 - h));
+    return QRect(x, y, w, h);
+}
+
+void MainWindow::restoreLayout(const QString &configDir, const QRect &availableOverride)
+{
+    m_layoutPath = QDir(configDir).filePath(layoutFileName());
+    const QSettings settings(m_layoutPath, QSettings::IniFormat);
+    const QSize size(settings.value(QStringLiteral("window/width")).toInt(), settings.value(QStringLiteral("window/height")).toInt());
+    if (size.width() > 0 && size.height() > 0 && settings.contains(QStringLiteral("window/x"))) {
+        const QPoint pos(settings.value(QStringLiteral("window/x")).toInt(), settings.value(QStringLiteral("window/y")).toInt());
+        QRect available = availableOverride;
+        if (!available.isValid()) {
+            const QScreen *screen = QGuiApplication::screenAt(pos + QPoint(size.width() / 2, size.height() / 2));
+            if (!screen)
+                screen = QGuiApplication::primaryScreen();
+            if (screen)
+                available = screen->availableGeometry();
+        }
+        const QRect r = available.isValid() ? clampToScreen(QRect(pos, size), available, minimumSize()) : QRect(pos, size);
+        resize(r.size());
+        move(r.topLeft());
+        if (settings.value(QStringLiteral("window/maximized")).toBool())
+            setWindowState(windowState() | Qt::WindowMaximized);
+    }
+    const int cat = settings.value(QStringLiteral("browse/categoryWidth")).toInt();
+    if (cat > 0)
+        m_browse->setCategoryWidth(cat);
+}
+
+void MainWindow::saveLayout()
+{
+    if (m_layoutPath.isEmpty())
+        return;
+    QSettings settings(m_layoutPath, QSettings::IniFormat);
+    // A maximized or minimized window remembers its normal size and position.
+    const bool maximized = isMaximized();
+    const QRect normal = (maximized || isMinimized()) ? normalGeometry() : QRect(pos(), size());
+    settings.setValue(QStringLiteral("window/x"), normal.x());
+    settings.setValue(QStringLiteral("window/y"), normal.y());
+    settings.setValue(QStringLiteral("window/width"), normal.width());
+    settings.setValue(QStringLiteral("window/height"), normal.height());
+    settings.setValue(QStringLiteral("window/maximized"), maximized);
+    settings.setValue(QStringLiteral("browse/categoryWidth"), m_browse->categoryWidth());
+    settings.sync();  // failure (read-only folder) is ignored: remembering the layout is a courtesy
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    saveLayout();
+    QMainWindow::closeEvent(event);
 }

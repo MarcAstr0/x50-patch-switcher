@@ -82,8 +82,10 @@ constexpr int browseCategoryTitleHeight = 24, browseCategoryRowHeight = 32;
 constexpr int kindToggleWidth = 100, readNamesWidth = 120, settingsWidth = 100, liveWidth = 100;
 constexpr int transportPrevWidth = 88, transportNextWidth = 88, transportPlayWidth = 120, transportStarWidth = 88;
 constexpr int resultHeaderHeight = 28, resultRowHeight = 36;
-// Result columns (DESIGN 7.7). Star and Used include the 12 px row padding on the outer side.
-constexpr int colStar = 48, colAddress = 112, colEdited = 60, colCategory = 140, colUsed = 56;
+// Result columns (DESIGN 7.7 table: Star 36, Address 112, Edited 60, Category 140, Used 44). The row
+// padding (resultCellPadding) is added outside the Star column on the left and the Used column on
+// the right only; the columns in between start at their own left edge.
+constexpr int colStar = 36, colAddress = 112, colEdited = 60, colCategory = 140, colUsed = 44;
 constexpr int resultStarSize = 18, resultCellPadding = 12;
 
 // ---- DESIGN 7.2 display strip, in units of k (device px per font pixel) ----

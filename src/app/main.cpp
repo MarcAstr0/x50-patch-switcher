@@ -80,8 +80,9 @@ int main(int argc, char *argv[])
     Theme::applyStyleSheet(app);
     // Library, catalogue, MIDI link and window. Declaration order is destruction order
     // reversed: the window goes first, then the link, then its backend.
+    const QString configDir = ConfigLocation::resolveForApp(cli.configDir());
     Library library;
-    library.load(ConfigLocation::resolveForApp(cli.configDir()));
+    library.load(configDir);
     QObject::connect(&app, &QCoreApplication::aboutToQuit, &library, [&library]() { library.flush(); });
     Catalogue catalogue;
     QString catalogueError;
@@ -95,6 +96,7 @@ int main(int argc, char *argv[])
     if (cli.options().channel > 0)
         link.setManualChannel(cli.options().channel);
     MainWindow window(&catalogue, &library, &link);
+    window.restoreLayout(configDir);  // window geometry and splitter, next to the library
     window.show();
     link.start();  // never blocks: connecting and probing run on the event loop
     const int rc = QApplication::exec();

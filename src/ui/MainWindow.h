@@ -3,6 +3,8 @@
 #include <memory>
 
 #include <QMainWindow>
+#include <QRect>
+#include <QSize>
 #include <QString>
 
 #include "midi/X50Link.h"
@@ -11,6 +13,7 @@ class BrowseView;
 class Catalogue;
 class DisplayStrip;
 class Library;
+class QCloseEvent;
 class QLabel;
 
 // Browse window (DESIGN 7.1): display strip, the browse page, status line, in a column with
@@ -38,6 +41,23 @@ public:
     // Shows a message in the status line (replacing the previous one).
     void showStatus(const QString &text, bool isError);
 
+    // Remembers the window geometry and the category splitter between runs, in
+    // "<configDir>/window.ini" (QSettings, INI format, so portable mode keeps it next to the
+    // exe and nothing goes to the system registry). Call before show(); the layout is saved when
+    // the window closes. Without this call nothing is read or written (tests, screenshots).
+    // Missing or unreadable settings leave the defaults. The geometry is clamped to the
+    // available area of the screen it was saved on (or the primary screen).
+    // `availableOverride` (tests) replaces the screen's available area when valid.
+    void restoreLayout(const QString &configDir, const QRect &availableOverride = QRect());
+    void saveLayout();
+    static QString layoutFileName() { return QStringLiteral("window.ini"); }
+    // Pure: `saved` (frame top-left and client size) moved and shrunk to lie inside `available`,
+    // never smaller than `minimum` (when the screen is smaller than the minimum, the minimum wins).
+    static QRect clampToScreen(const QRect &saved, const QRect &available, const QSize &minimum);
+
+protected:
+    void closeEvent(QCloseEvent *event) override;
+
 private:
     // DESIGN 7.1: the minimum height grows with the strip when k > 1; recomputed when it changes.
     void updateMinimumHeight();
@@ -51,5 +71,6 @@ private:
     BrowseView *m_browse = nullptr;
     QLabel *m_status = nullptr;
     bool m_statusError = false;
+    QString m_layoutPath;  // empty: layout is not remembered
     QString m_linkError;  // the link's last error while disconnected, shown in the strip
 };

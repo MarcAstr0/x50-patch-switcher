@@ -387,6 +387,30 @@ private slots:
                  qPrintable(out));
         QVERIFY(!QFileInfo::exists(png));
     }
+    // R-T3.1: the offscreen platform is forced even when the environment names another one
+    // (DISPLAY is absent, so xcb could not start).
+    void screenshotForcesOffscreen() {
+        QTemporaryDir tmp;
+        QVERIFY(tmp.isValid());
+        const QString png = tmp.filePath(QStringLiteral("forced.png"));
+        QString out;
+        QCOMPARE(run({QStringLiteral("--screenshot"), png}, &out, false,
+                     {{QStringLiteral("QT_QPA_PLATFORM"), QStringLiteral("xcb")}}),
+                 0);
+        QVERIFY2(!QImage(png).isNull(), qPrintable(out));
+    }
+    // R-T3.1: a PNG that cannot be written has its own exit code (6, listed in --help).
+    void screenshotWriteFailureExitsSix() {
+        QTemporaryDir tmp;
+        QVERIFY(tmp.isValid());
+        const QString png = tmp.filePath(QStringLiteral("no/such/dir/x.png"));
+        QString out;
+        QCOMPARE(run({QStringLiteral("--screenshot"), png}, &out), 6);
+        QVERIFY2(out.contains(QStringLiteral("Could not write")), qPrintable(out));
+        QString help;
+        QCOMPARE(run({QStringLiteral("--help")}, &help), 0);
+        QVERIFY2(help.contains(QStringLiteral("  6  --screenshot")), qPrintable(help));
+    }
     void screenshotBadScaleExitsTwo() {
         QString out;
         QCOMPARE(run({QStringLiteral("--screenshot"), QStringLiteral("x.png"), QStringLiteral("--screenshot-scale"),

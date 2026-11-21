@@ -17,9 +17,9 @@
 // and T4.1 (live-8, live-6, live-disconnected) replace their entries in applyState().
 namespace ScreenshotRunner {
 
-// Sets QT_QPA_PLATFORM and QT_SCALE_FACTOR. Must run before the QApplication exists.
+// Forces QT_QPA_PLATFORM=offscreen and sets QT_SCALE_FACTOR. Must run before the QApplication exists.
 void prepareEnvironment(const CliOptions &options);
-// Needs a QApplication. Returns a process exit code (ExitCode::Ok, or SendFailed
+// Needs a QApplication. Returns a process exit code (ExitCode::Ok, or ScreenshotFailed
 // when the PNG could not be written).
 int run(const CliOptions &options);
 

@@ -14,6 +14,7 @@ constexpr int BadUsage = 2;   // bad address, bad option value, unknown option
 constexpr int NoPort = 3;     // no MIDI port matched (or none exist)
 constexpr int SendFailed = 4; // port busy or died, the X50 refused (NAK), a file could not be written
 constexpr int MicroX = 5;     // a microX answered; nothing is sent
+constexpr int ScreenshotFailed = 6; // --screenshot: the PNG could not be written
 } // namespace ExitCode
 
 // What the command line asked for, once validated.

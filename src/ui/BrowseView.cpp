@@ -5,10 +5,14 @@
 #include "core/SearchQuery.h"
 #include "core/SetModel.h"
 #include "midi/X50Link.h"
+#include "ui/CategoryDelegate.h"
 #include "ui/Glyphs.h"
+#include "ui/KindToggle.h"
 #include "ui/PanelFrame.h"
 #include "ui/ResultDelegate.h"
 #include "ui/ResultModel.h"
+#include "ui/ResultTable.h"
+#include "ui/SearchField.h"
 #include "ui/Theme.h"
 
 #include <QAction>
@@ -20,11 +24,9 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMenu>
-#include <QPainter>
 #include <QPushButton>
 #include <QSet>
 #include <QSplitter>
-#include <QStyledItemDelegate>
 #include <QTableView>
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -36,114 +38,21 @@ bool isGm(const SoundAddress &a)
     return a.bank() == SoundAddress::Bank::G || a.bank() == SoundAddress::Bank::Gd;
 }
 
-// Search field with the painted magnifier (DESIGN 7.4); the clear cross is a line edit action.
-class SearchField : public QLineEdit
+// app.qss gives min-height/max-height as the content box, so a 1 px border makes the control 2 px
+// taller than DESIGN's 40 (7.3, 7.8). A widget-level rule corrects it (the app sheet is not ours
+// to edit); `selector` is the widget's own type.
+void fixToolbarHeight(QWidget *w, const QString &selector, int total)
 {
-public:
-    explicit SearchField(QWidget *parent) : QLineEdit(parent) {}
-
-protected:
-    void paintEvent(QPaintEvent *e) override
-    {
-        QLineEdit::paintEvent(e);
-        QPainter p(this);
-        Glyphs::magnifier(p, QRectF(12, (height() - 16) / 2.0, 16, 16), QColor(Theme::textDim));
-    }
-};
-
-// Kind toggle with the painted check mark left of the text when on (DESIGN 7.5): the state
-// is not shown by colour alone. QSS reserves 18 px of left padding for the mark.
-class KindToggle : public QToolButton
-{
-public:
-    explicit KindToggle(const QString &text, QWidget *parent) : QToolButton(parent)
-    {
-        setText(text);
-        setObjectName(QStringLiteral("kindToggle"));
-        setCheckable(true);
-        setChecked(true);
-        setFixedSize(Theme::kindToggleWidth, Theme::browseToolbarHeight);
-    }
-
-protected:
-    void paintEvent(QPaintEvent *e) override
-    {
-        QToolButton::paintEvent(e);
-        if (!isChecked())
-            return;
-        QFont f = font();
-        f.setBold(true);
-        const int textW = QFontMetrics(f).horizontalAdvance(text());
-        const int contentLeft = 2 + 18, contentW = width() - 4 - 18;
-        const int textLeft = contentLeft + (contentW - textW) / 2;
-        QPainter p(this);
-        Glyphs::checkMark(p, QRectF(textLeft - 6 - 12, (height() - 12) / 2.0, 12, 12), QColor(Theme::text));
-    }
-};
-
-// The result list: a table whose delegate paints the rows. Paints "No sounds match." when empty.
-class ResultTable : public QTableView
-{
-public:
-    explicit ResultTable(QWidget *parent) : QTableView(parent), m_font(Theme::roleFont(Theme::Role::Body)) {}
-
-protected:
-    void paintEvent(QPaintEvent *e) override
-    {
-        QTableView::paintEvent(e);
-        if (model() && model()->rowCount() == 0) {
-            QPainter p(viewport());
-            p.setFont(m_font);
-            p.setPen(QColor(Theme::textDim));
-            p.drawText(viewport()->rect(), Qt::AlignCenter, QStringLiteral("No sounds match."));
-        }
-    }
-
-private:
-    QFont m_font;
-};
-
-// Category rows (DESIGN 7.6): 32 high, text 12 px from the row's left, selected = `sel-row`
-// fill, 4 px `cyan` left bar, bold text; hover = `panel-raised`. Painted here rather than by
-// QSS, whose item padding does not reach the text of unselected rows in a list widget.
-class CategoryDelegate : public QStyledItemDelegate
-{
-public:
-    explicit CategoryDelegate(QObject *parent)
-        : QStyledItemDelegate(parent)
-        , m_regular(Theme::roleFont(Theme::Role::Body))
-        , m_bold(Theme::roleFont(Theme::Role::BodyStrong))
-    {
-    }
-    QSize sizeHint(const QStyleOptionViewItem &, const QModelIndex &) const override
-    {
-        return QSize(0, Theme::browseCategoryRowHeight);
-    }
-    void paint(QPainter *p, const QStyleOptionViewItem &option, const QModelIndex &index) const override
-    {
-        const bool selected = option.state & QStyle::State_Selected;
-        const QRect r = option.rect;
-        if (selected) {
-            p->fillRect(r, QColor(Theme::selRow));
-            p->fillRect(QRect(r.left(), r.top(), Theme::selectedRowAccent, r.height()), QColor(Theme::cyan));
-        } else if (option.state & QStyle::State_MouseOver) {
-            p->fillRect(r, QColor(Theme::panelRaised));
-        }
-        p->setFont(selected ? m_bold : m_regular);
-        p->setPen(QColor(Theme::text));
-        p->drawText(r.adjusted(Theme::s3, 0, -Theme::s3, 0), Qt::AlignLeft | Qt::AlignVCenter | Qt::TextSingleLine,
-                    index.data().toString());
-    }
-
-private:
-    QFont m_regular, m_bold;
-};
+    const int content = total - 2 * Theme::borderControl;
+    w->setStyleSheet(QStringLiteral("%1 { min-height: %2px; max-height: %2px; }").arg(selector).arg(content));
+}
 
 QPushButton *makeButton(const QString &text, int width, QWidget *parent, bool primary = false)
 {
     auto *b = new QPushButton(text, parent);
     b->setMinimumWidth(width);  // DESIGN widths are the floor: a wider text grows the button, never clips
     b->setProperty("role", primary ? QStringLiteral("primary") : QStringLiteral("secondary"));
+    fixToolbarHeight(b, QStringLiteral("QPushButton"), Theme::browseToolbarHeight);
     return b;
 }
 
@@ -209,6 +118,7 @@ void BrowseView::buildUi()
     m_search->setObjectName(QStringLiteral("searchField"));
     m_search->setPlaceholderText(QStringLiteral("Search name, address (A012), cat:text"));
     m_search->setMinimumWidth(260);
+    fixToolbarHeight(m_search, QStringLiteral("QLineEdit#searchField"), Theme::browseToolbarHeight);
     {
         auto *clear = new QAction(Glyphs::icon(Glyphs::Kind::Cross, QSize(16, 16), QColor(Theme::textDim)), QString(), m_search);
         clear->setVisible(false);
@@ -253,6 +163,7 @@ void BrowseView::buildUi()
 
     // ---- main area: category list | result list, transport, set editor (DESIGN 7.1)
     auto *split = new QSplitter(Qt::Horizontal, this);
+    m_split = split;
     split->setChildrenCollapsible(false);
     split->setHandleWidth(Theme::browseSplitterHandle);
 
@@ -274,6 +185,9 @@ void BrowseView::buildUi()
     m_categories->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_categories->setItemDelegate(new CategoryDelegate(m_categories));
     m_categories->setMouseTracking(true);
+    // The title block above is 32 high already (DESIGN 7.6: 8 padding + 24 title row), so the first
+    // row starts right under it; app.qss would add another 8 px of top padding.
+    m_categories->setStyleSheet(QStringLiteral("QListView#categoryList { padding: 0 8px 8px 8px; }"));
     connect(m_categories, &QListWidget::currentRowChanged, this, [this](int row) {
         if (m_building || row < 0)
             return;
@@ -309,19 +223,19 @@ void BrowseView::buildUi()
     m_table->verticalHeader()->setSectionResizeMode(QHeaderView::Fixed);
     m_table->verticalHeader()->setDefaultSectionSize(Theme::resultRowHeight);
     QHeaderView *header = m_table->horizontalHeader();
-    header->setFont(Theme::roleFont(Theme::Role::Label));
     header->setSectionsClickable(false);
     header->setSectionsMovable(false);
     header->setHighlightSections(false);
     header->setSectionResizeMode(QHeaderView::Fixed);
     header->setSectionResizeMode(ResultModel::ColName, QHeaderView::Stretch);
-    header->setFixedHeight(Theme::resultHeaderHeight);
-    header->setMinimumSectionSize(Theme::colStar);
-    header->resizeSection(ResultModel::ColStar, Theme::colStar);
+    // DESIGN 7.7: the list's top border plus the header are 28 high together.
+    header->setFixedHeight(Theme::resultHeaderHeight - Theme::borderControl);
+    header->setMinimumSectionSize(Theme::colUsed);
+    header->resizeSection(ResultModel::ColStar, Theme::resultCellPadding + Theme::colStar);
     header->resizeSection(ResultModel::ColAddress, Theme::colAddress);
     header->resizeSection(ResultModel::ColEdited, Theme::colEdited);
     header->resizeSection(ResultModel::ColCategory, Theme::colCategory);
-    header->resizeSection(ResultModel::ColUsed, Theme::colUsed);
+    header->resizeSection(ResultModel::ColUsed, Theme::colUsed + Theme::resultCellPadding);
     rightLayout->addWidget(m_table, 1);
 
     connect(m_table->selectionModel(), &QItemSelectionModel::currentChanged, this, [this]() { updateControls(); });
@@ -475,6 +389,14 @@ QStringList BrowseView::categoryNames() const
     return l;
 }
 
+int BrowseView::categoryWidth() const { return m_split->sizes().value(0); }
+
+void BrowseView::setCategoryWidth(int width)
+{
+    const int w = qBound(Theme::browseCategoryMinWidth, width, Theme::browseCategoryMaxWidth);
+    m_split->setSizes({w, qMax(1, m_split->width() - w)});
+}
+
 QString BrowseView::categoryTitle() const { return m_categoryTitle->text(); }
 
 QVector<SoundAddress> BrowseView::results() const { return m_model->addresses(); }
@@ -534,11 +456,13 @@ void BrowseView::refilter()
         out.append(a);
     }
     m_model->setResults(out);
-    if (keep) {
-        const int row = m_model->rowOf(*keep);
-        if (row >= 0)
-            selectRow(row);
-    }
+    int row = keep ? m_model->rowOf(*keep) : -1;
+    // A changed result set highlights its first row, so typing and Enter send it (the highlight
+    // itself never sends). Not at construction: nothing is highlighted until the user acts.
+    if (row < 0 && !m_building && m_model->rowCount() > 0)
+        row = 0;
+    if (row >= 0)
+        selectRow(row);
     updateControls();
 }
 
@@ -739,6 +663,9 @@ bool BrowseView::eventFilter(QObject *watched, QEvent *event)
 
 void BrowseView::keyPressEvent(QKeyEvent *event)
 {
-    if (!handleKey(this, event))
+    // A key a list did not use (PgDn on its last row) propagates up to here: it is still the
+    // list's key and must not step Prev/Next (SPEC 4.1), so judge it by the focused widget.
+    QWidget *source = focusWidget() ? focusWidget() : this;
+    if (!handleKey(source, event))
         QWidget::keyPressEvent(event);
 }

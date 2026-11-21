@@ -39,7 +39,7 @@ QRect ResultDelegate::starHitRect(const QRect &cell)
 {
     const int s = Theme::resultStarSize;
     // 36 px star column, right of the 12 px row padding; the hit box is a little larger than the star.
-    const QRect star(cell.left() + Theme::resultCellPadding + (36 - s) / 2, cell.center().y() - s / 2, s, s);
+    const QRect star(cell.left() + Theme::resultCellPadding + (Theme::colStar - s) / 2, cell.center().y() - s / 2, s, s);
     return star.adjusted(-6, -6, 6, 6);
 }
 
@@ -57,7 +57,7 @@ void ResultDelegate::paint(QPainter *p, const QStyleOptionViewItem &option, cons
     if (!selected)
         p->fillRect(QRect(r.left(), r.bottom(), r.width(), 1), QColor(Theme::line));
 
-    const QRect text = r.adjusted(pad, 0, -pad, 0);
+    // The 12 px row padding applies to the row's outer edges (star, used) only.
     switch (index.column()) {
     case ResultModel::ColStar: {
         if (selected)
@@ -65,7 +65,7 @@ void ResultDelegate::paint(QPainter *p, const QStyleOptionViewItem &option, cons
         if (index.data(ResultModel::CurrentRole).toBool())
             Glyphs::triangleRight(*p, QRectF(r.left() + 5, r.center().y() - 4.5, 8, 10), QColor(Theme::cyan));
         const int s = Theme::resultStarSize;
-        const QRectF star(r.left() + pad + (36 - s) / 2.0, r.center().y() - s / 2.0 + 0.5, s, s);
+        const QRectF star(r.left() + pad + (Theme::colStar - s) / 2.0, r.center().y() - s / 2.0 + 0.5, s, s);
         const bool fav = index.data(ResultModel::FavouriteRole).toBool();
         Glyphs::star(*p, star, fav, QColor(fav ? Theme::amber : Theme::textDim));
         break;
@@ -73,13 +73,13 @@ void ResultDelegate::paint(QPainter *p, const QStyleOptionViewItem &option, cons
     case ResultModel::ColAddress:
         p->setFont(m_address);
         p->setPen(QColor(selected ? Theme::text : Theme::textDim));
-        p->drawText(text, Qt::AlignLeft | Qt::AlignVCenter | Qt::TextSingleLine, index.data().toString());
+        p->drawText(r, Qt::AlignLeft | Qt::AlignVCenter | Qt::TextSingleLine, index.data().toString());
         break;
     case ResultModel::ColName: {
         p->setFont(m_body);
         p->setPen(QColor(Theme::text));
         const QString name = index.data().toString();
-        const QRect area = text.adjusted(0, 0, 8 - pad + 0, 0);  // elide at the column's right edge less 4 px
+        const QRect area = r.adjusted(0, 0, -Theme::s2, 0);  // elide 8 px short of the column's right edge
         if (m_bodyMetrics.horizontalAdvance(name) > area.width())
             p->drawText(area, Qt::AlignLeft | Qt::AlignVCenter | Qt::TextSingleLine,
                         m_bodyMetrics.elidedText(name, Qt::ElideRight, area.width()));
@@ -89,7 +89,7 @@ void ResultDelegate::paint(QPainter *p, const QStyleOptionViewItem &option, cons
     }
     case ResultModel::ColEdited:
         if (index.data(ResultModel::EditedRole).toBool()) {
-            const QRectF pill(r.left() + (r.width() - m_pillWidth) / 2.0, r.center().y() - 10, m_pillWidth, 20);
+            const QRectF pill(r.left(), r.center().y() - 10, m_pillWidth, 20);
             p->save();
             p->setRenderHint(QPainter::Antialiasing, true);
             p->setBrush(Qt::NoBrush);
@@ -104,7 +104,7 @@ void ResultDelegate::paint(QPainter *p, const QStyleOptionViewItem &option, cons
         p->setFont(m_small);
         p->setPen(QColor(Theme::textDim));
         const QString cat = index.data().toString();
-        const QRect area = text;
+        const QRect area = r.adjusted(0, 0, -Theme::s2, 0);
         if (m_smallMetrics.horizontalAdvance(cat) > area.width())
             p->drawText(area, Qt::AlignLeft | Qt::AlignVCenter | Qt::TextSingleLine,
                         m_smallMetrics.elidedText(cat, Qt::ElideRight, area.width()));
@@ -115,7 +115,7 @@ void ResultDelegate::paint(QPainter *p, const QStyleOptionViewItem &option, cons
     case ResultModel::ColUsed:
         p->setFont(m_small);
         p->setPen(QColor(Theme::textDim));
-        p->drawText(text, Qt::AlignRight | Qt::AlignVCenter | Qt::TextSingleLine, index.data().toString());
+        p->drawText(r.adjusted(0, 0, -pad, 0), Qt::AlignRight | Qt::AlignVCenter | Qt::TextSingleLine, index.data().toString());
         break;
     default:
         break;

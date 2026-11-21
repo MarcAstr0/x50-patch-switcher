@@ -3,7 +3,9 @@
 // Registered twice in CMake: at 1x and with QT_SCALE_FACTOR=2, so the checks below are
 // written against whatever device pixel ratio the process has.
 #include <QApplication>
+#include <QFontMetricsF>
 #include <QImage>
+#include <QSet>
 #include <QPixmap>
 #include <QTest>
 
@@ -183,6 +185,74 @@ private slots:
         const QImage img = s.grab().toImage();
         QVERIFY(!img.isNull());
         QCOMPARE(img.width(), qRound(520 * s.devicePixelRatioF()));
+    }
+
+    // R-T3.1 / DESIGN 7.2: the connection message stays in its zone (the right 40% of the
+    // window, up to two lines) even for one long token with no break opportunity.
+    void connectionMessageStaysInZone_data() {
+        QTest::addColumn<QString>("message");
+        QTest::newRow("long token") << QString(60, QLatin1Char('W'));
+        QTest::newRow("long path") << QStringLiteral("C:/Users/keys/AppData/Roaming/x50-patch-switcher/library-with-a-very-long-name.json");
+        QTest::newRow("normal") << QStringLiteral("Port busy (another program is using the X50)");
+        QTest::newRow("short") << QStringLiteral("NO X50");
+    }
+    void connectionMessageStaysInZone() {
+        QFETCH(QString, message);
+        const int W = 900;
+        DisplayStrip s;
+        s.setCatalogue(&m_cat);
+        s.setSound(combiC096());
+        s.resize(W, s.height());
+        s.setConnection(false, message);
+        const QImage img = s.grab().toImage();
+        const qreal dpr = s.devicePixelRatioF();
+        const int k = Theme::pixelScale(dpr);
+        const int zoneStart = int(0.6 * W * dpr) - 1;      // right 40%, one device pixel of rounding
+        const int panelRight = 480 * k + 2;
+        auto isBg = [&](int x, int y) { return img.pixelColor(x, y).rgb() == Theme::bgBrowse; };
+        // Nothing between the panel and the zone: the message did not grow leftwards.
+        for (int y = 0; y < img.height(); ++y)
+            for (int x = panelRight; x < zoneStart; ++x)
+                QVERIFY2(isBg(x, y), qPrintable(QStringLiteral("ink at %1,%2").arg(x).arg(y)));
+        // Text rows: right of the LED block, so only the message is in the band.
+        const int textStart = qMax(zoneStart + int(28 * dpr), panelRight);
+        int top = -1, bottom = -1;
+        for (int y = 0; y < img.height(); ++y)
+            for (int x = textStart; x < img.width(); ++x)
+                if (!isBg(x, y)) {
+                    if (top < 0) top = y;
+                    bottom = y;
+                    break;
+                }
+        QVERIFY(top >= 0);
+        QFont label = Theme::roleFont(Theme::Role::Label);
+        label.setPixelSize(Theme::stripLabelPx);
+        const double lineH = QFontMetricsF(label).lineSpacing() * dpr;
+        QVERIFY2((bottom - top + 1) <= 2 * lineH, qPrintable(QStringLiteral("%1 rows, line %2").arg(bottom - top + 1).arg(lineH)));
+    }
+
+    // R-T3.1: inside the LCD field (inset by the bezel's corner radius) only the LCD colours
+    // appear: ink, paper, the dim field colour. The anti-aliasing belongs to the bezel only.
+    void panelInteriorOnlyLcdColours() {
+        const QSet<QRgb> allowed = {Theme::lcdInk, Theme::lcdField, Theme::lcdFieldDim};
+        for (int mode = 0; mode < 2; ++mode) {
+            DisplayStrip s;
+            s.setCatalogue(&m_cat);
+            if (mode == 0)
+                s.setSound(combiC096());
+            else
+                s.clearSound();
+            s.setConnection(true);
+            s.resize(900, s.height());
+            const QImage img = s.grab().toImage();
+            const int k = s.pixelScaleK();
+            const QRect interior(4 * k, 4 * k, 472 * k, 66 * k);  // field inset by 2k from the field edge
+            for (int y = interior.top(); y <= interior.bottom(); ++y)
+                for (int x = interior.left(); x <= interior.right(); ++x)
+                    QVERIFY2(allowed.contains(img.pixelColor(x, y).rgb()),
+                             qPrintable(QStringLiteral("mode %1: stray colour %2 at %3,%4")
+                                            .arg(mode).arg(img.pixelColor(x, y).name()).arg(x).arg(y)));
+        }
     }
 
     void heightFormula() {

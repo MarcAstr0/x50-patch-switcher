@@ -121,8 +121,9 @@ namespace ScreenshotRunner {
 
 void prepareEnvironment(const CliOptions &options)
 {
-    if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM"))
-        qputenv("QT_QPA_PLATFORM", "offscreen");
+    // Always offscreen, even when the caller's environment names another platform: the
+    // render must be deterministic and must not need a display.
+    qputenv("QT_QPA_PLATFORM", "offscreen");
     // The device pixel ratio of the (virtual) screen; QApplication reads it at start.
     qputenv("QT_SCALE_FACTOR", QByteArray::number(options.screenshotScale));
 }
@@ -190,7 +191,7 @@ int run(const CliOptions &options)
     link.stop();
     if (!shot.save(options.screenshotPath, "PNG")) {
         QTextStream(stderr) << QStringLiteral("Could not write ") << options.screenshotPath << QStringLiteral("\n");
-        return ExitCode::SendFailed;
+        return ExitCode::ScreenshotFailed;
     }
     return ExitCode::Ok;
 }

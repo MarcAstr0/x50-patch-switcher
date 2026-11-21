@@ -15,6 +15,7 @@ class Library;
 class PanelFrame;
 class QKeyEvent;
 class QListWidget;
+class QSplitter;
 class QLabel;
 class QPushButton;
 class QTableView;
@@ -63,6 +64,9 @@ public:
     void refreshNames();
     QStringList categoryNames() const;  // as listed, "All" first
     QString categoryTitle() const;
+    // Width of the category column (the splitter position), remembered between runs.
+    int categoryWidth() const;
+    void setCategoryWidth(int width);  // clamped to DESIGN 7.1's 160..260
 
     QVector<SoundAddress> results() const;
     int resultCount() const;
@@ -133,6 +137,7 @@ private:
     QLineEdit *m_search = nullptr;
     QToolButton *m_combis = nullptr, *m_programs = nullptr, *m_gm = nullptr;
     QPushButton *m_readNames = nullptr, *m_settings = nullptr, *m_live = nullptr;
+    QSplitter *m_split = nullptr;
     QLabel *m_categoryTitle = nullptr;
     QListWidget *m_categories = nullptr;
     QTableView *m_table = nullptr;
