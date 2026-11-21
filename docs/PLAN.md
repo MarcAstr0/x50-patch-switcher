@@ -284,3 +284,10 @@ fixes go back to the builder as T5.x tasks.
   smoke-tested without Qt on PATH. Runners have no ALSA sequencer, so real-MIDI tests
   skip or accept the documented exit-1 path there. MSVC shows 11 Qt 6.8 deprecation /
   truncation warnings (qAsConst, QDateTime ctor, a cast in a test): fix in R1. (foreman)
+- 2026-11-21 · Codex on the T1.7/T1.8 fix rounds: "actions @v7 unpublished" rejected
+  (run 44932729199 resolved and ran them); "restore macos-14" rejected (image retired;
+  macos-15 recorded above). Queued for R1 fixes: after a NAK of a superseded Mode Change,
+  re-evaluate the newest send against the unchanged mode instead of failing it; keep all
+  unexpired echo tuples (overlapping sends); parse a dump of an unexpected kind and fail
+  the step with raw bytes if malformed (ignore only well-formed late dumps); remember the
+  exact port names opened and check those on timeout, not the substring. (foreman)
