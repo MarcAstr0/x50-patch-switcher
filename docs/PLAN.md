@@ -59,7 +59,7 @@ No GUI beyond the scaffold window. Everything testable headless.
   by page. Write `docs/proofread-T1.2.md` listing each mismatch (address, TSV value,
   VNL value, page). Edit nothing else. The builder fixes the script from that list;
   the clerk re-checks only the listed rows.
-- ☐ **T1.3 `SoundAddress`.** Parse and format per SPEC §3.1; `bankSelect(bankMap)` per
+- ☑ **T1.3 `SoundAddress`.** Parse and format per SPEC §3.1; `bankSelect(bankMap)` per
   MIDI.md §3 table; ordering for prev/next. Tests: round trip of all 1 033 addresses;
   every grammar form in SPEC §3.1; rejects `A128`, `COMBI D000`,
   `G000`, `G129`, `E000`; bank-select table for both maps, every row.
@@ -183,3 +183,6 @@ fixes go back to the builder as T5.x tasks.
   programs and combinations, English UI, Spanish one-page guide, no pedal or touch
   screen assumed (arrow and page keys still work). Revisit when the answers arrive.
   (owner)
+- 2026-11-21 · Default catalogue order (`SoundAddress::operator<`): COMBI before PROG,
+  then bank A, B, C, D, G, g(d), then number. Prev/next steps through the current result
+  list (SPEC §4.1), which uses this order when unsorted. (foreman, detail)

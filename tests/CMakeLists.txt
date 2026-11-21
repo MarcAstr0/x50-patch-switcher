@@ -11,3 +11,6 @@ x50_add_test(test_scaffold test_scaffold.cpp)
 x50_add_test(test_factory_table test_factory_table.cpp)
 target_compile_definitions(test_factory_table PRIVATE
   X50_FACTORY_TSV="${CMAKE_SOURCE_DIR}/data/x50-factory.tsv")
+x50_add_test(test_sound_address test_sound_address.cpp)
+target_compile_definitions(test_sound_address PRIVATE
+  X50_FACTORY_TSV="${CMAKE_SOURCE_DIR}/data/x50-factory.tsv")

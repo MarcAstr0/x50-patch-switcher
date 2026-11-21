@@ -32,7 +32,8 @@ function(x50_target_options target)
 endfunction()
 
 # core: no GUI, no MIDI. Placeholder-free content arrives with T1.1.
-add_library(x50core STATIC src/core/Version.cpp src/core/Version.h)
+add_library(x50core STATIC src/core/Version.cpp src/core/Version.h
+  src/core/SoundAddress.cpp src/core/SoundAddress.h src/core/BankMap.h)
 target_include_directories(x50core PUBLIC src)
 target_link_libraries(x50core PUBLIC Qt6::Core)
 x50_target_options(x50core)
