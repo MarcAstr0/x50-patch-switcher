@@ -117,7 +117,7 @@ jobs:
           # below from the toolset's own redist folder, so windeployqt must not add vc_redist.
           windeployqt --release --no-translations --no-system-d3d-compiler \
             --no-opengl-sw --no-compiler-runtime \
-            --skip-plugin-types tls,networkinformation "$stage/x50-patch-switcher.exe"
+            --skip-plugin-types tls,networkinformation,generic "$stage/x50-patch-switcher.exe"
 
           # The app links no network module (CLAUDE.md: no network code). Log which binaries
           # import Qt6Network.dll (to learn what pulls it in), then drop it and its plugins and
@@ -132,7 +132,7 @@ jobs:
             done < <(find "$stage" -type f \( -name '*.dll' -o -name '*.exe' \))
           fi
           rm -f "$stage/Qt6Network.dll"
-          rm -rf "$stage/tls" "$stage/networkinformation"
+          rm -rf "$stage/tls" "$stage/networkinformation" "$stage/generic"  # generic = TUIO touch over the network; Windows touch uses qwindows
           bad=0
           while IFS= read -r f; do
             if imports_network "$f"; then
