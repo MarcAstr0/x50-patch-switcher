@@ -145,7 +145,7 @@ on the live mockups, that is the moment to send them to her.
 - ☑ **T4.4 Footprint.** `scripts/measure-footprint.sh` (Linux) and the CI Windows job
   printing working-set size after start; within SPEC §5.
 - ☑ **D4 Design review** of live view at 1×, 1.25×, 1.5×, 2×.
-- ☐ **R4 Review** (reviewer + Codex), emphasis on input handling and repaint discipline.
+- ☑ **R4 Review** (reviewer + Codex), emphasis on input handling and repaint discipline.
 
 **Gate G3 (owner → keyboard player) · beta.** Pre-release `v0.9.0` zip. The foreman
 writes `docs/gates/G3-checklist.md` (Spanish, numbered, each step with what she should
@@ -440,3 +440,8 @@ fixes go back to the builder as T5.x tasks.
   advances; a held pedal sends once; a tap works after a Windows notification; the
   display stays on past the OS timeout while live and sleeps again after leaving. The
   display-sleep inhibit stays held while live is backgrounded (intended). (foreman)
+- 2026-11-21 · R4 closed (reviewer + Codex): Alt+F4/taskbar close ignored while live
+  (decision seam tested headless; real Alt+F4 is G3 step 14); X50_START_LIVE only with
+  --fake-midi; Settings saves only the manual field the user changed; a re-send from a
+  duplicate slot lights that slot; Esc timing tests de-flaked. G3 checklist drafted in
+  docs/gates/G3-checklist.md (Spanish, 19 steps, includes the G1 diagnose). (foreman)

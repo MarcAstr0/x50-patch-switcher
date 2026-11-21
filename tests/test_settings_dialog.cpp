@@ -574,6 +574,39 @@ private slots:
         QCOMPARE(link->manualBankMap(), BankMap::Korg);
         QCOMPARE(link->channel(), 5);
     }
+
+    // R4 P2: saved channel 1, launched with --channel 5, only the Bank Map is changed: the
+    // channel 5 from the command line must not be persisted.
+    void onlyTheEditedManualFieldIsSaved()
+    {
+        {
+            ConnectionSettings saved;
+            saved.channel = 1;
+            saved.bankMap = BankMap::Gm;
+            QVERIFY(saved.save(dir->path()));
+        }
+        fake->setDropReplies(true);
+        link->setManualChannel(5);
+        connectLink(X50Link::State::Manual);
+        {
+            SettingsDialog d(link, fake, dir->path());
+            QCOMPARE(d.channelSpin()->value(), 5);
+            d.bankMapCombo()->setCurrentIndex(1);  // KORG
+            d.reject();
+        }
+        const ConnectionSettings after = ConnectionSettings::load(dir->path());
+        QCOMPARE(after.channel, 1);
+        QCOMPARE(after.bankMap, BankMap::Korg);
+        // And the other way round: only the channel edited leaves the saved Bank Map alone.
+        {
+            SettingsDialog d(link, fake, dir->path());
+            d.channelSpin()->setValue(8);
+            d.reject();
+        }
+        const ConnectionSettings again = ConnectionSettings::load(dir->path());
+        QCOMPARE(again.channel, 8);
+        QCOMPARE(again.bankMap, BankMap::Korg);
+    }
 };
 
 QTEST_MAIN(TestSettingsDialog)

@@ -107,7 +107,8 @@ int main(int argc, char *argv[])
     window.restoreLayout(configDir);  // window geometry and splitter, next to the library
     window.show();
     // Test hook for scripts/measure-footprint.sh: X50_START_LIVE=1 opens the live view at start.
-    if (qEnvironmentVariableIsSet("X50_START_LIVE"))
+    // Honoured only with --fake-midi, so a stray variable cannot put the real app on stage.
+    if (cli.options().fakeMidi && qEnvironmentVariableIsSet("X50_START_LIVE"))
         window.enterLive();
     link.start();  // never blocks: connecting and probing run on the event loop
     const int rc = QApplication::exec();

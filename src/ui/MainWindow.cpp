@@ -10,6 +10,7 @@
 #include "ui/Theme.h"
 
 #include <QCloseEvent>
+#include <QEvent>
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QColor>
@@ -98,6 +99,9 @@ MainWindow::MainWindow(Catalogue *catalogue, Library *library, X50Link *link, QW
     connect(m_live, &LiveView::leaveRequested, this, &MainWindow::leaveLive);
     // A quit while live must not leave the display inhibit set.
     connect(qApp, &QCoreApplication::aboutToQuit, this, [this]() { m_sleepInhibitor.release(); });
+    // A quit or session end is allowed to close the window while live (SPEC 4.2); watch for it.
+    qApp->installEventFilter(this);
+    connect(qApp, &QGuiApplication::commitDataRequest, this, [this]() { m_shuttingDown = true; });
 
     if (m_link) {
         connect(m_link, &X50Link::stateChanged, this, [this]() {
@@ -418,8 +422,26 @@ void MainWindow::saveLayout()
     settings.sync();  // failure (read-only folder) is ignored: remembering the layout is a courtesy
 }
 
+bool MainWindow::eventFilter(QObject *watched, QEvent *event)
+{
+    if (watched == qApp && event->type() == QEvent::Quit)
+        m_shuttingDown = true;  // QCoreApplication::quit and friends
+    return QMainWindow::eventFilter(watched, event);
+}
+
+bool MainWindow::ignoresClose(bool spontaneous) const
+{
+    return m_isLive && spontaneous && !m_shuttingDown;
+}
+
 void MainWindow::closeEvent(QCloseEvent *event)
 {
+    // SPEC 4.2: Alt+F4 or the taskbar Close must not end the stage view; Esc is the way out.
+    if (ignoresClose(event->spontaneous())) {
+        event->ignore();
+        return;
+    }
+    m_sleepInhibitor.release();
     saveLayout();
     QMainWindow::closeEvent(event);
 }

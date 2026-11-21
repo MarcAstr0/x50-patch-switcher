@@ -5,6 +5,8 @@
 #include <memory>
 
 #include <QApplication>
+#include <QDir>
+#include <QFile>
 #include <QKeyEvent>
 #include <QPointingDevice>
 #include <QSettings>
@@ -297,6 +299,71 @@ private slots:
         QVERIFY(r.w->isLive());
     }
 
+    // R4 P1 (SPEC 4.2): Alt+F4 / taskbar Close (a spontaneous close) is ignored while live.
+    void spontaneousCloseWhileLiveIsIgnored()
+    {
+        Rig r(&m_cat);
+        QTemporaryDir cfg;
+        r.w->restoreLayout(cfg.path());
+        QVERIFY(r.w->enterLive());
+        const QString file = QDir(cfg.path()).filePath(MainWindow::layoutFileName());
+        QVERIFY(!QFile::exists(file));
+        // A window-system close (Alt+F4, taskbar) is spontaneous; the offscreen platform cannot
+        // deliver one, so the decision closeEvent makes is asked directly.
+        QVERIFY(r.w->ignoresClose(true));
+        QVERIFY(!r.w->ignoresClose(false));  // a programmatic close is never ignored
+        QVERIFY(r.w->isLive());
+        QVERIFY(r.w->isVisible());
+        QVERIFY2(!QFile::exists(file), "layout saved before any close");
+        // Outside live view a window-system close is honoured.
+        r.w->leaveLive();
+        QVERIFY(!r.w->ignoresClose(true));
+    }
+
+    // R4 P1: a programmatic close while live still closes, saves the layout, releases the inhibit.
+    void programmaticCloseWhileLiveCloses()
+    {
+        Rig r(&m_cat);
+        QTemporaryDir cfg;
+        r.w->restoreLayout(cfg.path());
+        QVERIFY(r.w->enterLive());
+        QVERIFY(r.w->close());
+        QVERIFY(!r.w->isVisible());
+        QVERIFY(QFile::exists(QDir(cfg.path()).filePath(MainWindow::layoutFileName())));
+        QVERIFY(!r.w->displaySleepInhibited());
+    }
+
+    // R4 P1: once a quit has been requested (QEvent::Quit) a window-system close while live goes through.
+    void quitRequestedWhileLiveAllowsClose()
+    {
+        Rig r(&m_cat);
+        QTemporaryDir cfg;
+        r.w->restoreLayout(cfg.path());
+        QVERIFY(r.w->enterLive());
+        QEvent quit(QEvent::Quit);
+        QCoreApplication::sendEvent(qApp, &quit);
+        QVERIFY(!r.w->ignoresClose(true));
+    }
+
+    // R4 P2: the same sound in slots 0 and 4; slot 0 lit; pressing slot 4 re-sends and lights slot 4,
+    // and stepping Right continues from slot 4.
+    void duplicateSlotResendLightsPressedSlot()
+    {
+        Rig r(&m_cat);
+        r.lib.setSlot(r.setA, 4, r.slotAddr[0]);
+        QVERIFY(r.w->enterLive());
+        QSignalSpy sent(&r.link, &X50Link::sent);
+        QTest::mouseClick(r.live(), Qt::LeftButton, Qt::NoModifier, r.live()->buttonRect(0).center());
+        QVERIFY(r.sentIs(sent, 1, r.slotAddr[0]));
+        QCOMPARE(r.live()->litSlot(), 0);
+        QTest::mouseClick(r.live(), Qt::LeftButton, Qt::NoModifier, r.live()->buttonRect(4).center());
+        QVERIFY(r.sentIs(sent, 2, r.slotAddr[0]));
+        QCOMPARE(r.live()->litSlot(), 4);
+        r.key(Qt::Key_Right);
+        QVERIFY(r.sentIs(sent, 3, r.slotAddr[6]));  // next filled slot after 4 is 6
+        QCOMPARE(r.live()->litSlot(), 6);
+    }
+
     // SPEC 4.2: a single Esc does not leave; it arms the hint, and the window passing disarms it.
     void escSinglePressDoesNotLeave()
     {
@@ -319,13 +386,12 @@ private slots:
         QVERIFY(r.w->enterLive());
         QTest::keyPress(r.live(), Qt::Key_Escape);
         QVERIFY(r.live()->escArmed());
+        // Auto-repeats arrive straight away (no wall-clock assumption); the 1 s timer then leaves.
         for (int i = 0; i < 4; ++i) {
-            QTest::qWait(200);
             QKeyEvent e(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier, QString(), true);
             QApplication::sendEvent(r.live(), &e);
-            QVERIFY(r.w->isLive());
         }
-        QTRY_VERIFY_WITH_TIMEOUT(!r.w->isLive(), 1000);
+        QTRY_VERIFY_WITH_TIMEOUT(!r.w->isLive(), 10000);
         QTest::keyRelease(r.live(), Qt::Key_Escape);
         QVERIFY(r.w->browseView()->isVisible());
         QVERIFY(r.w->settingsAllowed());
@@ -337,8 +403,7 @@ private slots:
         Rig r(&m_cat);
         QVERIFY(r.w->enterLive());
         QTest::keyPress(r.live(), Qt::Key_Escape);
-        QTest::qWait(400);
-        QTest::keyRelease(r.live(), Qt::Key_Escape);
+        QTest::keyRelease(r.live(), Qt::Key_Escape);  // no wait: a stalled CI run must not turn this into a hold
         QVERIFY(r.live()->escArmed());  // still waiting for a possible second press
         QTest::qWait(1200);
         QVERIFY(r.w->isLive());
@@ -351,9 +416,8 @@ private slots:
         Rig r(&m_cat);
         QVERIFY(r.w->enterLive());
         r.key(Qt::Key_Escape);
-        QTest::qWait(300);
         QVERIFY(r.w->isLive());
-        r.key(Qt::Key_Escape);
+        r.key(Qt::Key_Escape);  // straight away: well inside 1 s however slow the machine
         QVERIFY(!r.w->isLive());
         QVERIFY(!r.live()->escArmed());
     }

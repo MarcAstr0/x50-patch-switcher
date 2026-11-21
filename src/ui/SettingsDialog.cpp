@@ -378,10 +378,11 @@ bool SettingsDialog::saveSettings()
 {
     m_settings.outputPort = m_output->count() ? m_output->currentText() : m_settings.outputPort;
     m_settings.inputPort = m_input->count() ? m_input->currentText() : m_settings.inputPort;
-    if (m_manualTouched) {  // untouched: keep the saved values (the shown ones may come from --channel)
+    // Untouched fields keep their saved values (the shown ones may come from --channel).
+    if (m_channelTouched)
         m_settings.channel = m_shownChannel;
+    if (m_bankMapTouched)
         m_settings.bankMap = m_shownBankMap;
-    }
     const bool ok = m_settings.save(m_configDir);
     m_saveFailed = !ok;
     if (!ok)
@@ -405,10 +406,16 @@ void SettingsDialog::onManualChanged()
 {
     if (m_building)
         return;
-    m_manualTouched = true;
-    if (m_channel->isEnabled())  // a disabled spin box shows the learned channel, not a manual one
+    // A disabled spin box shows the learned channel, not a manual one.
+    if (m_channel->isEnabled() && m_channel->value() != m_shownChannel) {
         m_shownChannel = m_channel->value();
-    m_shownBankMap = m_bankMap->currentIndex() == 1 ? BankMap::Korg : BankMap::Gm;
+        m_channelTouched = true;
+    }
+    const BankMap bank = m_bankMap->currentIndex() == 1 ? BankMap::Korg : BankMap::Gm;
+    if (bank != m_shownBankMap) {
+        m_shownBankMap = bank;
+        m_bankMapTouched = true;
+    }
     if (!m_link)
         return;
     m_link->setManualChannel(m_shownChannel);  // the link ignores it when the X50 reported one

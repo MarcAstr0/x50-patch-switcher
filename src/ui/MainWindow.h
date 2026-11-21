@@ -57,6 +57,10 @@ public:
     // dialog, context menu or browse shortcut can be reached); the link's errors go to the live
     // top bar, never to a dialog or toast. Entering sends nothing. Returns false if already live.
     // Leaving (Esc held 1 s or twice within 1 s, from the live view) restores the browse page and the window state it had.
+    // True when a close of this kind must be ignored: a window-system close (Alt+F4, taskbar)
+    // while live, unless a quit or session end was requested. closeEvent uses exactly this; it is
+    // public because the headless platform cannot deliver a spontaneous QCloseEvent to a test.
+    bool ignoresClose(bool spontaneous) const;
     LiveView *liveView() const { return m_live; }
     bool isLive() const { return m_isLive; }
     // True while the display-sleep inhibit is held: exactly while live (Windows only has an effect).
@@ -86,6 +90,7 @@ public:
 
 protected:
     void closeEvent(QCloseEvent *event) override;
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     // DESIGN 7.1: the minimum height grows with the strip when k > 1; recomputed when it changes.
@@ -111,6 +116,7 @@ private:
     Catalogue *m_catalogue = nullptr;
     DisplaySleepInhibitor m_sleepInhibitor;
     bool m_isLive = false;
+    bool m_shuttingDown = false;  // quit or session end requested: a close while live is then allowed
     bool m_liveFullScreen = true;
     Qt::WindowStates m_stateBeforeLive;
     QRect m_geometryBeforeLive;  // normal (not maximised) geometry when live began

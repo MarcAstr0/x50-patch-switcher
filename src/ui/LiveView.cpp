@@ -176,8 +176,19 @@ void LiveView::setEscArmed(bool armed)
 
 void LiveView::sendResolved(const SoundAddress &address)
 {
-    if (m_target >= 0 && m_target < m_set.size() && m_set.slot(m_target).address && *m_set.slot(m_target).address == address)
+    if (m_target >= 0 && m_target < m_set.size() && m_set.slot(m_target).address && *m_set.slot(m_target).address == address) {
+        // A same-address resend from another slot: the sound did not change, so setCurrentSound
+        // did nothing; light the slot that was pressed.
+        if (m_current && *m_current == address && m_lit != m_target) {
+            const int old = m_lit;
+            m_lit = m_target;
+            m_chosen = m_target;
+            if (old >= 0)
+                update(m_buttons[old].rect);
+            update(m_buttons[m_lit].rect);
+        }
         m_target = -1;
+    }
 }
 
 void LiveView::refresh()

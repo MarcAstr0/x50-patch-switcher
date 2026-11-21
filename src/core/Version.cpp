@@ -7,5 +7,5 @@ QString Version::appName()
 
 QString Version::appVersion()
 {
-    return QStringLiteral("0.1.0");
+    return QStringLiteral(X50_VERSION);
 }

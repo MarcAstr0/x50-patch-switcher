@@ -105,7 +105,8 @@ private:
     // Only a user change is applied to the link and written to the settings.
     int m_shownChannel = 1;
     BankMap m_shownBankMap = BankMap::Gm;
-    bool m_manualTouched = false;
+    bool m_channelTouched = false;  // edited by the user: only edited fields are saved
+    bool m_bankMapTouched = false;
     bool m_hasPorts = false;
     bool m_checkedThisSession = false;
     bool m_saveFailed = false;

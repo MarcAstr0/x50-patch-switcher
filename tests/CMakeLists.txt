@@ -21,6 +21,7 @@ x50_add_test(test_search_query test_search_query.cpp)
 target_compile_definitions(test_search_query PRIVATE
   X50_FACTORY_TSV="${CMAKE_SOURCE_DIR}/data/x50-factory.tsv")
 x50_add_test(test_cli test_cli.cpp)
+x50_add_test(test_version test_version.cpp)
 target_compile_definitions(test_cli PRIVATE X50_EXE="$<TARGET_FILE:x50-patch-switcher>")
 add_dependencies(test_cli x50-patch-switcher)
 x50_add_test(test_config_location test_config_location.cpp)

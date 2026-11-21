@@ -35,6 +35,9 @@ CommandLine::Result CommandLine::process(const QStringList &arguments)
     parser.setApplicationDescription(Version::appName());
     // addHelpOption also registers --help-all (Qt's own option name).
     const QCommandLineOption helpOption = parser.addHelpOption();
+    const QCommandLineOption versionOpt(QStringLiteral("version"),
+                                        QStringLiteral("Print the version and exit."));
+    parser.addOption(versionOpt);
     const QCommandLineOption listPorts(QStringLiteral("list-ports"),
                                        QStringLiteral("Print output and input port names and exit."));
     parser.addOption(listPorts);
@@ -104,6 +107,11 @@ CommandLine::Result CommandLine::process(const QStringList &arguments)
             "  5  a microX answered (this app supports the X50 only); nothing was sent\n"
             "  6  --screenshot: the PNG could not be written\n");
         QTextStream(stdout) << help;
+        m_exitCode = 0;
+        return Result::Exit;
+    }
+    if (parser.isSet(versionOpt)) {
+        QTextStream(stdout) << Version::appName() << QLatin1Char(' ') << Version::appVersion() << QStringLiteral("\n");
         m_exitCode = 0;
         return Result::Exit;
     }

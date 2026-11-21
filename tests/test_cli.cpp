@@ -45,6 +45,12 @@ class TestCli : public QObject {
     }
 
 private slots:
+    void versionPrintsAndExits0() {
+        QString out;
+        const int rc = run({QStringLiteral("--version")}, &out);
+        QCOMPARE(rc, 0);
+        QCOMPARE(out.trimmed(), QStringLiteral("X50 Patch Switcher 0.9.0"));
+    }
     void listPorts() {
         QString out;
         const int rc = run({QStringLiteral("--list-ports")}, &out);
