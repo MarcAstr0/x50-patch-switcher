@@ -954,6 +954,37 @@ private slots:
         QCOMPARE(MainWindow::clampToScreen(QRect(2000, 100, 1100, 710), QRect(1920, 0, 1920, 1040), min),
                  QRect(2000, 100, 1100, 710));
     }
+
+    // R3 B: unit names persisted in library.json reach the catalogue at startup: the browse list
+    // shows the unit's name and marks the sound edited.
+    void persistedUnitNamesReachCatalogue()
+    {
+        QTemporaryDir dir;
+        const SoundAddress a(SoundAddress::Kind::Prog, SoundAddress::Bank::A, 0);
+        {
+            Library writer;
+            QVERIFY(writer.load(dir.path()));
+            QMap<SoundAddress, Catalogue::UnitName> names;
+            names.insert(a, {QStringLiteral("Zebra Zither"), QString(), QDateTime::currentDateTimeUtc()});
+            writer.setUnitNames(names);
+            writer.flush();
+        }
+        Catalogue cat;
+        QVERIFY(cat.loadFromResource());
+        QVERIFY(!cat.isEdited(a));
+        Library lib;
+        QVERIFY(lib.load(dir.path()));
+        QCOMPARE(lib.unitNames().size(), 1);
+        MainWindow w(&cat, &lib, nullptr);
+        QVERIFY(cat.isEdited(a));
+        QCOMPARE(cat.effectiveName(a), QStringLiteral("Zebra Zither"));
+        w.browseView()->setSearchText(QStringLiteral("Zebra"));
+        QVERIFY(w.browseView()->results().contains(a));
+        ResultModel *m = w.browseView()->resultModel();
+        QCOMPARE(m->index(0, ResultModel::ColName).data().toString(), QStringLiteral("Zebra Zither"));
+        QVERIFY(m->index(0, ResultModel::ColEdited).data(ResultModel::EditedRole).toBool());
+    }
+
 };
 
 QTEST_MAIN(TestBrowseView)

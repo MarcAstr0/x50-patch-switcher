@@ -131,7 +131,7 @@ on the live mockups, that is the moment to send them to her.
   `Ctrl+1…8`.
 - ☑ **D3 Design review** (designer): screenshots of every state at 1×, 1.25× and 2×
   against DESIGN.md; numbered deviations; one fix round, a second at most.
-- ☐ **R3 Review** (reviewer + Codex).
+- ☑ **R3 Review** (reviewer + Codex).
 
 ## M4 · Live view (builder; designer reviews)
 
@@ -417,3 +417,7 @@ fixes go back to the builder as T5.x tasks.
   disabled before any probe; dialog shows saved channel instead of the effective one;
   full-screen browse state not restored after live. Folded into the R-T4.2 follow-up
   round. With these, R3 is reconciled. (foreman)
+- 2026-11-21 · R3 closed. R-T4.2 + Codex R3 fixes in. Left for the next round: the
+  Settings dialog re-applies the saved manual channel on open, which overrides a
+  --channel from the command line; add X50Link::manualChannel()/manualBankMap() getters
+  and display the link's effective values instead of re-applying. (foreman)

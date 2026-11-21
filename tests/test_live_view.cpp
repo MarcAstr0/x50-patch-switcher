@@ -14,6 +14,7 @@
 #include <QSet>
 #include <QSignalSpy>
 #include <QTemporaryDir>
+#include <QFocusEvent>
 #include <QTest>
 #include <QtMath>
 
@@ -238,6 +239,20 @@ private slots:
         QCOMPARE(v.buttonState(5), LiveView::ButtonState::Empty);
         QTest::mouseRelease(&v, Qt::LeftButton, Qt::NoModifier, c);
         QCOMPARE(spy.count(), 0);
+    }
+
+    // T4.2 follow-up 3: losing focus clears the pressed look (the release would never arrive).
+    void focusOutClearsPressed()
+    {
+        LiveView v(&m_cat);
+        v.setSet(friday());
+        v.show();
+        sizeTo(v, 1280, 720);
+        QTest::mousePress(&v, Qt::LeftButton, Qt::NoModifier, v.buttonRect(0).center());
+        QCOMPARE(v.buttonState(0), LiveView::ButtonState::Pressed);
+        QFocusEvent out(QEvent::FocusOut, Qt::OtherFocusReason);
+        QCoreApplication::sendEvent(&v, &out);
+        QCOMPARE(v.buttonState(0), LiveView::ButtonState::Normal);
     }
 
     // DESIGN 5.4 "Pressed": press on a button, send nothing (signal only) on release inside; sliding out cancels.

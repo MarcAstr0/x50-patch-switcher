@@ -85,9 +85,10 @@ void LiveView::setSet(const SetModel &set)
 {
     if (sameSlots(set, m_set))
         return;
-    if (set.size() != m_set.size())
-        m_pressed = -1;  // a different grid: the pressed slot means nothing now
+    setPressed(-1);  // whatever was held is another sound now: a release must send nothing
     m_set = set;
+    m_target = -1;  // slots may mean other sounds now
+    m_chosen = -1;
     layoutButtons();   // also drops a pressed slot that became empty
     m_lit = findLit();
     layoutBar();  // the set name, and whether the sound is in the set
@@ -111,6 +112,10 @@ int LiveView::findLit() const
 {
     if (!m_current)
         return -1;
+    // A sound listed twice: the slot chosen here wins while it matches; a sound that came from
+    // the panel lights its first slot.
+    if (m_chosen >= 0 && m_chosen < m_set.size() && m_set.slot(m_chosen).address && *m_set.slot(m_chosen).address == *m_current)
+        return m_chosen;
     for (int i = 0; i < m_set.size(); ++i)
         if (m_set.slot(i).address && *m_set.slot(i).address == *m_current)
             return i;  // a sound listed twice lights its first slot
@@ -124,6 +129,9 @@ void LiveView::setCurrentSound(const std::optional<SoundAddress> &sound)
         return;
     const int old = m_lit;
     m_current = s;
+    if (m_chosen >= 0 && m_chosen < m_set.size() && !(s && m_set.slot(m_chosen).address && *m_set.slot(m_chosen).address == *s)
+        && m_target != m_chosen)
+        m_chosen = -1;  // the sound moved on without us: back to first match
     m_lit = findLit();
     layoutBar();
     m_nameSig = nameSignature();
@@ -164,6 +172,12 @@ void LiveView::setEscArmed(bool armed)
     m_escArmed = armed;
     layoutHint();
     update(m_hint.rect);
+}
+
+void LiveView::sendResolved(const SoundAddress &address)
+{
+    if (m_target >= 0 && m_target < m_set.size() && m_set.slot(m_target).address && *m_set.slot(m_target).address == address)
+        m_target = -1;
 }
 
 void LiveView::refresh()
@@ -652,6 +666,7 @@ void LiveView::showEvent(QShowEvent *)
 
 void LiveView::hideEvent(QHideEvent *)
 {
+    m_target = -1;
     setPressed(-1);
     resetEsc();
 }
@@ -719,7 +734,7 @@ void LiveView::mouseReleaseEvent(QMouseEvent *e)
                         && m_buttons[i].rect.contains(e->position().toPoint());
     setPressed(-1);
     if (inside)
-        emit slotClicked(i);
+        choose(i);
 }
 
 // ---------------------------------------------------------------- keys (SPEC 4.2)
@@ -729,7 +744,9 @@ int LiveView::stepTarget(int direction) const
     const int n = m_buttons.size();
     // The current sound is not in the set (or unknown): Next goes to the first non-empty slot,
     // Previous to the last. Otherwise the next/previous non-empty one; none past the ends (no wrap).
-    int i = m_lit >= 0 ? m_lit + direction : (direction > 0 ? 0 : n - 1);
+    // While a send is in flight the target is where we are going: step from it, not from the lit slot.
+    const int from = m_target >= 0 ? m_target : m_lit;
+    int i = from >= 0 ? from + direction : (direction > 0 ? 0 : n - 1);
     for (; i >= 0 && i < n; i += direction)
         if (!m_buttons[i].empty)
             return i;
@@ -783,7 +800,14 @@ void LiveView::keyPressEvent(QKeyEvent *e)
         return;  // F5 and everything else: nothing
     }
     if (target >= 0)
-        emit slotClicked(target);
+        choose(target);
+}
+
+void LiveView::choose(int slot)
+{
+    m_target = slot;
+    m_chosen = slot;
+    emit slotClicked(slot);
 }
 
 void LiveView::keyReleaseEvent(QKeyEvent *e)
@@ -796,6 +820,7 @@ void LiveView::keyReleaseEvent(QKeyEvent *e)
 void LiveView::focusOutEvent(QFocusEvent *e)
 {
     resetEsc();  // a release we will never see must not complete a hold
+    setPressed(-1);  // nor a button stay pressed
     QWidget::focusOutEvent(e);
 }
 

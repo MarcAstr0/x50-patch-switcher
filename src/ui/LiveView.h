@@ -73,6 +73,12 @@ public:
     // Names in the catalogue may have changed (unit names read): lays out again only if a name
     // that is shown differs from the one the layout was built with.
     void refresh();
+    // The outcome of a send this view asked for (MainWindow connects X50Link::sent / sendFailed).
+    // Ends the "target slot" if `address` is the sound it was waiting for. On success the lit slot
+    // follows setCurrentSound; on failure the lit slot stays.
+    void sendResolved(const SoundAddress &address);
+    // A requested send that never reached the link (no link): forget the target.
+    void clearTarget() { m_target = -1; }
 
     // ---- state and layout, for the screenshot harness and the tests ----
     const SetModel &set() const { return m_set; }
@@ -86,6 +92,7 @@ public:
     NameFit::Result nameFit(int i) const;
     ButtonState buttonState(int i) const;
     int litSlot() const { return m_lit; }           // -1: none
+    int targetSlot() const { return m_target; }     // -1: no send pending
     bool currentNotInSet() const { return m_notInSet; }
     std::optional<SoundAddress> currentSound() const { return m_current; }
     QString readoutMode() const { return m_readout.modeText; }   // "PROG 0:Play" / "--"
@@ -216,7 +223,8 @@ private:
     int hit(const QPoint &pos) const;
     void setPressed(int idx);
     QStringList nameSignature() const;
-    int stepTarget(int direction) const;      // next/previous non-empty slot from the lit one, or -1
+    int stepTarget(int direction) const;      // next/previous non-empty slot from the target (else lit) one, or -1
+    void choose(int slot);                    // remember the choice, then emit slotClicked
     void escPressed();
     void escReleased();
     void escTimeout();
@@ -237,6 +245,8 @@ private:
     bool m_escArmed = false;
     bool m_notInSet = false;
     int m_lit = -1;
+    int m_target = -1;            // slot of the newest send still in flight (Mode Change wait), -1: none
+    int m_chosen = -1;            // slot last chosen here: lights it when a sound sits in two slots
     int m_pressed = -1;
     int m_cols = 4;
     QTimer m_flashTimer;

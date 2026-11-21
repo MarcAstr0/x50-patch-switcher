@@ -44,6 +44,11 @@ MainWindow::MainWindow(Catalogue *catalogue, Library *library, X50Link *link, QW
         m_library = m_ownedLibrary.get();
     }
 
+    // Unit names persisted in the library belong in the catalogue (restart, and names read later).
+    // First on Library::changed, so every view's own slot sees the updated catalogue.
+    applyUnitNames();
+    connect(m_library, &Library::changed, this, [this]() { applyUnitNames(); });
+
     auto *root = new QWidget(this);
     root->setObjectName(QStringLiteral("browseRoot"));
     auto *layout = new QVBoxLayout(root);
@@ -102,7 +107,7 @@ MainWindow::MainWindow(Catalogue *catalogue, Library *library, X50Link *link, QW
         connect(m_link, &X50Link::statusChanged, this, [this](const QString &text) {
             // Connect failures are only status text (no errorOccurred): tell them once, here.
             if (m_link->state() == X50Link::State::Disconnected && m_link->statusIsFailure()) {
-                showStatus(text, true);
+                showLinkStatus(text);
                 syncFromLink();
             }
         });
@@ -110,6 +115,7 @@ MainWindow::MainWindow(Catalogue *catalogue, Library *library, X50Link *link, QW
         connect(m_link, &X50Link::sent, this, [this](const SoundAddress &address) {
             m_library->recordUse(address);
             syncFromLink();
+            m_live->sendResolved(address);  // after the lit slot moved
         });
         connect(m_link, &X50Link::followedSound, this, [this]() { syncFromLink(); });
         connect(m_link, &X50Link::followedMode, this, [this]() { syncFromLink(); });
@@ -128,13 +134,14 @@ MainWindow::MainWindow(Catalogue *catalogue, Library *library, X50Link *link, QW
         });
         connect(m_link, &X50Link::errorOccurred, this, [this](const QString &message, const QByteArray &) {
             m_linkError = message;
-            showStatus(message, true);
+            showLinkStatus(message);
             syncFromLink();
             // Connected, so the bar keeps its connection text: show the error in a red chip for 2 s.
             if (m_isLive && m_link->state() != X50Link::State::Disconnected && m_link->state() != X50Link::State::Refused)
                 m_live->flashSendFailure(message);
         });
-        connect(m_link, &X50Link::sendFailed, this, [this](const SoundAddress &, const QString &reason) {
+        connect(m_link, &X50Link::sendFailed, this, [this](const SoundAddress &address, const QString &reason) {
+            m_live->sendResolved(address);  // the lit slot stays
             if (m_isLive)
                 m_live->flashSendFailure(reason);
         });
@@ -144,12 +151,16 @@ MainWindow::MainWindow(Catalogue *catalogue, Library *library, X50Link *link, QW
     // Library problems found at load time are told once, here (never a dialog).
     const QString loadError = m_library->loadError();
     const QStringList warnings = m_library->loadWarnings();
+    QString notice;
     if (!loadError.isEmpty())
-        showStatus(loadError, true);
+        notice = loadError;
     else if (!warnings.isEmpty())
-        showStatus(warnings.size() == 1 ? warnings.first()
-                                        : QStringLiteral("%1 (and %2 more library warnings)").arg(warnings.first()).arg(warnings.size() - 1),
-                   true);
+        notice = warnings.size() == 1 ? warnings.first()
+                                      : QStringLiteral("%1 (and %2 more library warnings)").arg(warnings.first()).arg(warnings.size() - 1);
+    if (!notice.isEmpty()) {
+        showStatus(notice, true);
+        m_loadNotice = notice;
+    }
 
     m_browse->searchField()->setFocus();
 }
@@ -181,12 +192,34 @@ QString MainWindow::statusText() const { return m_status->text(); }
 
 void MainWindow::showStatus(const QString &text, bool isError)
 {
+    if (text != m_loadNotice)
+        m_loadNotice.clear();
     if (m_status->text() == text && m_statusError == isError)
         return;
     m_statusError = isError;
     m_status->setText(text);
     // `red` means "something is wrong" (DESIGN 1.1); a normal message uses the QSS colour.
     m_status->setStyleSheet(isError ? QStringLiteral("color: %1;").arg(QColor(Theme::red).name()) : QString());
+}
+
+void MainWindow::applyUnitNames()
+{
+    const auto &names = m_library->unitNames();
+    for (auto it = names.cbegin(); it != names.cend(); ++it) {
+        const Catalogue::UnitName *have = m_catalogue->unitName(it.key());
+        if (have && have->name == it.value().name && have->category == it.value().category && have->readAt == it.value().readAt)
+            continue;
+        m_catalogue->setUnitName(it.key(), it.value().name, it.value().category, it.value().readAt);
+    }
+}
+
+void MainWindow::showLinkStatus(const QString &text)
+{
+    // A library problem found at load stays until the user acts (any other message replaces it);
+    // the link's own state is on the connection strip meanwhile.
+    if (!m_loadNotice.isEmpty())
+        return;
+    showStatus(text, true);
 }
 
 void MainWindow::syncLive()
@@ -224,8 +257,10 @@ void MainWindow::syncLive()
 
 void MainWindow::sendSlot(int index)
 {
-    if (!m_isLive || !m_link)
+    if (!m_isLive || !m_link) {
+        m_live->clearTarget();
         return;
+    }
     const SetModel::Slot &slot = m_live->set().slot(index);  // bounds-checked
     if (slot.address)
         m_link->send(*slot.address);
@@ -281,7 +316,9 @@ void MainWindow::leaveLive()
         m_browse->searchField()->setFocus();
         return;
     }
-    if (m_stateBeforeLive.testFlag(Qt::WindowMaximized)) {
+    if (m_stateBeforeLive.testFlag(Qt::WindowFullScreen)) {
+        showFullScreen();
+    } else if (m_stateBeforeLive.testFlag(Qt::WindowMaximized)) {
         showMaximized();
     } else {
         showNormal();

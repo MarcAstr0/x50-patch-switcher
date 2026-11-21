@@ -525,6 +525,39 @@ private slots:
         // The diamond is outlined, not filled: just inside its top vertex is background.
         QVERIFY(!near(at(12, d.checklist()->rowGeometry(2).top + 16 - 5), Theme::amber));
     }
+
+    // R3 D: with no port, never probed, the manual controls are enabled.
+    void manualEnabledBeforeAnyProbe()
+    {
+        SettingsDialog d(link, fake, dir->path());
+        QVERIFY(d.manualEnabled());
+        QVERIFY(d.channelSpin()->isEnabled());
+        fake->setPortBusy(true);
+        link->start();
+        SettingsDialog d2(link, fake, dir->path());
+        QCOMPARE(link->state(), X50Link::State::Disconnected);
+        QVERIFY(d2.manualEnabled());
+    }
+
+    // R3 E: the dialog shows, and the link uses, the same manual channel (here --channel 5 over a saved 1).
+    void displayedManualChannelIsTheOneOnTheWire()
+    {
+        fake->setDropReplies(true);
+        link->setManualChannel(5);
+        connectLink(X50Link::State::Manual);
+        SettingsDialog d(link, fake, dir->path());
+        QCOMPARE(d.channelSpin()->value(), 1);  // saved settings.ini value
+        fake->clearReceived();
+        QSignalSpy sent(link, &X50Link::sent);
+        link->send(combi(0));
+        QTRY_COMPARE_WITH_TIMEOUT(sent.count(), 1, 3000);
+        QList<QByteArray> cv;
+        for (const QByteArray &m : fake->received())
+            if (isChannelVoice(m))
+                cv << m;
+        QCOMPARE(cv.first().at(0) & 0x0F, d.channelSpin()->value() - 1);
+    }
+
 };
 
 QTEST_MAIN(TestSettingsDialog)

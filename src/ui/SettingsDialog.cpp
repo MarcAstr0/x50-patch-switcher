@@ -324,6 +324,12 @@ SettingsDialog::SettingsDialog(X50Link *link, MidiBackend *backend, const QStrin
                 setNote(message);
         });
     }
+    // The link may hold another manual channel than the saved one (--channel): what this dialog
+    // shows is what goes on the wire, so apply the displayed values to the link.
+    if (m_link) {
+        m_link->setManualChannel(m_settings.channel);
+        m_link->setManualBankMap(m_settings.bankMap);
+    }
     onLinkChanged();
     fitToContent();
 }
@@ -504,15 +510,15 @@ void SettingsDialog::updateEnabled()
     else if (m_note->text() == busyText)
         setNote(QString());
 
-    // The manual values are for a probe that could not read them (SPEC 4.5): the link is in
-    // manual mode, or a probe has run, learned no Mode and State, and the unit is not a microX.
-    bool manual = false;
+    // The manual values are for an X50 whose Mode and State were not read (SPEC 4.5). They are
+    // enabled by default (no port, busy, never probed) and off only once a check read the state or
+    // found a microX.
+    bool manual = true;
     bool channelLearned = false;
-    if (m_link && !busy) {
+    if (m_link) {
         const X50Link::ProbeResult &r = m_link->lastProbe();
-        manual = m_link->state() == X50Link::State::Manual ||
-                 (!r.items.isEmpty() && !r.state.has_value() && !r.microX);
-        channelLearned = manual && r.x50Confirmed;
+        manual = !(r.state.has_value() || r.microX);
+        channelLearned = manual && r.x50Confirmed && !busy;
     }
     m_building = true;
     m_channel->setValue(channelLearned ? m_link->channel() : m_settings.channel);

@@ -92,6 +92,8 @@ private:
     void updateMinimumHeight();
     void syncFromLink();
     void syncLive();
+    void applyUnitNames();
+    void showLinkStatus(const QString &text);
     void sendSlot(int index);
     void stepSet(int direction);
 
@@ -105,6 +107,7 @@ private:
     QStackedWidget *m_stack = nullptr;
     QWidget *m_browsePage = nullptr;
     LiveView *m_live = nullptr;
+    QString m_loadNotice;   // library problem told at start; link messages do not replace it
     Catalogue *m_catalogue = nullptr;
     DisplaySleepInhibitor m_sleepInhibitor;
     bool m_isLive = false;

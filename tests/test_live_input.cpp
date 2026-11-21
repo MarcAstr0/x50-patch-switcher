@@ -468,6 +468,79 @@ private slots:
         QVERIFY2(r.live()->connectionText().contains(QStringLiteral("DISK FULL"), Qt::CaseInsensitive), qPrintable(r.live()->connectionText()));
     }
 
+    // T4.2 follow-up 1. Slot 0 is COMBI, slots 1 and 2 are PROG, so Next crosses to PROG PLAY and waits for
+    // the Mode Change ACK (delayed here). Two Next presses inside the wait must advance two slots.
+    // Bytes (MIDI.md 4 and 3, global channel 1, Bank Map GM): Mode Change F0 42 30 7A 4E 02 F7 (m = 2 PROG PLAY);
+    // program A 005 = B0 00 3F, B0 20 00, C0 05.
+    void fastNextDuringModeChange()
+    {
+        Rig r(&m_cat);
+        r.lib.setSlot(r.setA, 2, prog(B::A, 5));
+        QVERIFY(r.w->enterLive());
+        QSignalSpy sent(&r.link, &X50Link::sent);
+        r.key(Qt::Key_1);
+        QVERIFY(r.sentIs(sent, 1, combi(B::A, 2)));
+        QTRY_COMPARE(r.live()->litSlot(), 0);
+        r.fake.clearReceived();
+        r.fake.setReplyDelayMs(50);
+        r.key(Qt::Key_Right);
+        r.key(Qt::Key_Right);
+        QCOMPARE(r.live()->targetSlot(), 2);
+        QVERIFY(r.sentIs(sent, 2, prog(B::A, 5)));
+        const QList<QByteArray> got = r.fake.received();
+        QCOMPARE(got.size(), 4);
+        QCOMPARE(got.first(), QByteArray::fromHex("F042307A4E02F7"));
+        QCOMPARE(got.mid(1), (QList<QByteArray>{QByteArray::fromHex("B0003F"), QByteArray::fromHex("B02000"),
+                                                QByteArray::fromHex("C005")}));
+        QTRY_COMPARE(r.live()->litSlot(), 2);
+        QCOMPARE(r.live()->targetSlot(), -1);
+    }
+
+    // T4.2 follow-up 1: Right then Left quickly ends on slot 0 (COMBI A 002), and the target is resolved.
+    void fastRightThenLeft()
+    {
+        Rig r(&m_cat);
+        QVERIFY(r.w->enterLive());
+        QSignalSpy sent(&r.link, &X50Link::sent);
+        r.key(Qt::Key_1);
+        QVERIFY(r.sentIs(sent, 1, combi(B::A, 2)));
+        QTRY_COMPARE(r.live()->litSlot(), 0);
+        r.fake.setReplyDelayMs(50);
+        r.key(Qt::Key_Right);  // slot 1, PROG
+        QCOMPARE(r.live()->targetSlot(), 1);
+        r.key(Qt::Key_Left);   // back to slot 0
+        QCOMPARE(r.live()->targetSlot(), 0);
+        QVERIFY(r.sentIs(sent, 2, combi(B::A, 2)));
+        QTRY_COMPARE(r.live()->litSlot(), 0);
+        QCOMPARE(r.live()->targetSlot(), -1);
+        r.key(Qt::Key_Right);  // and stepping works again from the lit slot
+        QVERIFY(r.sentIs(sent, 3, prog(B::D, 104)));
+    }
+
+    // T4.2 follow-up 2: A at slots 0 and 4 (indices); choosing slot 4 lights slot 4, so Next goes to slot 5.
+    void duplicateSoundPrefersChosenSlot()
+    {
+        Rig r(&m_cat);
+        r.lib.setSlot(r.setA, 4, combi(B::A, 2));
+        r.lib.setSlot(r.setA, 5, prog(B::A, 5));
+        QVERIFY(r.w->enterLive());
+        QSignalSpy sent(&r.link, &X50Link::sent);
+        r.key(Qt::Key_5);
+        QVERIFY(r.sentIs(sent, 1, combi(B::A, 2)));
+        QTRY_COMPARE(r.live()->litSlot(), 4);
+        r.key(Qt::Key_Right);
+        QVERIFY(r.sentIs(sent, 2, prog(B::A, 5)));
+        QTRY_COMPARE(r.live()->litSlot(), 5);
+        // From the panel (not chosen here) the first match lights.
+        r.fake.setMode(X50Protocol::Mode::CombiPlay);
+        r.key(Qt::Key_5);
+        QVERIFY(r.sentIs(sent, 3, combi(B::A, 2)));
+        QTRY_COMPARE(r.live()->litSlot(), 4);
+        r.live()->setCurrentSound(prog(B::A, 5));
+        r.live()->setCurrentSound(combi(B::A, 2));
+        QCOMPARE(r.live()->litSlot(), 0);
+    }
+
     // T4.1 review fix 4: unit names read while live reach the live view (the readout shows the new name).
     void unitNamesReachLiveView()
     {
@@ -485,6 +558,72 @@ private slots:
         r.lib.setUnitNames(names);
         QTRY_VERIFY2(r.live()->readoutBar().contains(QStringLiteral("Zebra")), qPrintable(r.live()->readoutBar()));
     }
+
+    // R3 A: holding a button while switching to another set of the same size, then releasing, sends
+    // nothing (the slot under the finger is another sound now).
+    void heldPressDoesNotSurviveSetSwitch()
+    {
+        Rig r(&m_cat);
+        QString setC;
+        r.lib.createSet(QStringLiteral("Set C"), 6, &setC);
+        r.lib.setSlot(setC, 0, prog(B::B, 7));
+        r.lib.setCurrentSet(r.setB);  // 6 slots; Ctrl+Right goes to Set C (6 slots)
+        QVERIFY(r.w->enterLive());
+        QSignalSpy sent(&r.link, &X50Link::sent);
+        const QPoint c = r.live()->buttonRect(0).center();
+        QTest::mousePress(r.live(), Qt::LeftButton, Qt::NoModifier, c);
+        QCOMPARE(r.live()->buttonState(0), LiveView::ButtonState::Pressed);
+        r.key(Qt::Key_Right, Qt::ControlModifier);
+        QCOMPARE(r.lib.currentSetId(), setC);
+        QCOMPARE(r.live()->buttonState(0), LiveView::ButtonState::Normal);
+        QTest::mouseRelease(r.live(), Qt::LeftButton, Qt::NoModifier, c);
+        QTest::qWait(200);
+        QCOMPARE(sent.count(), 0);
+        QVERIFY(r.fake.received().isEmpty());
+    }
+
+    // R3 C: a library error told at start stays when link.start() then reports a failure.
+    void libraryErrorSurvivesLinkFailure()
+    {
+        QTemporaryDir dir;
+        {
+            QFile f(dir.filePath(QStringLiteral("library.json")));
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write("{ not json");
+        }
+        Library lib;
+        lib.load(dir.path());
+        QVERIFY(!lib.loadError().isEmpty());
+        FakeX50 fake;
+        fake.setPortBusy(true);
+        X50Link link(&fake);
+        link.setPortNames(QStringLiteral("X50"));
+        MainWindow w(&m_cat, &lib, &link);
+        QCOMPARE(w.statusText(), lib.loadError());
+        QSignalSpy errors(&link, &X50Link::errorOccurred);
+        QSignalSpy statuses(&link, &X50Link::statusChanged);
+        link.start();
+        QTest::qWait(300);
+        QCOMPARE(link.state(), X50Link::State::Disconnected);
+        QVERIFY2(errors.count() + statuses.count() > 0, "the link reported nothing, so the test proves nothing");
+        QCOMPARE(w.statusText(), lib.loadError());
+        link.stop();
+    }
+
+    // R3 F: leaving live restores a window that was full screen before.
+    void leaveRestoresFullScreenWindow()
+    {
+        Rig r(&m_cat, true);
+        r.w->showFullScreen();
+        QTRY_VERIFY(r.w->isFullScreen());
+        QVERIFY(r.w->enterLive());
+        QTRY_VERIFY(r.w->isFullScreen());
+        r.live()->leaveRequested();
+        QVERIFY(!r.w->isLive());
+        QTest::qWait(100);
+        QVERIFY(r.w->isFullScreen());
+    }
+
 };
 
 int main(int argc, char **argv)
