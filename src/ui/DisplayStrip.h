@@ -13,6 +13,7 @@
 #include <QWidget>
 
 #include "core/SoundAddress.h"
+#include "ui/PixelRun.h"
 
 class Catalogue;
 class QPainter;
@@ -84,16 +85,9 @@ protected:
     bool event(QEvent *event) override;
 
 private:
-    // One character at an integer device position. Qt 6.4's FreeType engine keeps unrounded
-    // advances, so a whole string drifts off the pixel grid after a few glyphs and grey
-    // fringes appear; placing every glyph at the sum of whole-pixel advances keeps the face
-    // crisp (DESIGN 2.2 rule 2 asks for integer positions).
-    struct Glyph
-    {
-        QPoint pos;
-        QString text;
-    };
-    using Run = QVector<Glyph>;
+    // One glyph per integer device position: see PixelRun.
+    using Run = PixelRun::Run;
+    using Glyph = PixelRun::Glyph;
 
     struct Layout
     {
@@ -109,7 +103,6 @@ private:
         QRect ledDev;
     };
 
-    static void drawRun(QPainter &p, const Run &run);
     void setTexts(const Texts &t);
     void relayout();
     // Re-lays out when the device pixel ratio changed; queued from paintEvent, never run there.

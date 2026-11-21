@@ -13,9 +13,11 @@ class BrowseView;
 class Catalogue;
 class DisplayStrip;
 class Library;
+class LiveView;
 class QCloseEvent;
 class MidiBackend;
 class QLabel;
+class QStackedWidget;
 class SettingsDialog;
 
 // Browse window (DESIGN 7.1): display strip, the browse page, status line, in a column with
@@ -48,6 +50,20 @@ public:
     // The live view sets this false while it is active (M4) and true on leaving it.
     void setSettingsAllowed(bool allowed) { m_settingsAllowed = allowed; }
     bool settingsAllowed() const { return m_settingsAllowed; }
+
+    // Live view (SPEC 4.2): a second page of the same window. Entering shows the current set
+    // full screen, forbids Settings and leaves every browse widget hidden (so no set-editor
+    // dialog, context menu or browse shortcut can be reached); the link's errors go to the live
+    // top bar, never to a dialog or toast. Entering sends nothing. Returns false if already live.
+    // Leaving (T4.2 wires Esc to it) restores the browse page and the window state it had.
+    LiveView *liveView() const { return m_live; }
+    bool isLive() const { return m_isLive; }
+    // Entering live shows the window full screen (default). Tests and --screenshot turn this off.
+    void setLiveFullScreen(bool on) { m_liveFullScreen = on; }
+public slots:
+    bool enterLive();
+    void leaveLive();
+public:
     // Shows a message in the status line (replacing the previous one).
     void showStatus(const QString &text, bool isError);
 
@@ -72,7 +88,7 @@ private:
     // DESIGN 7.1: the minimum height grows with the strip when k > 1; recomputed when it changes.
     void updateMinimumHeight();
     void syncFromLink();
-    static bool isConnectFailure(const QString &text);
+    void syncLive();
 
     std::unique_ptr<Catalogue> m_ownedCatalogue;
     std::unique_ptr<Library> m_ownedLibrary;
@@ -81,6 +97,13 @@ private:
     MidiBackend *m_backend = nullptr;
     QString m_configDir;  // empty until restoreLayout()
     DisplayStrip *m_strip = nullptr;
+    QStackedWidget *m_stack = nullptr;
+    QWidget *m_browsePage = nullptr;
+    LiveView *m_live = nullptr;
+    Catalogue *m_catalogue = nullptr;
+    bool m_isLive = false;
+    bool m_liveFullScreen = true;
+    Qt::WindowStates m_stateBeforeLive;
     BrowseView *m_browse = nullptr;
     QLabel *m_status = nullptr;
     bool m_statusError = false;

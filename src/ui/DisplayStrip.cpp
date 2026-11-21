@@ -288,12 +288,6 @@ bool DisplayStrip::event(QEvent *e)
     return QWidget::event(e);
 }
 
-void DisplayStrip::drawRun(QPainter &p, const Run &run)
-{
-    for (const Glyph &g : run)
-        p.drawText(g.pos, g.text);
-}
-
 void DisplayStrip::paintEvent(QPaintEvent *)
 {
     if (!m_syncQueued && !qFuzzyCompare(devicePixelRatioF(), m_dpr)) {
@@ -340,17 +334,17 @@ void DisplayStrip::paintEvent(QPaintEvent *)
     p.fillRect(m_l.modeSeg, ink);
     p.setPen(m_penPaper);
     p.setFont(m_bold16);
-    drawRun(p, m_l.modeText);
+    PixelRun::draw(p, m_l.modeText);
     if (m_texts.known) {
         p.fillRect(m_l.pageSeg, ink);
-        drawRun(p, m_l.pageBoldText);
+        PixelRun::draw(p, m_l.pageBoldText);
         p.setFont(m_regular16);
-        drawRun(p, m_l.pageRegText);
+        PixelRun::draw(p, m_l.pageRegText);
         p.setPen(m_penInk);
         p.setFont(m_bold16);
-        drawRun(p, m_l.bankText);
+        PixelRun::draw(p, m_l.bankText);
         p.setFont(m_regular16);
-        drawRun(p, m_l.categoryText);
+        PixelRun::draw(p, m_l.categoryText);
         p.fillRect(m_l.bar, ink);
         p.setPen(m_penPaper);
     } else {
@@ -360,6 +354,6 @@ void DisplayStrip::paintEvent(QPaintEvent *)
         p.setPen(m_penInk);
     }
     p.setFont(m_regular32);
-    drawRun(p, m_l.barText);
+    PixelRun::draw(p, m_l.barText);
     p.restore();
 }

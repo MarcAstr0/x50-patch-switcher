@@ -135,7 +135,7 @@ on the live mockups, that is the moment to send them to her.
 
 ## M4 · Live view (builder; designer reviews)
 
-- ☐ **T4.1 LiveView** painting per DESIGN.md: 6 and 8 grids, lit, empty, label + sound
+- ☑ **T4.1 LiveView** painting per DESIGN.md: 6 and 8 grids, lit, empty, label + sound
   name, fit-to-width text, top bar.
 - ☐ **T4.2 Live input**: click/touch, `1`-`8`, next/previous keys with empty-slot
   skipping and no wrap, re-send on current, set switching, Esc hold / double-Esc,
@@ -393,3 +393,8 @@ fixes go back to the builder as T5.x tasks.
   exact fixed width (Qt 6.8's sizeHint added 3 px); a test read slot 7 of a 6-slot set.
   That last one exposes a core gap for the next round: SetModel::slot(i) must
   bounds-check (QVector::at asserts only in debug). (foreman)
+- 2026-11-21 · T4.1 details: live screenshots are 1920x1080 device px at every scale
+  (window floor(1920/s) x floor(1080/s), matching DESIGN §5.7's u/U table); the last
+  known sound stays lit until the link is Connected with an unknown sound; a sound in two
+  slots lights the first; no set at all shows an empty 8-slot grid. For D4: the patched
+  `&` still reads close to `8` at k=6 in "Piano &Strings". (foreman)

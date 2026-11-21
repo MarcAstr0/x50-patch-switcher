@@ -5,6 +5,7 @@
 #include "core/Version.h"
 #include "ui/BrowseView.h"
 #include "ui/DisplayStrip.h"
+#include "ui/LiveView.h"
 #include "ui/SettingsDialog.h"
 #include "ui/Theme.h"
 
@@ -19,6 +20,7 @@
 #include <QIcon>
 #include <QLabel>
 #include <QLineEdit>
+#include <QStackedWidget>
 #include <QStringList>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -36,6 +38,7 @@ MainWindow::MainWindow(Catalogue *catalogue, Library *library, X50Link *link, QW
         m_ownedCatalogue = std::make_unique<Catalogue>();
         catalogue = m_ownedCatalogue.get();
     }
+    m_catalogue = catalogue;
     if (!m_library) {
         m_ownedLibrary = std::make_unique<Library>();  // never loaded: it never writes
         m_library = m_ownedLibrary.get();
@@ -56,7 +59,12 @@ MainWindow::MainWindow(Catalogue *catalogue, Library *library, X50Link *link, QW
     m_status->setFixedHeight(Theme::browseStatusHeight);
     m_status->setTextFormat(Qt::PlainText);
     layout->addWidget(m_status);
-    setCentralWidget(root);
+    m_browsePage = root;
+    m_live = new LiveView(catalogue, this);
+    m_stack = new QStackedWidget(this);
+    m_stack->addWidget(root);
+    m_stack->addWidget(m_live);
+    setCentralWidget(m_stack);
 
     connect(m_strip, &DisplayStrip::heightChanged, this, [this](int) { updateMinimumHeight(); });
     updateMinimumHeight();
@@ -64,6 +72,12 @@ MainWindow::MainWindow(Catalogue *catalogue, Library *library, X50Link *link, QW
 
     connect(m_browse, &BrowseView::statusMessage, this, &MainWindow::showStatus);
     connect(m_browse, &BrowseView::settingsRequested, this, &MainWindow::openSettings);
+    connect(m_browse, &BrowseView::liveRequested, this, &MainWindow::enterLive);
+    // Set changes while live (none can be made from the live page, but the library is shared).
+    connect(m_library, &Library::changed, this, [this]() {
+        if (m_isLive)
+            syncLive();
+    });
     connect(m_library, &Library::saveFailed, this,
             [this](const QString &error) { showStatus(QStringLiteral("Could not save the library: %1").arg(error), true); });
 
@@ -103,6 +117,13 @@ MainWindow::MainWindow(Catalogue *catalogue, Library *library, X50Link *link, QW
             m_linkError = message;
             showStatus(message, true);
             syncFromLink();
+            // Connected, so the bar keeps its connection text: show the error in a red chip for 2 s.
+            if (m_isLive && m_link->state() != X50Link::State::Disconnected && m_link->state() != X50Link::State::Refused)
+                m_live->flashSendFailure(message);
+        });
+        connect(m_link, &X50Link::sendFailed, this, [this](const SoundAddress &, const QString &reason) {
+            if (m_isLive)
+                m_live->flashSendFailure(reason);
         });
         syncFromLink();
     }
@@ -152,8 +173,80 @@ void MainWindow::showStatus(const QString &text, bool isError)
     m_status->setStyleSheet(isError ? QStringLiteral("color: %1;").arg(QColor(Theme::red).name()) : QString());
 }
 
+void MainWindow::syncLive()
+{
+    const SetModel *set = m_library->currentSet();
+    m_live->setSet(set ? *set : SetModel(QString(), QString(), 8));
+    if (!m_link) {
+        m_live->setConnection(false);
+        return;
+    }
+    // The lit button stays as last known while disconnected (DESIGN 6.3): the link forgets its
+    // learned state then, the view does not.
+    if (const auto sound = m_link->currentSound())
+        m_live->setCurrentSound(*sound);
+    else if (m_link->state() == X50Link::State::Connected)
+        m_live->clearCurrentSound();
+    switch (m_link->state()) {
+    case X50Link::State::Connected:
+        m_live->setConnection(true);
+        break;
+    case X50Link::State::Probing:
+        m_live->setConnection(true, QStringLiteral("CHECKING X50"));
+        break;
+    case X50Link::State::Manual:
+        m_live->setConnection(true, QStringLiteral("X50 NOT CONFIRMED"));
+        break;
+    case X50Link::State::Refused:
+        m_live->setConnection(false, m_linkError.isEmpty() ? m_link->statusText() : m_linkError);
+        break;
+    case X50Link::State::Disconnected:
+        m_live->setConnection(false, m_link->statusIsFailure() ? m_link->statusText() : m_linkError);
+        break;
+    }
+}
+
+bool MainWindow::enterLive()
+{
+    if (m_isLive)
+        return false;
+    m_isLive = true;
+    setSettingsAllowed(false);
+    m_stateBeforeLive = windowState();
+    m_live->refresh();  // unit names may have been read in browse
+    syncLive();
+    m_stack->setCurrentWidget(m_live);
+    setMinimumSize(0, 0);  // the browse minimum must not stop a small screen or a scaled test window
+    if (m_liveFullScreen)
+        showFullScreen();
+    m_live->setFocus();
+    return true;
+}
+
+void MainWindow::leaveLive()
+{
+    if (!m_isLive)
+        return;
+    m_isLive = false;
+    m_live->setEscArmed(false);
+    m_stack->setCurrentWidget(m_browsePage);
+    setSettingsAllowed(true);
+    updateMinimumHeight();
+    if (!m_liveFullScreen) {
+        m_browse->searchField()->setFocus();
+        return;
+    }
+    if (m_stateBeforeLive.testFlag(Qt::WindowMaximized))
+        showMaximized();
+    else
+        showNormal();
+    m_browse->searchField()->setFocus();
+}
+
 void MainWindow::syncFromLink()
 {
+    if (m_isLive)
+        syncLive();
     if (!m_link)
         return;
     if (const auto sound = m_link->currentSound())

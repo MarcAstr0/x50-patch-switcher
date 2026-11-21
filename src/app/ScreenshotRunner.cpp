@@ -2,6 +2,8 @@
 
 #include "core/Catalogue.h"
 #include "core/Library.h"
+#include "core/SetModel.h"
+#include "ui/LiveView.h"
 #include "core/SoundAddress.h"
 #include "app/CliRunner.h"
 #include "midi/FakeX50.h"
@@ -27,6 +29,7 @@
 #include <QTemporaryDir>
 #include <QTextStream>
 #include <QThread>
+#include <QtMath>
 
 #include <functional>
 #include <memory>
@@ -193,6 +196,7 @@ int run(const CliOptions &options)
 
     const bool browse = options.screenshotState == QLatin1String("browse") ||
                         options.screenshotState == QLatin1String("browse-search");
+    const bool live = options.screenshotState.startsWith(QLatin1String("live-"));
 
     QTemporaryDir configDir;  // declared first so it outlives the library that saves into it
     Library library;
@@ -211,7 +215,7 @@ int run(const CliOptions &options)
     std::unique_ptr<MidiBackend> backend = CliCommon::makeBackend(true);
     X50Link link(backend.get());
     link.setPortNames(CliCommon::defaultPortSubstring());
-    MainWindow window(&catalogue, &library, browse ? &link : nullptr);
+    MainWindow window(&catalogue, &library, (browse || live) ? &link : nullptr);
     if (browse) {
         link.start();
         const bool connected = waitFor([&] { return link.state() == X50Link::State::Connected; }, 3000);
@@ -230,8 +234,46 @@ int run(const CliOptions &options)
             bv->highlight(combi(SoundAddress::Bank::C, 96));
         }
         bv->searchField()->setFocus();
+    } else if (live) {
+        // The real LiveView on the real link against the simulated X50 (DESIGN 12 mockups).
+        // live-8: Friday Set 2 with slot 2 current; live-6: Acoustic Night with the X50 on a sound
+        // that is not in the set; live-disconnected: Friday Set 2, then the link goes away.
+        using B = SoundAddress::Bank;
+        link.start();
+        const bool connected = waitFor([&] { return link.state() == X50Link::State::Connected; }, 3000);
+        const bool six = options.screenshotState == QLatin1String("live-6");
+        const QString setName = six ? QStringLiteral("Acoustic Night") : QStringLiteral("Friday Set 2");
+        for (const SetModel &s : library.sets())
+            if (s.name() == setName)
+                library.setCurrentSet(s.id());
+        if (connected) {
+            link.send(six ? prog(B::D, 1) : prog(B::D, 104));
+            waitFor([&] { return link.currentSound().has_value(); }, 3000);
+        }
     } else {
         applyState(window, options.screenshotState);
+    }
+    if (live) {
+        // DESIGN 5.7: a 1920x1080 screen at scale s has a (1920/s) x (1080/s) logical window, so
+        // the PNG is 1920x1080 device px at every scale and u = 1.5 / s x s as in the table.
+        window.setLiveFullScreen(false);
+        window.show();
+        QApplication::processEvents();
+        window.enterLive();  // lifts the browse minimum size
+        window.resize(qFloor(kLogicalWidth / options.screenshotScale), qFloor(kLogicalHeight / options.screenshotScale));
+        QApplication::processEvents();
+        if (options.screenshotState == QLatin1String("live-disconnected")) {
+            link.stop();  // the lit button stays as last known (DESIGN 6.3)
+            QApplication::processEvents();
+        }
+        QApplication::processEvents();
+        const QPixmap shot = window.liveView()->grab();
+        link.stop();
+        if (!shot.save(options.screenshotPath, "PNG")) {
+            QTextStream(stderr) << QStringLiteral("Could not write ") << options.screenshotPath << QStringLiteral("\n");
+            return ExitCode::ScreenshotFailed;
+        }
+        return ExitCode::Ok;
     }
     window.resize(kLogicalWidth, kLogicalHeight);
     window.show();
