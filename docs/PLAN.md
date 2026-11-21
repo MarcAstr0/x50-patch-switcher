@@ -219,3 +219,7 @@ fixes go back to the builder as T5.x tasks.
 - 2026-11-21 · G2 (owner): mockups approved with changes: no NEXT state in live view;
   long names break onto two larger lines before shrinking on one; browse results in
   catalogue order (COMBI A-C, PROG A-D, G, g(d), by number). (owner)
+- 2026-11-21 · G2 (owner): the display strip keeps the X50's black-on-white LCD look (as
+  the D-05 app kept its green-on-black). Browse strip is a full LCD panel; in live view
+  only the current-sound readout is a dimmed LCD panel inside the dark top bar, so it
+  does not glow on stage. Lit-button cyan unchanged. (owner; placement by foreman)
