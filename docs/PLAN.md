@@ -371,3 +371,8 @@ fixes go back to the builder as T5.x tasks.
   PgUp/PgDn/Home/End and mouse click; Prev/Next no-wrap and Enter order in Favourites and
   Recent; Ctrl+D on a row no longer a favourite; Ctrl+1..8 from these views; stronger
   screenshot pixel checks (text colour in its rect, clock glyph text-dim). (foreman)
+- 2026-11-21 · D3 (designer, docs/design/review-M3/D3.md): 8 deviations (3 medium, 5
+  low), DESIGN.md and app.qss updated to answer the builder's open questions. Foreman
+  decisions on its three questions: accept QSS-drawn borders blending at 1.25x
+  (strict snapping only for QPainter items); manual Channel/Bank Map disabled after a
+  passing check; Close below the card. Builder fix round D3-1 next. (foreman)

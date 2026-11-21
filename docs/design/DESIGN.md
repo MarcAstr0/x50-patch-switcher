@@ -233,7 +233,13 @@ Rendering rules for the builder:
    point size); `f.setHintingPreference(QFont::PreferNoHinting)`;
    `f.setStyleStrategy(QFont::StyleStrategy(QFont::PreferAntialias | QFont::NoSubpixelAntialias))`;
    `f.setKerning(false)`; `f.setLetterSpacing(QFont::AbsoluteSpacing, 0)`. Draw with
-   `drawText(QPoint(x, baseline), text)` where `x` and `baseline` are integers. Subpixel
+   `drawText(QPoint(x, baseline), text)` where `x` and `baseline` are integers, **one call per
+   character** (D3, 2026-11-21: Qt 6.4 with FreeType drifts by a device pixel inside a
+   run even with hinting off). For each character `c` of the text: `adv(c) = k * round(
+   QFontMetricsF(f).horizontalAdvance(c) / k)` (whole font pixels), `x_0` the integer
+   start, `x_(i+1) = x_i + adv(c_i)`, no kerning, no letter spacing. Line width for
+   centring and fitting is the sum of `adv`. Cache the per-character offsets in the same
+   pass as the fit (no allocation in paint). Subpixel
    (ClearType) antialiasing is off so no coloured fringes appear on the inverse bars.
 3. Do not measure with `QFontMetricsF` in logical pixels. Use `QFontMetrics` on the same
    device-space font; with no hinting the advance is exactly `k` times the font-pixel
@@ -304,6 +310,13 @@ width = `max(1, round(w * dpr))`; logical width = device width / dpr. Borders ar
 **inside** the rect (inset by half the stroke) so a thicker border never moves content.
 Content layout uses the unsnapped values; only the painted edges snap. This is what
 makes 1.25x and 1.5x crisp.
+
+Scope (D3, 2026-11-21): the rule is **strict** for everything painted by `QPainter`
+(live view, the two LCD panels, glyphs, the checklist, the list delegates). Controls
+drawn by QSS in browse and settings (buttons, inputs, toggles, slot cells) are drawn by
+Qt with its own border geometry; at 1.25x their 1 px borders land on 1.25 device px and
+show one blended row. That is accepted there (measured, D3 review item 4) and is not
+a reason to replace QSS controls by custom painting. At 1x and 2x they are exact.
 
 ---
 
@@ -776,14 +789,20 @@ Left to right, gap 8 between items:
 | Item | Width | Notes |
 |---|---|---|
 | Search field | stretch, min 260 | 40 high, §7.4 |
-| Kind toggles | 3 x 100, gap 4 | `Combis`, `Programs`, `GM`; §7.5 |
-| `Read names` button | 120 | secondary; disabled with tooltip text when not connected |
+| Kind toggles | 3 x 112, gap 4 | `Combis`, `Programs`, `GM`; §7.5 |
+| `Read names` button | 126 | secondary; disabled with tooltip text when not connected |
 | `Settings` button | 100 | secondary |
 | `Live  F5` button | 100 | **primary** (cyan fill); text `Live` plus `F5` in `label` style |
 
-Total at the minimum: 1000 - 32 = 968 available; fixed items 308 (3 x 100 + 2 x 4) + 120
-+ 100 + 100 = 628, plus 4 gaps of 8 = 660, so the search field gets 308 (min 260).
-(Toggles were 88 wide; `Programs` with its check mark did not fit, so they are 100.)
+Button rule (D3): padding 16 left and right (border included), so a button is
+`max(listed width, text advance + 32)`; the listed width is a floor and a wider text grows
+the button, never clips it. Measured advances (Atkinson Bold 15): `Read names` 94 (so 126),
+`Settings` 62, `Live  F5` 70 (listed 100 holds). Toolbar and the three buttons are 40 high.
+
+Total at the minimum: 1000 - 32 = 968 available; fixed items 348 (3 x 112 + 2 x 4) + 126
++ 100 + 100 = 674, plus 4 gaps of 8 = 706, so the search field gets 262 (min 260).
+(Toggles were 88, then 100; `Programs` with its check mark sat 5 px from the border at
+100, so they are 112.)
 
 ### 7.4 Search field
 
@@ -796,9 +815,15 @@ Focused on start (SPEC §4.1).
 
 ### 7.5 Kind toggles
 
-Three checkable buttons, 100 x 40, radius 6, text `body-strong` 15px. On: fill
+Three checkable buttons, 112 x 40 (fixed), radius 6, text `body-strong` 15px. On: fill
 `sel-row`, 2px `cyan` border, text `text`, **plus a painted check mark 12 x 12 left of
-the text** (not colour only). Off: fill `panel-raised`, 1px `border`, text `text-dim`, no
+the text** (not colour only). Layout inside (D3): the left padding is a constant 20 in
+every state (12 for the check mark plus 8 gap, reserved even when off, so the text never
+moves when toggled); the text is centred in the width that remains inside the border.
+The check mark's left edge is the text's left edge minus 20 (so 8 gap to the text); its
+vertical centre is the button's. At `Programs` (text 71 wide) the check sits 10 px from
+the outer edge and the text ends 11 px from the other edge; `Combis` and `GM` have more
+air, same rule. Off: fill `panel-raised`, 1px `border`, text `text-dim`, no
 check. Hover: fill lightens to `#2C353C`. Pressed: fill `surface-pressed`. Focus: 2px
 `cyan` outline offset 2. Disabled: text `disabled-text`, fill `panel`. All three on by
 default.
@@ -841,20 +866,27 @@ shown, to keep the list calm.
 
 ### 7.7 Result list and row delegate
 
-Background `field`, radius 8, 1px `border`, no alternating rows. Header row 28 high
+Background `field`, radius 8, 1px `border`, no alternating rows. Header row **28 high
+measured from the outer top edge of the list**: the 1px `border` plus a 27 px header
+section (`QHeaderView::section` height 27, and the header widget `setFixedHeight(27)`)
 with `label` style column titles in `text-dim` on `panel`: no title over the star
 column, `ADDRESS`, `NAME`, no title over the edited column, `CATEGORY`, `USED` (right
 aligned). Rows are **36 high** (touch friendly; fits 5 rows at the
 minimum). Row separator: 1px `line`, none under the selected row.
 
-Columns left to right (widths in px; row padding 12 left and right):
+Columns left to right (widths in px). Row padding 12 applies **only to the outer edges**:
+12 before the star column and 12 after the `Used` column (so the star column starts 12
+px inside the list's inner edge and `Used` text ends 12 px before the scrollbar or inner
+right edge). Columns abut with no inner cell padding; text is drawn at the column's left
+edge (right edge for `Used`), the gutter is in the column widths. Header titles use the
+same x as their column. Name text is elided at `Edited` column left minus 8.
 
 | Column | Width | Content |
 |---|---|---|
 | Star | 36 | painted star 18 x 18, centred. Favourite: filled `amber`. Not: 1.5px outline `text-dim`. Click toggles. |
 | Address | 112 | `address` style, `text-dim` (`text` in selected). Canonical form `COMBI A012`, `PROG G001`, `PROG g(d)001` |
 | Name | stretch | `body` (Atkinson Regular 15px), `text`. Edited names show the unit's name. Elide with `…` at the right edge only when the column is too narrow (browse is a finder; the full name is in the tooltip and in the display strip once sent) |
-| Edited | 60 | pill `EDITED`, 20 high, radius 4, 1px `amber` border, text `label` style 11px `amber`, shown only when the unit name differs from the factory name; tooltip shows the factory name |
+| Edited | 60 | pill `EDITED`, 20 high (vertically centred in the 36 row), radius 4, 1px `amber` border, text `label` style 11px `amber`, **left-aligned in its column** (pill x = column left, width = text advance + 12, 52 at the committed font), shown only when the unit name differs from the factory name; tooltip shows the factory name. Measured: x 1635 to 1686, the Category column starts 8 px later |
 | Category | 140 | `small` 13px `text-dim`, elide `…` |
 | Used | 44 | `small`, `text-dim`, right aligned, `x12` form, blank for 0 |
 
@@ -905,11 +937,18 @@ Left to right, gap 8, buttons 40 high:
 
 | Control | Width | Notes |
 |---|---|---|
-| `Prev` | 88 | secondary, painted left chevron + text, tooltip `Ctrl+Left` |
-| `Next` | 88 | secondary, text + right chevron, tooltip `Ctrl+Right` |
+| `Prev` | 90 | secondary, painted left chevron + text, tooltip `Ctrl+Left` |
+| `Next` | 90 | secondary, text + right chevron, tooltip `Ctrl+Right` |
 | `Play` | 120 | **primary** (cyan fill, `on-cyan` text bold), enabled only with a highlighted row; sends it |
 | spacer | stretch | |
 | `Star` toggle | 88 | secondary, painted star + `Star`, `Ctrl+D`; filled amber star when the highlighted sound is a favourite |
+
+Prev / Next content (D3): a chevron 7 wide x 12 high, 2px `text` stroke, round caps,
+vertically centred; gap **8** between chevron and text; chevron and text together are
+centred in the button (padding at least 16). `Prev`: chevron then text; `Next`: text then
+chevron. (The build had 5 and 3 px gaps.) Play 120 and Star 88 as listed; the same
+`max(listed, advance + 32)` rule as §7.3 applies (Star's painted star 14 + gap 8 count as
+advance).
 
 Primary state set: normal fill `cyan`; hover fill `#6FBFDE`; pressed fill `cyan-text`;
 focus 2px `text` outline offset 2; disabled fill `panel-raised`, text `disabled-text`.
@@ -921,10 +960,16 @@ Secondary: normal fill `panel-raised` + 1px `border`, hover `#2C353C`, pressed
 Background `panel`, radius 8, padding 12. Two rows:
 
 1. **Header row**, height 36, gap 8: set picker (combo, stretch, min 160, 36 high),
-   buttons `New`, `Rename`, `Duplicate`, `Delete` (secondary, 36 high, 84 wide each; Delete
-   text `red`; it asks for confirmation as SPEC says), and a size toggle `6 | 8` (two
-   segmented 36 x 36 toggles styled like kind toggles).
-2. Gap 8. **Slot grid**, remaining height (200 - 24 - 36 - 8 = 132): 2 rows by 4 columns
+   buttons `New` 84, `Rename` 96, `Duplicate` 106, `Delete` 84 (secondary, 36 high; the
+   `max(84, advance + 32)` rule of §7.3, which gives these; Delete text `red`; it asks for
+   confirmation as SPEC says), and a size toggle `6 | 8` (two segmented 36 x 36 toggles
+   styled like kind toggles, gap 8, no check mark: the digit is the label and the on
+   state's cyan border and `sel-row` fill carry the state; the on state is also bold).
+2. Gap 8. **Slot grid**, remaining height (200 - 24 - 36 - 8 = 132): the grid's outer
+   edges are the panel's content edges, i.e. flush with the header row (left edge of the
+   set picker, right edge of the `8` toggle). No extra inset: focus rings (offset 2) may
+   overflow into the 12 px panel padding. Cell top = header bottom + 8, last row bottom =
+   panel bottom - 12. 2 rows by 4 columns
    (8 slots) or 3 columns (6 slots), the same shape as the live layout, gap 8. Cell
    height (132 - 8) / 2 = 62, width = (panel inner width - gaps) / columns (about 170 at
    the minimum window for 8 slots).
@@ -953,8 +998,11 @@ Never modal.
 
 Modal, 520 wide, minimum height 560, fixed width, height grows with content to at most
 80% of the screen (the checklist scrolls inside if needed). Background `bg-browse`,
-content on a `panel` card (radius 8, padding 16). Title bar is the OS title bar, text
-`Settings`. Closes with `Close` (primary, 120 x 40, bottom right) or Esc.
+content on a `panel` card (radius 8, padding 16, inset 16 from the dialog edge). Title bar
+is the OS title bar, text `Settings`. Closes with `Close` (primary, 120 x 40) or Esc.
+**Close sits below the card, outside it** (D3, matches the build; the mockup drew it
+inside): 16 below the card, its right edge on the card's right edge, 16 above the dialog
+bottom.
 
 Sections, vertical gap 16, each starts with a `label` style title in `text-dim`:
 
@@ -964,7 +1012,10 @@ Sections, vertical gap 16, each starts with a `label` style title in `text-dim`:
 2. **`IF THE X50 DOES NOT ANSWER`** (manual settings): `Channel` spin box (1 to 16,
    default 1, 40 high, 96 wide) and `Bank Map` combo (`GM`, `KORG`, default `GM`, 40 high,
    160 wide) on one row, with a `small` `text-dim` note beneath: `Used only when the X50
-   gives no answer.`
+   gives no answer.` Enabled state (D3, was unspecified): both are **disabled** (text
+   `disabled-text`, fill `panel`) while the last check found the X50 (they are then not
+   used), and enabled in every other case (never checked, X50 not found, check failed).
+   Owner to confirm.
 3. **`X50 CHECK`**: `Check X50` button (primary, 140 x 40) and, to the right, a status
    word `small` `text-dim` (`Last check: 14:02` or `Not checked yet`). Below, the
    **probe checklist** (§8.1).
@@ -1056,6 +1107,13 @@ Browse and settings use QSS from `assets/theme/app.qss` loaded once with
 | `QMenu`, `QMenu::item:selected` | context menus | bg `panel`, selected `sel-row`, item height 32 |
 | `QScrollBar:vertical` | scrollbars | 12 wide, handle `border` with radius 6, hover `strip`, no arrows |
 | `QSplitter::handle` | splitter | 6 wide, `line` |
+
+Box model (D3): QSS `min-/max-height` and `min-/max-width` are **content-box**; the border
+is added outside. A 40 px control with a 1px border writes `min-height: 38px` in the QSS
+(toggle: `min-width: 110px`, total 112 with the 1px border; the checked 2px border is
+absorbed by `setFixedSize` and a 1px smaller padding in C++). The `QHeaderView::section`
+height is 27 (the list's 1px border is the 28th). `app.qss` is already written this way;
+its header comment lists the same tokens as §1.1 (the old `lcd-bg`, `lcd-text` are gone).
 
 Rule for everything painted by QPainter (live buttons, top bar, display strip,
 checklist, delegate): colours and sizes come from `Theme`, which mirrors the tokens in
@@ -1186,6 +1244,15 @@ unless the owner objects):
   decision, SPEC §4.1): §7.6 order, separator, star and clock glyphs, text indent; §7.7
   ordering (Favourites catalogue order, Recent newest first), column behaviour, three
   empty-state texts. Static mockup not updated.
+
+- 2026-11-21 (D3 review, `docs/design/review-M3/D3.md`): toolbar widths (toggles 112,
+  `Read names` 126, min-width rule `max(listed, advance + 32)`), kind toggle inset and
+  check gap, result header 28 = border + 27, cell padding on outer edges only, `EDITED`
+  pill left-aligned in its column, Prev/Next 90 with 8 gap chevrons, set editor header
+  buttons 84/96/106/84 and slot grid flush with the header, Settings Close below the
+  card, manual fields disabled after a passing check, pixel font placed per character
+  (§2.2 rule 2), QSS content-box rule (§10), strict pixel snapping limited to painted
+  items (§3.5). `app.qss` header and min sizes aligned.
 
 Change round G2 (2026-11-21, owner-approved changes):
 

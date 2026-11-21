@@ -9,9 +9,16 @@
  *   text-empty #7E8A94   strip #B2BBCA   cyan #5DB0D0   cyan-text #7CC8E4
  *   on-cyan #04141B   red #FF8080   on-red #04141B   amber #F0B65A   green #7BD39A
  *   bg-browse #121518   panel #1B2024   panel-raised #232A30   field #101417
- *   sel-row #1E4A5C   border #46525A   disabled-text #6B7780   lcd-bg #0F2B36
- *   lcd-text #7CC8E4   placeholder #8A97A2
+ *   sel-row #1E4A5C   border #46525A   disabled-text #6B7780   placeholder #8A97A2
+ *   lcd-field #E6E8E1   lcd-field-dim #BFC3BA   lcd-ink #111411   lcd-bezel #3A413B
+ *   lcd-warn #8A1414 (the lcd-* tokens are painted in C++, none is used in this file;
+ *   lcd-bg and lcd-text were retired at G2)
  * Extra literals used by DESIGN.md 7.5/7.8: hover fill #2C353C, primary hover #6FBFDE.
+ * Box model (DESIGN.md 10): min-/max-height and min-/max-width here are CONTENT-box, the
+ * border is added outside them. A control that DESIGN says is 40 high with a 1px border
+ * therefore writes 38 here; the toggle (112 wide) writes 110. Where the border grows on
+ * focus or check (1px to 2px) the C++ also calls setFixedHeight/setFixedSize with the
+ * DESIGN total, so nothing moves.
  * Painted checkmarks, chevrons, stars, combo arrows and spin arrows are drawn in C++.
  */
 
@@ -24,8 +31,7 @@ QMainWindow, QDialog, QWidget#browseRoot {
 
 /* ---- search field (7.4) ---- */
 QLineEdit#searchField {
-    min-height: 40px;
-    max-height: 40px;
+    min-height: 38px;
     background: #101417;
     color: #F2F5F7;
     border: 1px solid #46525A;
@@ -41,12 +47,12 @@ QLineEdit#searchField:disabled { color: #6B7780; background: #1B2024; }
 
 /* ---- kind toggles (7.5) ---- */
 QToolButton#kindToggle {
-    min-width: 88px; max-width: 88px; min-height: 40px; max-height: 40px;
+    min-width: 110px; min-height: 38px;
     background: #232A30;
     color: #AEB8C2;
     border: 1px solid #46525A;
     border-radius: 6px;
-    padding-left: 18px;
+    padding-left: 20px;  /* check mark 12 + gap 8, reserved in every state */
     font-weight: bold;
     font-size: 15px;
 }
@@ -58,7 +64,7 @@ QToolButton#kindToggle:disabled { background: #1B2024; color: #6B7780; }
 
 /* ---- push buttons (7.8): secondary is the default ---- */
 QPushButton {
-    min-height: 40px; max-height: 40px;
+    min-height: 38px; max-height: 38px;
     background: #232A30;
     color: #F2F5F7;
     border: 1px solid #46525A;
@@ -110,7 +116,7 @@ QListView#resultList, QTableView#resultList {
 }
 QListView#resultList:focus, QTableView#resultList:focus { border: 2px solid #5DB0D0; }
 #resultList QHeaderView::section {
-    height: 28px; min-height: 28px; max-height: 28px;
+    height: 27px; min-height: 27px; max-height: 27px;
     background: #1B2024;
     color: #AEB8C2;
     border: none;
@@ -157,7 +163,7 @@ QLabel[role="small"], QLabel[role="hint"] { color: #AEB8C2; font-size: 13px; }
 
 /* ---- inputs (8) ---- */
 QComboBox, QSpinBox {
-    min-height: 40px; max-height: 40px;
+    min-height: 38px;
     background: #101417;
     color: #F2F5F7;
     border: 1px solid #46525A;
