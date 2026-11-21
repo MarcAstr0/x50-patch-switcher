@@ -324,3 +324,10 @@ fixes go back to the builder as T5.x tasks.
 - 2026-11-21 · Codex unavailable (ChatGPT usage limit) until 18:18 local. M3 tasks get the
   reviewer agent now; Codex reviews owed for: T3.1 (f60fae9), and every M3 commit after
   it until Codex is back. Run them then, before R3. (foreman)
+- 2026-11-21 · R-T3.1 (reviewer: ship; Codex owed). Fix round after T3.2: connection
+  message must wrap/elide inside its 40% zone even for one unbroken token (and a test
+  that checks the zone); --screenshot always forces offscreen; disconnected ring and LED
+  snapped to device pixels (DESIGN §3.5); no QPen construction or relayout() inside
+  paintEvent (queue syncScale); test_display_strip at 1.25 and 1.5 plus an "only LCD
+  colours inside the panel" check; distinct exit code for a failed screenshot write.
+  (foreman)
