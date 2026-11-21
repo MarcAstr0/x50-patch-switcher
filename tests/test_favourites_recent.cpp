@@ -8,6 +8,7 @@
 #include <QApplication>
 #include <QImage>
 #include <QKeyEvent>
+#include <QLineEdit>
 #include <QListWidget>
 #include <QMouseEvent>
 #include <QPixmap>
@@ -264,6 +265,157 @@ private slots:
         QVERIFY(m_fake->received().isEmpty());
     }
 
+    // R-T3.3b: the separator row is never the current row, by PgUp/PgDn/Home/End or by a click.
+    void separatorNeverCurrent()
+    {
+        cats()->setFocus();
+        const Qt::Key keys[] = {Qt::Key_PageUp, Qt::Key_PageDown, Qt::Key_Home, Qt::Key_End, Qt::Key_Up, Qt::Key_Down};
+        for (int start : {0, 1, 3}) {
+            for (Qt::Key k : keys) {
+                cats()->setCurrentRow(start);
+                for (int n = 0; n < 3; ++n) {
+                    QTest::keyClick(cats(), k);
+                    QVERIFY2(cats()->currentRow() != 2, qPrintable(QStringLiteral("key %1 from row %2").arg(int(k)).arg(start)));
+                    QVERIFY(cats()->currentRow() >= 0);
+                }
+            }
+        }
+        // A mouse click on the separator changes nothing.
+        cats()->setCurrentRow(1);
+        QVERIFY(view().source() == BrowseView::Source::Recent);
+        const QRect sep = cats()->visualItemRect(cats()->item(2));
+        QVERIFY(sep.isValid() && sep.height() == 9);
+        QTest::mouseClick(cats()->viewport(), Qt::LeftButton, Qt::NoModifier, sep.center());
+        QCOMPARE(cats()->currentRow(), 1);
+        QVERIFY(view().source() == BrowseView::Source::Recent);
+        cats()->setCurrentRow(3);
+        QTest::mouseClick(cats()->viewport(), Qt::LeftButton, Qt::NoModifier, sep.center());
+        QCOMPARE(cats()->currentRow(), 3);
+        QVERIFY(view().source() == BrowseView::Source::Browse);
+        // Nothing sent (no link started here, so nothing could be; FakeX50 saw no bytes).
+        QVERIFY(m_fake->received().isEmpty());
+    }
+
+    // R-T3.3b: Prev/Next follow the order on screen, do not wrap, and Enter sends the highlighted
+    // row. The sends are observed through X50Link::sent (the byte sequences are MIDI.md section 3's
+    // and are covered in test_x50_link; here the claim is which sound and how many).
+    void prevNextNoWrapAndEnterOrder_data()
+    {
+        QTest::addColumn<int>("source");
+        QTest::newRow("favourites") << int(BrowseView::Source::Favourites);
+        QTest::newRow("recent") << int(BrowseView::Source::Recent);
+    }
+    void prevNextNoWrapAndEnterOrder()
+    {
+        QFETCH(int, source);
+        m_link->start();
+        QTRY_COMPARE_WITH_TIMEOUT(m_link->state(), X50Link::State::Connected, 3000);
+        QVector<A> shown;
+        if (source == int(BrowseView::Source::Favourites)) {
+            m_library->setFavourite(prog(B::B, 5), true);
+            m_library->setFavourite(combi(B::C, 7), true);
+            m_library->setFavourite(combi(B::A, 3), true);
+            shown = {combi(B::A, 3), combi(B::C, 7), prog(B::B, 5)};  // catalogue order
+        } else {
+            m_library->recordUse(prog(B::B, 5));
+            m_library->recordUse(combi(B::C, 7));
+            m_library->recordUse(combi(B::A, 3));
+            shown = {combi(B::A, 3), combi(B::C, 7), prog(B::B, 5)};  // most recent first
+        }
+        view().setSource(static_cast<BrowseView::Source>(source));
+        QCOMPARE(view().results(), shown);
+        QSignalSpy sent(m_link.get(), &X50Link::sent);
+        const auto lastSent = [&sent]() { return sent.last().at(0).value<SoundAddress>(); };
+
+        view().highlight(shown[0]);
+        view().step(-1);  // before the first row: no wrap, nothing sent
+        QTest::qWait(60);
+        QCOMPARE(sent.count(), 0);
+        QCOMPARE(*view().highlighted(), shown[0]);
+        for (int i = 1; i < 3; ++i) {
+            view().step(1);
+            QTRY_COMPARE_WITH_TIMEOUT(sent.count(), i, 3000);
+            QCOMPARE(lastSent(), shown[i]);
+            QCOMPARE(*view().highlighted(), shown[i]);
+        }
+        view().step(1);  // after the last row: no wrap, nothing sent
+        QTest::qWait(60);
+        QCOMPARE(sent.count(), 2);
+        QCOMPARE(*view().highlighted(), shown[2]);
+        // Recent does not re-order while shown, so Prev still follows the screen order.
+        QCOMPARE(view().results(), shown);
+        view().step(-1);
+        QTRY_COMPARE_WITH_TIMEOUT(sent.count(), 3, 3000);
+        QCOMPARE(lastSent(), shown[1]);
+        QCOMPARE(view().results(), shown);
+        // Enter on the table sends the highlighted row, in this view's order.
+        view().highlight(shown[0]);
+        table()->setFocus();
+        QTest::keyClick(table(), Qt::Key_Return);
+        QTRY_COMPARE_WITH_TIMEOUT(sent.count(), 4, 3000);
+        QCOMPARE(lastSent(), shown[0]);
+        QTest::keyClick(table(), Qt::Key_Down);  // highlight only
+        QTest::qWait(60);
+        QCOMPARE(sent.count(), 4);
+    }
+
+    // R-T3.3b: Ctrl+D on a row that is no longer a favourite stars it again; the row stays in place.
+    void ctrlDOnFormerFavourite()
+    {
+        m_library->setFavourite(combi(B::A, 3), true);
+        m_library->setFavourite(combi(B::A, 4), true);
+        view().setSource(BrowseView::Source::Favourites);
+        view().highlight(combi(B::A, 3));
+        table()->setFocus();
+        QTest::keyClick(table(), Qt::Key_D, Qt::ControlModifier);
+        QVERIFY(!m_library->isFavourite(combi(B::A, 3)));
+        QCOMPARE(view().resultCount(), 2);  // stays until a rebuild
+        QCOMPARE(*view().highlighted(), combi(B::A, 3));
+        QTest::keyClick(table(), Qt::Key_D, Qt::ControlModifier);  // the row is no longer a favourite: starred again
+        QVERIFY(m_library->isFavourite(combi(B::A, 3)));
+        QCOMPARE(view().resultCount(), 2);
+        // From the search field too.
+        QTest::keyClick(static_cast<QWidget *>(view().searchField()), Qt::Key_D, Qt::ControlModifier);
+        QVERIFY(!m_library->isFavourite(combi(B::A, 3)));
+        QTest::keyClick(static_cast<QWidget *>(view().searchField()), Qt::Key_D, Qt::ControlModifier);
+        QVERIFY(m_library->isFavourite(combi(B::A, 3)));
+        QVERIFY(m_fake->received().isEmpty());
+    }
+
+    // R-T3.3b: Ctrl+1..8 from Favourites and Recent put the highlighted sound in that slot; a slot
+    // beyond the set size is refused with a status error and changes nothing.
+    void ctrlDigitFromFavouritesAndRecent()
+    {
+        QString id;
+        QVERIFY(m_library->createSet(QStringLiteral("Fri"), 6, &id).ok());
+        m_library->setFavourite(combi(B::A, 3), true);
+        m_library->recordUse(prog(B::B, 5));
+        QStringList status;
+        QList<bool> errors;
+        connect(&view(), &BrowseView::statusMessage, this, [&](const QString &t, bool e) { status << t; errors << e; });
+
+        view().setSource(BrowseView::Source::Favourites);
+        view().highlight(combi(B::A, 3));
+        table()->setFocus();
+        QTest::keyClick(table(), Qt::Key_1, Qt::ControlModifier);
+        QCOMPARE(m_library->setById(id)->slot(0).address.value(), combi(B::A, 3));
+
+        view().setSource(BrowseView::Source::Recent);
+        view().highlight(prog(B::B, 5));
+        QTest::keyClick(static_cast<QWidget *>(view().searchField()), Qt::Key_6, Qt::ControlModifier);
+        QCOMPARE(m_library->setById(id)->slot(5).address.value(), prog(B::B, 5));
+        QVERIFY(!errors.isEmpty() && !errors.last());
+
+        QTest::keyClick(table(), Qt::Key_8, Qt::ControlModifier);  // the set has 6 slots
+        QVERIFY(errors.last());
+        QVERIFY(!m_library->setById(id)->slot(7).address.has_value());
+        // The shortcut also works with the category list focused (the highlight is in the Recent view).
+        cats()->setFocus();
+        QTest::keyClick(cats(), Qt::Key_2, Qt::ControlModifier);
+        QCOMPARE(m_library->setById(id)->slot(1).address.value(), prog(B::B, 5));
+        QVERIFY(m_fake->received().isEmpty());
+    }
+
     void screenshotSmoke()
     {
         m_library->setFavourite(combi(B::A, 3), true);
@@ -279,6 +431,28 @@ private slots:
             for (int x = 0; x < img.width(); ++x)
                 if (img.pixel(x, y) == want) { amber = true; break; }
         QVERIFY2(amber, "no amber star pixel in the category list");
+        // The Recent row (unselected while Favourites is current): its label paints `text` inside the
+        // item rect, and the clock glyph paints `text-dim` (DESIGN 7.6), both to the right of the star
+        // column and inside the row.
+        const QRect recent = cats()->visualItemRect(cats()->item(1));
+        const qreal cd = img.devicePixelRatio();
+        const auto device = [cd](int v) { return qRound(v * cd); };
+        const auto near = [](QRgb c, QRgb want, int tol) {
+            return qAbs(qRed(c) - qRed(want)) <= tol && qAbs(qGreen(c) - qGreen(want)) <= tol && qAbs(qBlue(c) - qBlue(want)) <= tol;
+        };
+        bool textPx = false, clockPx = false;
+        for (int y = device(recent.top()); y < device(recent.bottom() + 1); ++y) {
+            for (int x = device(recent.left()); x < device(recent.right() + 1); ++x) {
+                const QRgb c = img.pixel(x, y);
+                const int lx = qRound(x / cd) - recent.left();  // logical offset inside the row
+                if (lx >= Theme::s3 + 14 + Theme::s2 && near(c, Theme::text, 0))
+                    textPx = true;
+                if (lx >= Theme::s3 && lx < Theme::s3 + 14 && near(c, Theme::textDim, 24))
+                    clockPx = true;
+            }
+        }
+        QVERIFY2(textPx, "no exact `text` pixel in the Recent label rect");
+        QVERIFY2(clockPx, "no `text-dim` pixel in the clock glyph box");
         // Empty state paints (Recent is empty).
         view().setSource(BrowseView::Source::Recent);
         const QImage empty = table()->viewport()->grab().toImage();

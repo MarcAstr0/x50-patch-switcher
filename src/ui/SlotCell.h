@@ -24,10 +24,6 @@ class SlotCell : public QWidget
 {
     Q_OBJECT
 public:
-    // The cell body is drawn this many px inside the widget rect so the 2 px focus ring can
-    // sit 2 px outside the border (DESIGN 7.9) without leaving the widget.
-    static constexpr int kFocusMargin = 4;
-
     explicit SlotCell(int index, QWidget *parent = nullptr);
 
     int index() const { return m_index; }  // 0-based; the digit shown is index + 1

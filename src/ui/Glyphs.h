@@ -22,6 +22,9 @@ const QPolygonF &starPolygon();
 void star(QPainter &p, const QRectF &r, bool filled, const QColor &color, qreal stroke = 1.5);
 void checkMark(QPainter &p, const QRectF &r, const QColor &color, qreal stroke = 2.0);
 void chevron(QPainter &p, const QRectF &r, bool left, const QColor &color, qreal stroke = 2.0);
+// Chevron whose INK box (stroke included) is exactly `ink`: round caps and joins, centre line
+// inset by half the stroke (DESIGN 7.8: 7 x 12 ink, 2 px stroke).
+void chevronInk(QPainter &p, const QRectF &ink, bool left, const QColor &color, qreal stroke = 2.0);
 void magnifier(QPainter &p, const QRectF &r, const QColor &color, qreal stroke = 2.0);
 void cross(QPainter &p, const QRectF &r, const QColor &color, qreal stroke = 1.5);
 // Clock (DESIGN 7.6): circle filling `r` (outer diameter = the smaller side), `stroke` px, no fill,

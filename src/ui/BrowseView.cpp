@@ -17,6 +17,7 @@
 #include "ui/Theme.h"
 
 #include <QAction>
+#include <QFontMetrics>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QItemSelectionModel>
@@ -25,6 +26,7 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMenu>
+#include <QPainter>
 #include <QPushButton>
 #include <QSet>
 #include <QSplitter>
@@ -42,23 +44,50 @@ bool isGm(const SoundAddress &a)
     return a.bank() == SoundAddress::Bank::G || a.bank() == SoundAddress::Bank::Gd;
 }
 
-// app.qss gives min-height/max-height as the content box, so a 1 px border makes the control 2 px
-// taller than DESIGN's 40 (7.3, 7.8). A widget-level rule corrects it (the app sheet is not ours
-// to edit); `selector` is the widget's own type.
-void fixToolbarHeight(QWidget *w, const QString &selector, int total)
-{
-    const int content = total - 2 * Theme::borderControl;
-    w->setStyleSheet(QStringLiteral("%1 { min-height: %2px; max-height: %2px; }").arg(selector).arg(content));
-}
-
 QPushButton *makeButton(const QString &text, int width, QWidget *parent, bool primary = false)
 {
     auto *b = new QPushButton(text, parent);
     b->setMinimumWidth(width);  // DESIGN widths are the floor: a wider text grows the button, never clips
     b->setProperty("role", primary ? QStringLiteral("primary") : QStringLiteral("secondary"));
-    fixToolbarHeight(b, QStringLiteral("QPushButton"), Theme::browseToolbarHeight);
     return b;
 }
+
+// Prev / Next (DESIGN 7.8): text plus a painted chevron 7 x 12, gap 8, the pair centred. QSS
+// padding on the chevron side (7 + 8 = 15) moves the centred text by half of that; the chevron
+// is painted beside it.
+class ChevronButton : public QPushButton
+{
+public:
+    ChevronButton(const QString &text, bool chevronLeft, int width, QWidget *parent)
+        : QPushButton(text, parent)
+        , m_left(chevronLeft)
+    {
+        setProperty("role", QStringLiteral("secondary"));
+        const int reserve = Theme::chevronInkWidth + Theme::chevronGap;
+        setStyleSheet(QStringLiteral("QPushButton { padding-left: %1px; padding-right: %2px; }")
+                          .arg(chevronLeft ? reserve : 0)
+                          .arg(chevronLeft ? 0 : reserve));
+        const int adv = QFontMetrics(Theme::roleFont(Theme::Role::BodyStrong)).horizontalAdvance(text);
+        setMinimumWidth(qMax(width, adv + reserve + 2 * Theme::s4));
+    }
+
+protected:
+    void paintEvent(QPaintEvent *e) override
+    {
+        QPushButton::paintEvent(e);
+        const int reserve = Theme::chevronInkWidth + Theme::chevronGap;
+        const int adv = fontMetrics().horizontalAdvance(text());
+        const qreal textCentre = width() / 2.0 + (m_left ? reserve : -reserve) / 2.0;
+        const qreal textLeft = textCentre - adv / 2.0;
+        const qreal x = m_left ? textLeft - reserve : textLeft + adv + Theme::chevronGap;
+        QPainter p(this);
+        Glyphs::chevronInk(p, QRectF(x, (height() - Theme::chevronInkHeight) / 2.0, Theme::chevronInkWidth, Theme::chevronInkHeight),
+                           m_left, QColor(isEnabled() ? Theme::text : Theme::disabledText));
+    }
+
+private:
+    bool m_left;
+};
 
 // Distinct factory categories of a kind in order of first appearance, GM banks left out
 // (Decisions log 2026-11-21: the unit's own order is unknown until it was read).
@@ -123,7 +152,7 @@ void BrowseView::buildUi()
     m_search->setObjectName(QStringLiteral("searchField"));
     m_search->setPlaceholderText(QStringLiteral("Search name, address (A012), cat:text"));
     m_search->setMinimumWidth(260);
-    fixToolbarHeight(m_search, QStringLiteral("QLineEdit#searchField"), Theme::browseToolbarHeight);
+    m_search->setFixedHeight(Theme::browseToolbarHeight);  // the 2 px focus border must not grow it
     {
         auto *clear = new QAction(Glyphs::icon(Glyphs::Kind::Cross, QSize(16, 16), QColor(Theme::textDim)), QString(), m_search);
         clear->setVisible(false);
@@ -261,13 +290,9 @@ void BrowseView::buildUi()
     auto *tl = new QHBoxLayout(transport);
     tl->setContentsMargins(0, 0, 0, 0);
     tl->setSpacing(Theme::s2);
-    const QColor textCol(Theme::text);
-    m_prev = makeButton(QStringLiteral("Prev"), Theme::transportPrevWidth, transport);
-    m_prev->setIcon(Glyphs::icon(Glyphs::Kind::ChevronLeft, QSize(14, 14), textCol));
+    m_prev = new ChevronButton(QStringLiteral("Prev"), true, Theme::transportPrevWidth, transport);
     m_prev->setToolTip(QStringLiteral("Ctrl+Left"));
-    m_next = makeButton(QStringLiteral("Next"), Theme::transportNextWidth, transport);
-    m_next->setIcon(Glyphs::icon(Glyphs::Kind::ChevronRight, QSize(14, 14), textCol));
-    m_next->setLayoutDirection(Qt::RightToLeft);  // icon after the text
+    m_next = new ChevronButton(QStringLiteral("Next"), false, Theme::transportNextWidth, transport);
     m_next->setToolTip(QStringLiteral("Ctrl+Right"));
     m_play = makeButton(QStringLiteral("Play"), Theme::transportPlayWidth, transport, true);
     m_play->setToolTip(QStringLiteral("Enter"));

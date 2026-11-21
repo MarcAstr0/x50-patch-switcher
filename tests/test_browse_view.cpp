@@ -763,6 +763,23 @@ private slots:
         QCOMPARE(view().liveButton()->height(), Theme::browseToolbarHeight);
         QCOMPARE(view().settingsButton()->height(), Theme::browseToolbarHeight);
         QCOMPARE(view().readNamesButton()->height(), Theme::browseToolbarHeight);
+        // DESIGN 7.3 / 7.8 (D3): Read names 126, Settings and Live 100, Prev and Next 90, all 40 high.
+        QCOMPARE(view().readNamesButton()->width(), 126);
+        QCOMPARE(view().settingsButton()->width(), 100);
+        QCOMPARE(view().liveButton()->width(), 100);
+        QCOMPARE(view().prevButton()->width(), 90);
+        QCOMPARE(view().nextButton()->width(), 90);
+        QCOMPARE(view().prevButton()->height(), Theme::browseToolbarHeight);
+        QCOMPARE(view().nextButton()->height(), Theme::browseToolbarHeight);
+        QCOMPARE(view().playButton()->width(), 120);
+        QCOMPARE(view().starButton()->width(), 88);
+        QCOMPARE(Theme::kindToggleWidth, 112);
+        QCOMPARE(Theme::kindToggleMarkReserve, 20);
+        // "Programs" (the longest toggle label) keeps air on both sides of its text: 10 px right of the
+        // text and the 20 px mark reserve on the left, with the 2 px border either side (DESIGN 7.5).
+        const QFontMetrics fm(Theme::roleFont(Theme::Role::BodyStrong));
+        const int adv = fm.horizontalAdvance(QStringLiteral("Programs"));
+        QVERIFY2(Theme::kindToggleWidth - 2 * Theme::borderFocus - Theme::kindToggleMarkReserve - adv >= 18, "Programs is cramped");
         QHeaderView *h = table()->horizontalHeader();
         QCOMPARE(h->sectionSize(ResultModel::ColStar), Theme::resultCellPadding + 36);  // DESIGN 7.7: Star 36
         QCOMPARE(h->sectionSize(ResultModel::ColAddress), 112);

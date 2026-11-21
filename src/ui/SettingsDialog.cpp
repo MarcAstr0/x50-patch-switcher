@@ -29,13 +29,6 @@ constexpr int kControlHeight = 40, kLabelColumn = 96;
 constexpr int kHeightAboveChecklist = 460;
 constexpr int kChecklistWidth = kDialogWidth - 2 * Theme::s4 - 2 * Theme::s4;  // card padding inside the margin
 
-// app.qss gives min-height/max-height as the content box; the 1 px border adds 2 px (see BrowseView).
-void fixHeight(QWidget *w, const QString &selector, int total)
-{
-    const int content = total - 2 * Theme::borderControl;
-    w->setStyleSheet(QStringLiteral("%1 { min-height: %2px; max-height: %2px; }").arg(selector).arg(content));
-}
-
 // A chevron pointing down (`up` false) or up, painted, into the square `box`.
 void paintVerticalChevron(QPainter &p, const QRectF &box, bool up, const QColor &color)
 {
@@ -95,7 +88,6 @@ QPushButton *makeButton(const QString &text, int width, bool primary, QWidget *p
     auto *b = new QPushButton(text, parent);
     b->setMinimumWidth(width);
     b->setProperty("role", primary ? QStringLiteral("primary") : QStringLiteral("secondary"));
-    fixHeight(b, QStringLiteral("QPushButton"), kControlHeight);
     return b;
 }
 
@@ -212,7 +204,7 @@ SettingsDialog::SettingsDialog(X50Link *link, MidiBackend *backend, const QStrin
     m_output = new ChevronCombo(card);
     m_input = new ChevronCombo(card);
     for (QComboBox *c : {m_output, m_input}) {
-        fixHeight(c, QStringLiteral("QComboBox"), kControlHeight);
+        c->setFixedHeight(kControlHeight);  // the 2 px focus border must not grow it
         c->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
         c->setMinimumContentsLength(10);
     }
@@ -235,13 +227,13 @@ SettingsDialog::SettingsDialog(X50Link *link, MidiBackend *backend, const QStrin
     m_channel->setRange(1, 16);
     m_channel->setObjectName(QStringLiteral("manualChannel"));
     m_channel->setFixedWidth(96);
-    fixHeight(m_channel, QStringLiteral("QSpinBox"), kControlHeight);
+    m_channel->setFixedHeight(kControlHeight);
     m_bankMap = new ChevronCombo(card);
     m_bankMap->setObjectName(QStringLiteral("manualBankMap"));
     m_bankMap->addItem(QStringLiteral("GM"));
     m_bankMap->addItem(QStringLiteral("KORG"));
     m_bankMap->setFixedWidth(160);
-    fixHeight(m_bankMap, QStringLiteral("QComboBox"), kControlHeight);
+    m_bankMap->setFixedHeight(kControlHeight);
     auto *chLabel = new QLabel(QStringLiteral("Channel"), card);
     chLabel->setMinimumWidth(kLabelColumn - Theme::s3);
     manual->addWidget(chLabel);

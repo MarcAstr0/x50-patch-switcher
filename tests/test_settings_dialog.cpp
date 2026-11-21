@@ -85,6 +85,7 @@ class TestSettingsDialog : public QObject {
 private slots:
     void initTestCase()
     {
+        Theme::applyStyleSheet(*static_cast<QApplication *>(QCoreApplication::instance()));
         Theme::loadFonts();
         qRegisterMetaType<SoundAddress>("SoundAddress");
         qRegisterMetaType<X50Link::State>("X50Link::State");
@@ -471,6 +472,27 @@ private slots:
         const auto r = SettingsDialog::bankMapNotReportedRow(BankMap::Korg);
         QCOMPARE(r.text, QStringLiteral("Bank Map: not reported"));
         QVERIFY(r.hint.contains(QStringLiteral("Sending as KORG")));
+    }
+
+    // DESIGN 8 (D3): Close sits below the card, its right edge on the card's right edge; the
+    // controls are 40 high (QSS content box plus border) and the focus border does not grow them.
+    void closeBelowCardAndControlHeights()
+    {
+        connectLink();
+        SettingsDialog d(link, fake, dir->path());
+        d.show();
+        QApplication::processEvents();
+        QFrame *card = d.findChild<QFrame *>(QStringLiteral("settingsCard"));
+        QVERIFY(card);
+        const QRect cardRect(card->mapTo(&d, QPoint(0, 0)), card->size());
+        const QRect close(d.closeButton()->mapTo(&d, QPoint(0, 0)), d.closeButton()->size());
+        QVERIFY(close.top() > cardRect.bottom());
+        QCOMPARE(close.top() - (cardRect.bottom() + 1), 16);
+        QCOMPARE(close.right(), cardRect.right());
+        QCOMPARE(d.closeButton()->height(), 40);
+        QCOMPARE(d.checkButton()->height(), 40);
+        QCOMPARE(d.testButton()->height(), 40);
+        QCOMPARE(d.outputCombo()->height(), 40);
     }
 
     // Screenshot smoke: the dialog renders at the DESIGN width; the four glyph shapes are

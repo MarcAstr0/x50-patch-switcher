@@ -66,6 +66,18 @@ void checkMark(QPainter &p, const QRectF &r, const QColor &color, qreal stroke)
     p.drawPolyline(line);
 }
 
+void chevronInk(QPainter &p, const QRectF &ink, bool left, const QColor &color, qreal stroke)
+{
+    Scope scope(p);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    p.setPen(QPen(color, stroke, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    const QRectF c = ink.adjusted(stroke / 2, stroke / 2, -stroke / 2, -stroke / 2);
+    const QPointF tip(left ? c.left() : c.right(), c.center().y());
+    const QPointF back(left ? c.right() : c.left(), 0);
+    const QPointF pts[3] = {QPointF(back.x(), c.top()), tip, QPointF(back.x(), c.bottom())};
+    p.drawPolyline(pts, 3);
+}
+
 void chevron(QPainter &p, const QRectF &r, bool left, const QColor &color, qreal stroke)
 {
     Scope scope(p);

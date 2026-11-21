@@ -20,7 +20,6 @@
 
 namespace {
 constexpr int kHeaderHeight = 36;
-constexpr int kButtonWidth = 84;
 
 // The combo with the chevron the QSS leaves out (`::down-arrow { image: none }`).
 class SetCombo : public QComboBox
@@ -41,10 +40,10 @@ protected:
     }
 };
 
-QPushButton *makeButton(const QString &text, QWidget *parent, const char *role)
+QPushButton *makeButton(const QString &text, int width, QWidget *parent, const char *role)
 {
     auto *b = new QPushButton(text, parent);
-    b->setMinimumWidth(kButtonWidth);
+    b->setMinimumWidth(width);  // DESIGN 7.9: max(listed, advance + 32)
     b->setProperty("role", QString::fromLatin1(role));
     b->setStyleSheet(QStringLiteral("QPushButton { min-height: %1px; max-height: %1px; }").arg(kHeaderHeight - 2));
     return b;
@@ -101,10 +100,10 @@ void SetEditor::build()
     m_picker->setMinimumWidth(160);
     m_picker->setStyleSheet(QStringLiteral("QComboBox { min-height: %1px; max-height: %1px; }").arg(kHeaderHeight - 2));
     m_picker->setToolTip(QStringLiteral("Current set"));
-    m_new = makeButton(QStringLiteral("New"), this, "secondary");
-    m_rename = makeButton(QStringLiteral("Rename"), this, "secondary");
-    m_duplicate = makeButton(QStringLiteral("Duplicate"), this, "secondary");
-    m_delete = makeButton(QStringLiteral("Delete"), this, "danger");
+    m_new = makeButton(QStringLiteral("New"), 84, this, "secondary");
+    m_rename = makeButton(QStringLiteral("Rename"), 96, this, "secondary");
+    m_duplicate = makeButton(QStringLiteral("Duplicate"), 106, this, "secondary");
+    m_delete = makeButton(QStringLiteral("Delete"), 84, this, "danger");
     m_size6 = makeSizeToggle(QStringLiteral("6"), this);
     m_size8 = makeSizeToggle(QStringLiteral("8"), this);
     m_size6->setToolTip(QStringLiteral("Six slots"));
@@ -119,11 +118,9 @@ void SetEditor::build()
     root->addLayout(header);
 
     m_grid = new QGridLayout;
-    // Each cell keeps a 4 px margin inside its widget rect for the focus ring (DESIGN 7.9: 2 px
-    // ring, offset 2), so the grid has no spacing of its own and bleeds 4 px into the panel
-    // padding: the visible cells and the 8 px gaps are exactly the designed size.
-    m_grid->setContentsMargins(-SlotCell::kFocusMargin, -SlotCell::kFocusMargin, -SlotCell::kFocusMargin, -SlotCell::kFocusMargin);
-    m_grid->setSpacing(0);
+    // DESIGN 7.9: flush with the header row, no inset; the 8 px gap between rows and columns.
+    m_grid->setContentsMargins(0, 0, 0, 0);
+    m_grid->setSpacing(Theme::s2);
     for (int i = 0; i < 8; ++i) {
         auto *c = new SlotCell(i, this);
         m_cells.append(c);

@@ -129,6 +129,48 @@ private slots:
         QVERIFY(ed().cell(2)->isEmpty());
     }
 
+    // DESIGN 7.9 (D3): header buttons 84/96/106/84, size toggles 36 x 36, the slot grid flush with the
+    // header row (no inset), cells 62 high, 8 gaps, 8 below the header, 12 above the panel bottom.
+    void headerAndGridGeometry()
+    {
+        QApplication::processEvents();
+        QWidget *panel = &ed();
+        QCOMPARE(panel->height(), Theme::browseSetEditorHeight);
+        const auto button = [this](const QString &text) {
+            for (QPushButton *b : ed().findChildren<QPushButton *>())
+                if (b->text() == text)
+                    return b;
+            return static_cast<QPushButton *>(nullptr);
+        };
+        QPushButton *nb = button(QStringLiteral("New")), *rb = button(QStringLiteral("Rename")),
+                    *db = button(QStringLiteral("Duplicate")), *xb = button(QStringLiteral("Delete"));
+        QVERIFY(nb && rb && db && xb);
+        QCOMPARE(nb->width(), 84);
+        QCOMPARE(rb->width(), 96);
+        QCOMPARE(db->width(), 106);
+        QCOMPARE(xb->width(), 84);
+        for (QWidget *w : {static_cast<QWidget *>(nb), static_cast<QWidget *>(rb), static_cast<QWidget *>(db),
+                           static_cast<QWidget *>(xb), static_cast<QWidget *>(ed().picker())})
+            QCOMPARE(w->height(), 36);
+        QCOMPARE(ed().size6Button()->size(), QSize(36, 36));
+        QCOMPARE(ed().size8Button()->size(), QSize(36, 36));
+        ed().size6Button()->setChecked(true);  // the checked state has the thicker border: size must not move
+        QCOMPARE(ed().size6Button()->size(), QSize(36, 36));
+        ed().size6Button()->setChecked(false);
+
+        const QRect picker = ed().picker()->geometry();
+        const QRect last = ed().size8Button()->geometry();
+        const QRect c0 = ed().cell(0)->geometry(), c3 = ed().cell(3)->geometry(), c4 = ed().cell(4)->geometry();
+        QCOMPARE(c0.left(), picker.left());          // flush with the header row, no 4 px inset
+        QCOMPARE(c3.right(), last.right());
+        QCOMPARE(c0.top(), picker.bottom() + 1 + 8);  // header bottom + 8
+        QCOMPARE(c0.height(), 62);
+        QCOMPARE(c4.height(), 62);
+        QCOMPARE(c4.top() - (c0.bottom() + 1), 8);
+        QCOMPARE(ed().height() - (c4.bottom() + 1), 12);  // panel bottom - 12
+        QCOMPARE(ed().cell(1)->geometry().left() - (c0.right() + 1), 8);
+    }
+
     void clickSelectsButSendsNothing()
     {
         QTest::mouseClick(ed().cell(0), Qt::LeftButton);

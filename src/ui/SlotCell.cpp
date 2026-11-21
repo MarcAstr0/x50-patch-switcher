@@ -82,7 +82,7 @@ void SlotCell::setDropTarget(bool on)
 
 QRect SlotCell::textArea() const
 {
-    const QRect body = rect().adjusted(kFocusMargin, kFocusMargin, -kFocusMargin, -kFocusMargin);
+    const QRect body = rect();
     const int left = body.left() + kPad + kDigitBox + kDigitGap;
     return QRect(left, body.top(), qMax(0, body.right() + 1 - kPad - left), body.height());
 }
@@ -106,7 +106,7 @@ void SlotCell::paintEvent(QPaintEvent *)
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing, true);
     const qreal radius = Theme::radiusControl;
-    const QRect body = rect().adjusted(kFocusMargin, kFocusMargin, -kFocusMargin, -kFocusMargin);
+    const QRect body = rect();
     QRectF box(body);
 
     QColor fill(Theme::panelRaised);
@@ -163,8 +163,10 @@ void SlotCell::paintEvent(QPaintEvent *)
     if (hasFocus()) {
         p.setBrush(Qt::NoBrush);
         p.setPen(QPen(QColor(Theme::cyan), Theme::borderFocus));
-        // 2 px ring on the outer 2 px of the widget rect, 2 px clear of the 4 px inset border.
-        p.drawRoundedRect(QRectF(rect()).adjusted(1, 1, -1, -1), radius + 3, radius + 3);
+        // The cell is flush with its grid and has no room outside its border, so the 2 px ring is
+        // drawn inside the cell, its outer edge 2 px in from the border (inside the 8 px cell
+        // padding, clear of the digit box and texts). Only the ring is inset, never the cell.
+        p.drawRoundedRect(QRectF(rect()).adjusted(3, 3, -3, -3), radius - 2, radius - 2);
     }
 }
 
