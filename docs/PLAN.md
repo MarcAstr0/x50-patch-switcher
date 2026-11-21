@@ -140,7 +140,7 @@ on the live mockups, that is the moment to send them to her.
 - ☑ **T4.2 Live input**: click/touch, `1`-`8`, next/previous keys with empty-slot
   skipping and no wrap, re-send on current, set switching, Esc hold / double-Esc,
   no dialogs in live view. Tests drive it with `QTest::keyClick`.
-- ☐ **T4.3 Display-sleep inhibit** on Windows while live (SPEC §4.2), no-op elsewhere;
+- ☑ **T4.3 Display-sleep inhibit** on Windows while live (SPEC §4.2), no-op elsewhere;
   CI-built, behaviour confirmed at G3.
 - ☐ **T4.4 Footprint.** `scripts/measure-footprint.sh` (Linux) and the CI Windows job
   printing working-set size after start; within SPEC §5.

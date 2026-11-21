@@ -69,6 +69,7 @@ add_library(x50ui STATIC src/ui/MainWindow.cpp src/ui/MainWindow.h
   src/ui/SetEditor.cpp src/ui/SetEditor.h src/ui/SlotCell.cpp src/ui/SlotCell.h
   src/ui/LiveView.cpp src/ui/LiveView.h src/ui/NameFit.cpp src/ui/NameFit.h
   src/ui/PixelRun.cpp src/ui/PixelRun.h
+  src/ui/DisplaySleepInhibitor.cpp src/ui/DisplaySleepInhibitor.h
   src/ui/x50ui.qrc)
 set_target_properties(x50ui PROPERTIES AUTORCC ON)
 target_include_directories(x50ui PUBLIC src)

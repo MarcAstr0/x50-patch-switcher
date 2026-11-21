@@ -91,6 +91,8 @@ MainWindow::MainWindow(Catalogue *catalogue, Library *library, X50Link *link, QW
     connect(m_live, &LiveView::slotClicked, this, [this](int index) { sendSlot(index); });
     connect(m_live, &LiveView::setStepRequested, this, [this](int direction) { stepSet(direction); });
     connect(m_live, &LiveView::leaveRequested, this, &MainWindow::leaveLive);
+    // A quit while live must not leave the display inhibit set.
+    connect(qApp, &QCoreApplication::aboutToQuit, this, [this]() { m_sleepInhibitor.release(); });
 
     if (m_link) {
         connect(m_link, &X50Link::stateChanged, this, [this]() {
@@ -152,7 +154,10 @@ MainWindow::MainWindow(Catalogue *catalogue, Library *library, X50Link *link, QW
     m_browse->searchField()->setFocus();
 }
 
-MainWindow::~MainWindow() = default;
+MainWindow::~MainWindow()
+{
+    m_sleepInhibitor.release();
+}
 
 bool MainWindow::openSettings()
 {
@@ -248,6 +253,7 @@ bool MainWindow::enterLive()
     if (m_isLive)
         return false;
     m_isLive = true;
+    m_sleepInhibitor.acquire();
     setSettingsAllowed(false);
     m_stateBeforeLive = windowState();
     m_geometryBeforeLive = (isMaximized() || isFullScreen() || isMinimized()) ? normalGeometry() : QRect(pos(), size());
@@ -266,6 +272,7 @@ void MainWindow::leaveLive()
     if (!m_isLive)
         return;
     m_isLive = false;
+    m_sleepInhibitor.release();
     m_live->setEscArmed(false);
     m_stack->setCurrentWidget(m_browsePage);
     setSettingsAllowed(true);

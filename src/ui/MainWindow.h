@@ -8,6 +8,7 @@
 #include <QString>
 
 #include "midi/X50Link.h"
+#include "ui/DisplaySleepInhibitor.h"
 
 class BrowseView;
 class Catalogue;
@@ -58,6 +59,8 @@ public:
     // Leaving (Esc held 1 s or twice within 1 s, from the live view) restores the browse page and the window state it had.
     LiveView *liveView() const { return m_live; }
     bool isLive() const { return m_isLive; }
+    // True while the display-sleep inhibit is held: exactly while live (Windows only has an effect).
+    bool displaySleepInhibited() const { return m_sleepInhibitor.isActive(); }
     // Entering live shows the window full screen (default). Tests and --screenshot turn this off.
     void setLiveFullScreen(bool on) { m_liveFullScreen = on; }
 public slots:
@@ -103,6 +106,7 @@ private:
     QWidget *m_browsePage = nullptr;
     LiveView *m_live = nullptr;
     Catalogue *m_catalogue = nullptr;
+    DisplaySleepInhibitor m_sleepInhibitor;
     bool m_isLive = false;
     bool m_liveFullScreen = true;
     Qt::WindowStates m_stateBeforeLive;
