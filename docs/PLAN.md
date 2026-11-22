@@ -157,10 +157,10 @@ fixes go back to the builder as T5.x tasks.
 - ☑ **T5.1 Windows polish** (builder): icon and version resources in the exe, portable
   mode, `Diagnose X50.bat` still included, SmartScreen note in the readme.
 - ☑ **T5.2 Linux AppImage and macOS dmg** (builder), as in the D-05 project.
-- ☐ **T5.3 One-page guide for the keyboard player** (clerk drafts from SPEC §4 and the
+- ☑ **T5.3 One-page guide for the keyboard player** (clerk drafts from SPEC §4 and the
   screenshots, in the G0 language; foreman checks every instruction against the built
   app). `docs/GUIDE.md` plus a PDF in the zip.
-- ☐ **T5.4 README, CHANGELOG, screenshots at 2×** (clerk, foreman checks).
+- ☑ **T5.4 README, CHANGELOG, screenshots at 2×** (clerk, foreman checks).
 - ☐ **T5.5** Everything reported at G3.
 - ☐ **R5 Final review** (reviewer + Codex).
 - ☐ **T5.6** Tag `v1.0.0`, release green.
@@ -463,3 +463,9 @@ fixes go back to the builder as T5.x tasks.
   a 1024 px icon master from the designer for a sharp .icns. T5.3 draft guide written
   (docs/GUIDE.md, Spanish, every instruction checked by the foreman against SPEC, the
   decisions and the screenshots); the PDF copy goes into the zip at release. (foreman)
+- 2026-11-21 · T5.3 and T5.4 done: docs/GUIDE.md (Spanish, one A4 page) ships as
+  "Guia rapida.pdf" in all three packages (built in CI with pandoc + headless Chrome,
+  Atkinson + DejaVu for the arrows and the cross mark); README (English) and CHANGELOG
+  (0.9.0) with 2x screenshots. All three packages assert no Qt network module. CI run
+  44963890569 green. Remaining in M5: T5.5 (G3 findings), R5, T5.6 tag v1.0.0, all
+  waiting on G3. (foreman)
