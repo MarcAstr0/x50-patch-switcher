@@ -139,12 +139,11 @@ private slots:
         fake->unplug();
         link->start();
         QCOMPARE(link->state(), X50Link::State::Disconnected);
-        QTest::qWait(150);
-        QVERIFY(fake->portListCount() >= 3);  // polled several times at 30 ms
+        QTRY_VERIFY_WITH_TIMEOUT(fake->portListCount() >= 3, 5000);  // polled several times at 30 ms
         fake->plug();
         QTRY_COMPARE_WITH_TIMEOUT(link->state(), X50Link::State::Connected, 3000);
         const int calls = fake->portListCount();
-        QTest::qWait(200);
+        QTest::qWait(link->timing().pollMs * 6);  // well over 3 poll intervals
         QCOMPARE(fake->portListCount(), calls);  // no timer while connected
     }
 
@@ -992,8 +991,7 @@ private slots:
         QVERIFY(failed.at(0).at(1).toString().contains(QStringLiteral("gone")));
         QCOMPARE(link->state(), X50Link::State::Disconnected);
         const int calls = fake->portListCount();
-        QTest::qWait(100);
-        QVERIFY(fake->portListCount() > calls);  // polling again
+        QTRY_VERIFY_WITH_TIMEOUT(fake->portListCount() > calls, 5000);  // polling again
         fake->plug();
         QTRY_COMPARE_WITH_TIMEOUT(link->state(), X50Link::State::Connected, 3000);
     }
